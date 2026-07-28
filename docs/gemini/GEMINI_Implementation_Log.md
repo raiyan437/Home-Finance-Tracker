@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Full Online Static Bundling Complete & Production Verified  
+**Current Status**: Firebase Authentication & Personal Money Tracker Complete  
 
 ---
 
@@ -57,5 +57,13 @@
   * Vite now bundles `raiyan-[hash].png`, `himel-[hash].png`, and `lazim-[hash].png` cleanly under `dist/assets/`.
 * **GitHub Actions Workflow (`.github/workflows/deploy.yml`)**:
   * Formulated full automated pipeline: dependency installation, `oxlint` linting, `tsc` type-checking, production building, and automated deployment to GitHub Pages.
-* **Vite Base Configuration (`vite.config.ts`)**:
-  * Set `base: './'` for relative asset links compatible with GitHub Pages hosting under subpaths.
+
+### 2026-07-28: Firebase Authentication & Private Personal Money Tracker
+* **Firebase SDK Integration (`src/config/firebase.ts` & `src/context/AuthContext.tsx`)**:
+  * Added `firebase` SDK with `AuthContext` supporting 1-Click Housemate profile switching (Raiyan, Himel, Lazim) and Firebase Email/Password authentication.
+* **Private Personal Money Tracker (`src/components/PersonalWallet.tsx`)**:
+  * Created dedicated **Personal Wallet** view allowing users to log private personal outlays.
+  * Expenses with `scope === 'personal'` are stored under the user's `ownerId` and completely excluded from household debt simplification calculations.
+  * Added private monthly budget progress bar and category spend distribution.
+* **Modal Scope Selector (`src/components/AddExpenseModal.tsx`)**:
+  * Added toggle for **Shared Household Expense** vs **Private Personal Expense**.
