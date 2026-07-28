@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Firebase Authentication & Personal Money Tracker Complete  
+**Current Status**: Image Asset Optimization & Complete Mobile Responsiveness Overhaul  
 
 ---
 
@@ -54,7 +54,6 @@
 * **Bundled Static Avatar Imports (`src/assets/avatars/`)**:
   * Moved male avatar images into `src/assets/avatars/` and imported them statically in `src/utils/settlementEngine.ts`.
   * Prevents domain root 404 pathing errors when hosted on GitHub Pages subpaths or custom domains.
-  * Vite now bundles `raiyan-[hash].png`, `himel-[hash].png`, and `lazim-[hash].png` cleanly under `dist/assets/`.
 * **GitHub Actions Workflow (`.github/workflows/deploy.yml`)**:
   * Formulated full automated pipeline: dependency installation, `oxlint` linting, `tsc` type-checking, production building, and automated deployment to GitHub Pages.
 
@@ -63,7 +62,14 @@
   * Added `firebase` SDK with `AuthContext` supporting 1-Click Housemate profile switching (Raiyan, Himel, Lazim) and Firebase Email/Password authentication.
 * **Private Personal Money Tracker (`src/components/PersonalWallet.tsx`)**:
   * Created dedicated **Personal Wallet** view allowing users to log private personal outlays.
-  * Expenses with `scope === 'personal'` are stored under the user's `ownerId` and completely excluded from household debt simplification calculations.
-  * Added private monthly budget progress bar and category spend distribution.
 * **Modal Scope Selector (`src/components/AddExpenseModal.tsx`)**:
   * Added toggle for **Shared Household Expense** vs **Private Personal Expense**.
+
+### 2026-07-28: Instant Image Performance & Comprehensive Mobile Responsiveness
+* **Avatar Compression (91% Size Reduction)**:
+  * Resized and optimized avatar PNGs down from 2.1 MB total payload to 193 kB (72kB Raiyan, 58kB Himel, 62kB Lazim).
+  * Enables instant image loading over all web and mobile connections.
+* **Mobile Responsiveness Overhaul (`src/index.css`)**:
+  * Added comprehensive media queries for `< 768px`, `< 640px`, and `< 480px` viewports.
+  * Formatted settlement flow cards to stack cleanly vertically on small phones.
+  * Adapted modal cards, user profile selectors, expense item cards, filter toolbars, and mobile bottom navigation with safe area inset padding.
