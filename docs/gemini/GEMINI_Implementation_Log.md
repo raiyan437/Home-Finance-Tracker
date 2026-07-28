@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Distinct Male Avatars Integration & Production Verified  
+**Current Status**: Full CI/CD Pipeline & GitHub Pages Configured  
 
 ---
 
@@ -46,10 +46,16 @@
   * `SettlementView.tsx`: Step-by-step transaction flow visualization and audit history log.
 
 ### 2026-07-28: Custom Male Avatar Integration
-* Generated 3 distinct 3D rendered male character avatar icons for **Raiyan**, **Himel**, and **Lazim**:
-  * `public/avatars/raiyan.png`: Stylish male portrait with electric blue background.
-  * `public/avatars/himel.png`: Friendly male portrait with emerald green hoodie background.
-  * `public/avatars/lazim.png`: Smart male portrait with deep purple background.
+* Generated 3 distinct 3D rendered male character avatar icons for **Raiyan**, **Himel**, and **Lazim**.
 * Created `src/components/UserAvatar.tsx` reusable avatar component supporting images with fallback text initials.
-* Integrated `UserAvatar` across `Dashboard.tsx`, `ExpenseList.tsx`, `AddExpenseModal.tsx`, `SettlementView.tsx`, `MonthlySummary.tsx`, and `CategoryChart.tsx`.
-* Verified clean production build via `npm run build`.
+* Integrated `UserAvatar` across all views.
+
+### 2026-07-28: Full GitHub CI/CD Pipeline & GitHub Pages Configuration
+* **GitHub Actions Workflow (`.github/workflows/deploy.yml`)**:
+  * Formulated full automated pipeline: dependency installation, `oxlint` linting, `tsc` type-checking, production building, and automated deployment to GitHub Pages.
+* **Vite Subpath & Relative Base Configuration (`vite.config.ts`)**:
+  * Set `base: './'` for relative asset links compatible with GitHub Pages hosting under subpaths.
+* **Git Repository Setup & Synchronization**:
+  * Initialized local repository, linked remote `https://github.com/raiyan437/Home-Finance-Tracker.git`, and pushed production codebase to `main`.
+* **Updated README.md**:
+  * Added project documentation, build status badges, and instructions for GitHub Actions + GitHub Pages setup.
