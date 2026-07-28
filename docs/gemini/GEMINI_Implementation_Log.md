@@ -53,6 +53,7 @@
 ### 2026-07-28: Full GitHub CI/CD Pipeline & GitHub Pages Configuration
 * **GitHub Actions Workflow (`.github/workflows/deploy.yml`)**:
   * Formulated full automated pipeline: dependency installation, `oxlint` linting, `tsc` type-checking, production building, and automated deployment to GitHub Pages.
+  * Added `actions/configure-pages@v5` step and consolidated build & deploy sequence for GitHub Pages.
 * **Vite Subpath & Relative Base Configuration (`vite.config.ts`)**:
   * Set `base: './'` for relative asset links compatible with GitHub Pages hosting under subpaths.
 * **Git Repository Setup & Synchronization**:
