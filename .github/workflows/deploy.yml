@@ -15,15 +15,18 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment
+# Allow one concurrent deployment, skipping runs in progress if a new push arrives
 concurrency:
   group: 'pages'
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Verify
+  build-and-deploy:
+    name: Build, Test & Deploy
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout Repository
@@ -47,22 +50,17 @@ jobs:
       - name: Build Application
         run: npm run build
 
+      - name: Setup GitHub Pages Metadata
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
       - name: Upload GitHub Pages Artifact
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
 
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/deploy-pages@v4
