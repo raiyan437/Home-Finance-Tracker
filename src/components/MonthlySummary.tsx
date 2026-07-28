@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import type { Expense, Settlement } from '../types';
 import { calculateNetBalances, ALL_USERS } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
+import { exportAuditReportCsv } from '../utils/exportCsv';
 import { CategoryChart } from './CategoryChart';
 import { UserAvatar } from './UserAvatar';
-import { Calendar, Users } from 'lucide-react';
+import { Calendar, Users, Download } from 'lucide-react';
 
 interface MonthlySummaryProps {
   expenses: Expense[];
@@ -53,26 +54,37 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settle
           </p>
         </div>
 
-        {/* Month Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Calendar size={18} style={{ color: 'var(--accent-primary)' }} />
-          <select
-            className="form-select"
-            style={{ width: '200px', fontWeight: 800 }}
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
+        {/* Actions & Month Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => exportAuditReportCsv(monthExpenses, settlements, `report_${selectedMonth}.csv`)}
+            title="Download CSV Audit Report"
           >
-            {availableMonths.map((mKey) => {
-              const [y, m] = mKey.split('-');
-              const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
-              const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-              return (
-                <option key={mKey} value={mKey}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
+            <Download size={16} />
+            <span>Export CSV Report</span>
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Calendar size={18} style={{ color: 'var(--accent-primary)' }} />
+            <select
+              className="form-select"
+              style={{ width: '190px', fontWeight: 800 }}
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            >
+              {availableMonths.map((mKey) => {
+                const [y, m] = mKey.split('-');
+                const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+                const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                return (
+                  <option key={mKey} value={mKey}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
         </div>
       </div>
 

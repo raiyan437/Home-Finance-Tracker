@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import type { TabType } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { ExpenseList } from './components/ExpenseList';
 import { SettlementView } from './components/SettlementView';
-import { MonthlySummary } from './components/MonthlySummary';
-import { PersonalWallet } from './components/PersonalWallet';
-import { CardsManager } from './components/CardsManager';
 import { AddExpenseModal } from './components/AddExpenseModal';
 import { AuthModal } from './components/AuthModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -22,7 +19,28 @@ import {
   saveCards,
   resetToSeedData,
 } from './utils/storage';
+import {
+  subscribeExpenses,
+  subscribeSettlements,
+  subscribeCards,
+  syncSaveExpense,
+  syncDeleteExpense,
+  syncSaveSettlement,
+  syncSaveCard,
+  syncDeleteCard,
+} from './utils/firebaseSync';
 import { calculateNetBalances, calculateSimplifiedSettlements } from './utils/settlementEngine';
+
+// Code-split heavy views for instant page loads
+const MonthlySummary = lazy(() =>
+  import('./components/MonthlySummary').then((m) => ({ default: m.MonthlySummary }))
+);
+const PersonalWallet = lazy(() =>
+  import('./components/PersonalWallet').then((m) => ({ default: m.PersonalWallet }))
+);
+const CardsManager = lazy(() =>
+  import('./components/CardsManager').then((m) => ({ default: m.CardsManager }))
+);
 
 const AppContent: React.FC = () => {
   const { activeUserId } = useAuth();
@@ -41,7 +59,7 @@ const AppContent: React.FC = () => {
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [pendingSettlementTx, setPendingSettlementTx] = useState<SimplifiedTransaction | null>(null);
 
-  // Initialize data and theme
+  // Initialize data, theme, and Firestore realtime subscriptions
   useEffect(() => {
     setExpenses(loadExpenses());
     setSettlements(loadSettlements());
@@ -50,6 +68,28 @@ const AppContent: React.FC = () => {
     const savedTheme = (localStorage.getItem('home_finance_theme') as 'dark' | 'light') || 'dark';
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // Subscribe to Firestore Realtime Updates when available
+    const unsubExp = subscribeExpenses((fbExpenses) => {
+      setExpenses(fbExpenses);
+      saveExpenses(fbExpenses);
+    });
+
+    const unsubSt = subscribeSettlements((fbSettlements) => {
+      setSettlements(fbSettlements);
+      saveSettlements(fbSettlements);
+    });
+
+    const unsubCards = subscribeCards((fbCards) => {
+      setCards(fbCards);
+      saveCards(fbCards);
+    });
+
+    return () => {
+      unsubExp();
+      unsubSt();
+      unsubCards();
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -84,17 +124,19 @@ const AppContent: React.FC = () => {
     const now = new Date().toISOString();
 
     if (editingId) {
-      const updated = expenses.map((e) =>
-        e.id === editingId
-          ? {
-              ...e,
-              ...expenseData,
-              updatedAt: now,
-            }
-          : e
-      );
-      setExpenses(updated);
-      saveExpenses(updated);
+      const target = expenses.find((e) => e.id === editingId);
+      const updatedExpense: Expense = {
+        ...(target || {}),
+        ...expenseData,
+        id: editingId,
+        createdAt: target?.createdAt || now,
+        updatedAt: now,
+      };
+
+      const updatedList = expenses.map((e) => (e.id === editingId ? updatedExpense : e));
+      setExpenses(updatedList);
+      saveExpenses(updatedList);
+      syncSaveExpense(updatedExpense);
     } else {
       const newExpense: Expense = {
         ...expenseData,
@@ -102,9 +144,10 @@ const AppContent: React.FC = () => {
         createdAt: now,
         updatedAt: now,
       };
-      const updated = [newExpense, ...expenses];
-      setExpenses(updated);
-      saveExpenses(updated);
+      const updatedList = [newExpense, ...expenses];
+      setExpenses(updatedList);
+      saveExpenses(updatedList);
+      syncSaveExpense(newExpense);
     }
   };
 
@@ -114,6 +157,7 @@ const AppContent: React.FC = () => {
     const updated = expenses.filter((e) => e.id !== deletingExpenseId);
     setExpenses(updated);
     saveExpenses(updated);
+    syncDeleteExpense(deletingExpenseId);
     setDeletingExpenseId(null);
   };
 
@@ -124,20 +168,27 @@ const AppContent: React.FC = () => {
   ) => {
     const now = new Date().toISOString();
     if (editingId) {
-      const updated = cards.map((c) =>
-        c.id === editingId ? { ...c, ...cardData } : c
-      );
-      setCards(updated);
-      saveCards(updated);
+      const target = cards.find((c) => c.id === editingId);
+      const updatedCard: PaymentCard = {
+        ...(target || {}),
+        ...cardData,
+        id: editingId,
+        createdAt: target?.createdAt || now,
+      };
+      const updatedList = cards.map((c) => (c.id === editingId ? updatedCard : c));
+      setCards(updatedList);
+      saveCards(updatedList);
+      syncSaveCard(updatedCard);
     } else {
       const newCard: PaymentCard = {
         ...cardData,
         id: `card-${Date.now()}`,
         createdAt: now,
       };
-      const updated = [...cards, newCard];
-      setCards(updated);
-      saveCards(updated);
+      const updatedList = [...cards, newCard];
+      setCards(updatedList);
+      saveCards(updatedList);
+      syncSaveCard(newCard);
     }
   };
 
@@ -145,6 +196,7 @@ const AppContent: React.FC = () => {
     const updated = cards.filter((c) => c.id !== cardId);
     setCards(updated);
     saveCards(updated);
+    syncDeleteCard(cardId);
   };
 
   // Mark Settlement Completed
@@ -164,6 +216,7 @@ const AppContent: React.FC = () => {
     const updated = [newSettlement, ...settlements];
     setSettlements(updated);
     saveSettlements(updated);
+    syncSaveSettlement(newSettlement);
     setPendingSettlementTx(null);
   };
 
@@ -232,26 +285,34 @@ const AppContent: React.FC = () => {
           />
         )}
 
-        {activeTab === 'personal' && (
-          <PersonalWallet
-            expenses={expenses}
-            onSaveExpense={handleSaveExpense}
-            onDeleteExpense={(id) => setDeletingExpenseId(id)}
-          />
-        )}
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '60px', color: 'var(--text-muted)', fontWeight: 700 }}>
+              Loading Module...
+            </div>
+          }
+        >
+          {activeTab === 'personal' && (
+            <PersonalWallet
+              expenses={expenses}
+              onSaveExpense={handleSaveExpense}
+              onDeleteExpense={(id) => setDeletingExpenseId(id)}
+            />
+          )}
 
-        {activeTab === 'cards' && (
-          <CardsManager
-            cards={cards}
-            expenses={expenses}
-            onAddCard={handleAddCard}
-            onDeleteCard={handleDeleteCard}
-          />
-        )}
+          {activeTab === 'cards' && (
+            <CardsManager
+              cards={cards}
+              expenses={expenses}
+              onAddCard={handleAddCard}
+              onDeleteCard={handleDeleteCard}
+            />
+          )}
 
-        {activeTab === 'monthly' && (
-          <MonthlySummary expenses={householdExpenses} settlements={settlements} />
-        )}
+          {activeTab === 'monthly' && (
+            <MonthlySummary expenses={householdExpenses} settlements={settlements} />
+          )}
+        </Suspense>
       </main>
 
       {/* Add / Edit Expense Modal */}

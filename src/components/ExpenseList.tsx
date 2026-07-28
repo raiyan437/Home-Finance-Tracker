@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import type { Expense, UserId, Category, PaymentCard } from '../types';
 import { USERS, ALL_USERS } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
+import { exportAuditReportCsv } from '../utils/exportCsv';
 import { UserAvatar } from './UserAvatar';
-import { Search, Edit, Trash2, Plus, Receipt, ChevronDown, ChevronUp, Filter, FileText, CreditCard, Banknote } from 'lucide-react';
+import { Search, Edit, Trash2, Plus, Receipt, ChevronDown, ChevronUp, Filter, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -27,6 +28,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   const [selectedUserFilter, setSelectedUserFilter] = useState<UserId | 'All'>('All');
   const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<'All' | 'cash' | 'card'>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
 
   const cardsMap = useMemo(() => {
     const map: Record<string, PaymentCard> = {};
@@ -90,10 +92,20 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={onOpenAddExpense}>
-          <Plus size={18} />
-          <span>Add Expense</span>
-        </button>
+        <div className="header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={() => exportAuditReportCsv(filteredExpenses, [], 'expenses_audit_report.csv')}
+            title="Download formatted CSV report"
+          >
+            <Download size={16} />
+            <span>Export CSV</span>
+          </button>
+          <button className="btn btn-primary" onClick={onOpenAddExpense}>
+            <Plus size={18} />
+            <span>Add Expense</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -227,6 +239,30 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                             </>
                           )}
                         </span>
+
+                        {/* Recurring Bill Tag */}
+                        {exp.isRecurring && (
+                          <span className="share-mini-tag" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(59, 130, 246, 0.18)', color: 'var(--accent-primary)' }}>
+                            <RefreshCw size={11} />
+                            <span style={{ textTransform: 'capitalize' }}>{exp.recurringFrequency || 'Recurring'}</span>
+                          </span>
+                        )}
+
+                        {/* Receipt Tag */}
+                        {exp.receiptUrl && (
+                          <button
+                            type="button"
+                            className="share-mini-tag"
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.18)', color: 'var(--accent-emerald)', border: 'none', cursor: 'pointer' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewReceiptUrl(exp.receiptUrl || null);
+                            }}
+                          >
+                            <Paperclip size={11} />
+                            <span>Receipt Photo</span>
+                          </button>
+                        )}
                       </div>
                       <div className="expense-meta-row">
                         <span>Paid by <strong>{payer.name}</strong></span>
@@ -347,6 +383,23 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Receipt Image Preview Modal */}
+      {previewReceiptUrl && (
+        <div className="modal-overlay" onClick={() => setPreviewReceiptUrl(null)}>
+          <div className="modal-card" style={{ maxWidth: '520px', padding: '20px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title" style={{ fontSize: '1.1rem' }}>Attached Receipt Photo</h2>
+              <button className="close-btn" onClick={() => setPreviewReceiptUrl(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0' }}>
+              <img src={previewReceiptUrl} alt="Receipt Full View" style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 'var(--radius-md)', objectFit: 'contain' }} />
+            </div>
+          </div>
         </div>
       )}
     </div>

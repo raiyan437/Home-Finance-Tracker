@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType } from '../types';
+import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType, RecurringFrequency } from '../types';
 import { ALL_USERS, USERS } from '../utils/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,7 +10,7 @@ import {
   formatCurrency,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
-import { X, Check, AlertCircle, Sparkles, Receipt, Users, Wallet, CreditCard, Banknote } from 'lucide-react';
+import { X, Check, AlertCircle, Sparkles, Receipt, Users, Wallet, CreditCard, Banknote, RefreshCw, Paperclip, Image as ImageIcon } from 'lucide-react';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -48,6 +48,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [scope, setScope] = useState<ExpenseScope>('household');
   const [paymentType, setPaymentType] = useState<PaymentMethodType>('cash');
   const [selectedCardId, setSelectedCardId] = useState<string>('');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('monthly');
+  const [receiptUrl, setReceiptUrl] = useState<string>('');
   const [selectedParticipants, setSelectedParticipants] = useState<UserId[]>(['raiyan', 'himel', 'lazim']);
   const [customSharesStr, setCustomSharesStr] = useState<Record<UserId, string>>({
     raiyan: '',
@@ -74,6 +77,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setScope(initialExpense.scope || 'household');
       setPaymentType(initialExpense.paymentMethod?.type || 'cash');
       setSelectedCardId(initialExpense.paymentMethod?.cardId || (cards[0]?.id || ''));
+      setIsRecurring(Boolean(initialExpense.isRecurring));
+      setRecurringFrequency(initialExpense.recurringFrequency || 'monthly');
+      setReceiptUrl(initialExpense.receiptUrl || '');
       setNotes(initialExpense.notes || '');
 
       const partIds = initialExpense.shares.map((s) => s.userId);
@@ -101,6 +107,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setScope('household');
       setPaymentType('cash');
       setSelectedCardId(cards[0]?.id || '');
+      setIsRecurring(false);
+      setRecurringFrequency('monthly');
+      setReceiptUrl('');
       setSelectedParticipants(['raiyan', 'himel', 'lazim']);
       setCustomSharesStr({ raiyan: '', himel: '', lazim: '' });
       setPercentagesStr({ raiyan: '33.33', himel: '33.33', lazim: '33.34' });
@@ -133,6 +142,22 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     setTitle(preset.name);
     setAmountStr(preset.amount);
     setCategory(preset.category);
+  };
+
+  // Handle Receipt Upload (convert file to base64)
+  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        setErrorMessage('Receipt image size should be less than 3MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -221,6 +246,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           type: paymentType,
           cardId: paymentType === 'card' ? (selectedCardId || cards[0]?.id) : undefined,
         },
+        isRecurring,
+        recurringFrequency: isRecurring ? recurringFrequency : undefined,
+        receiptUrl: receiptUrl || undefined,
         notes: notes.trim(),
       },
       initialExpense ? initialExpense.id : undefined
@@ -393,6 +421,77 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   </select>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Recurring Bill & Frequency Section */}
+          <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RefreshCw size={16} style={{ color: 'var(--accent-primary)' }} />
+                <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>Recurring Bill Automation</span>
+              </div>
+              <button
+                type="button"
+                className={`btn ${isRecurring ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                onClick={() => setIsRecurring(!isRecurring)}
+              >
+                <span>{isRecurring ? 'Enabled' : 'Disabled'}</span>
+              </button>
+            </div>
+
+            {isRecurring && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Repeat Schedule:</span>
+                <select
+                  className="form-select"
+                  style={{ width: '150px', padding: '6px 10px', fontSize: '0.82rem' }}
+                  value={recurringFrequency}
+                  onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
+                >
+                  <option value="monthly">Every Month</option>
+                  <option value="weekly">Every Week</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Receipt Image File Attachment */}
+          <div className="form-group">
+            <label className="form-label">
+              <span>Attach Receipt Image</span>
+              <Paperclip size={14} style={{ color: 'var(--text-muted)' }} />
+            </label>
+
+            {receiptUrl ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-input)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                <img src={receiptUrl} alt="Receipt Preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                <div style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600 }}>Receipt photo attached</div>
+                <button type="button" className="btn btn-danger btn-sm" onClick={() => setReceiptUrl('')}>
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px dashed var(--border-medium)',
+                  backgroundColor: 'var(--bg-input)',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                }}
+              >
+                <ImageIcon size={18} />
+                <span>Upload or Snap Receipt Image</span>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleReceiptUpload} />
+              </label>
             )}
           </div>
 

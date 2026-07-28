@@ -17,6 +17,8 @@ export type ExpenseScope = 'household' | 'personal';
 
 export type PaymentMethodType = 'cash' | 'card';
 
+export type RecurringFrequency = 'monthly' | 'weekly';
+
 export interface PaymentCard {
   id: string;
   bankName: string;
@@ -48,6 +50,9 @@ export interface Expense {
   scope?: ExpenseScope; // 'household' (shared) vs 'personal' (private wallet)
   ownerId?: UserId;     // Owner ID for personal private expenses
   paymentMethod?: PaymentMethodInfo; // Cash vs specific Card
+  isRecurring?: boolean;
+  recurringFrequency?: RecurringFrequency;
+  receiptUrl?: string; // Base64 data URL or photo link
   notes?: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
