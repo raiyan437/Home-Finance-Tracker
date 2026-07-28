@@ -633,7 +633,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Custom Taka Amounts</div>
                   {selectedParticipants.map((userId) => (
                     <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                      <span style={{ fontWeight: 700 }}>{USERS[userId].name}</span>
+                      <span style={{ fontWeight: 700 }}>{USERS[userId]?.name || userId}</span>
                       <input
                         type="number"
                         step="0.01"
@@ -655,7 +655,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Percentage Share Allocations</div>
                   {selectedParticipants.map((userId) => (
                     <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                      <span style={{ fontWeight: 700 }}>{USERS[userId].name}</span>
+                      <span style={{ fontWeight: 700 }}>{USERS[userId]?.name || userId}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <input
                           type="number"

@@ -2,14 +2,17 @@ import React from 'react';
 import type { User } from '../types';
 
 interface UserAvatarProps {
-  user: User;
+  user?: User | null;
   size?: number;
   className?: string;
   style?: React.CSSProperties;
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, className = '', style = {} }) => {
-  const isImage = typeof user.avatar === 'string' && (user.avatar.includes('/') || user.avatar.includes('.') || user.avatar.startsWith('data:'));
+  const safeUser = user || { name: 'User', avatar: 'U', color: '#3b82f6' };
+  const isImage =
+    typeof safeUser.avatar === 'string' &&
+    (safeUser.avatar.includes('/') || safeUser.avatar.includes('.') || safeUser.avatar.startsWith('data:'));
 
   return (
     <div
@@ -18,7 +21,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, classNa
         width: `${size}px`,
         height: `${size}px`,
         borderRadius: '50%',
-        backgroundColor: user.color,
+        backgroundColor: safeUser.color || '#3b82f6',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -34,12 +37,12 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, classNa
     >
       {isImage ? (
         <img
-          src={user.avatar}
-          alt={user.name}
+          src={safeUser.avatar}
+          alt={safeUser.name || 'Avatar'}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       ) : (
-        user.avatar
+        safeUser.avatar || safeUser.name?.charAt(0) || 'U'
       )}
     </div>
   );

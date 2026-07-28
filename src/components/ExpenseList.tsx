@@ -54,7 +54,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           const matchesTitle = exp.title.toLowerCase().includes(q);
           const matchesNotes = exp.notes?.toLowerCase().includes(q);
           const matchesCategory = exp.category.toLowerCase().includes(q);
-          const matchesPayer = USERS[exp.paidBy].name.toLowerCase().includes(q);
+          const matchesPayer = (USERS[exp.paidBy]?.name || exp.paidBy || '').toLowerCase().includes(q);
           if (!matchesTitle && !matchesNotes && !matchesCategory && !matchesPayer) {
             return false;
           }
@@ -218,7 +218,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {filteredExpenses.map((exp) => {
-            const payer = USERS[exp.paidBy];
+            const payer = USERS[exp.paidBy] || { id: exp.paidBy, name: exp.paidBy, avatar: exp.paidBy?.charAt(0) || 'U', color: '#3b82f6' };
             const isExpanded = expandedId === exp.id;
             const pm = exp.paymentMethod;
             const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
@@ -297,7 +297,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       <div className="expense-shares-list">
                         {exp.shares.map((s) => (
                           <span key={s.userId} className="share-mini-tag">
-                            {USERS[s.userId].name}: {formatCurrency(s.amountCents)}
+                            {USERS[s.userId]?.name || s.userId}: {formatCurrency(s.amountCents)}
                           </span>
                         ))}
                       </div>
@@ -374,7 +374,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
                       {exp.shares.map((share) => {
-                        const user = USERS[share.userId];
+                        const user = USERS[share.userId] || { id: share.userId, name: share.userId, avatar: share.userId?.charAt(0) || 'U', color: '#3b82f6' };
                         return (
                           <div
                             key={share.userId}
