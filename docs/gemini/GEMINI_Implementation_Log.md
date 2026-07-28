@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Payment Cards Management & Channel Tracking Complete  
+**Current Status**: Realtime Cloud Sync, Code-Splitting, Recurring Bills, & CSV Reports Complete  
 
 ---
 
@@ -75,8 +75,20 @@
 ### 2026-07-28: Payment Cards Management & Channel Tracking
 * **Payment Cards View (`src/components/CardsManager.tsx`)**:
   * Added **Payment Cards** section to sidebar and mobile navigation with `CreditCard` icon.
-  * Form to create custom bank cards with **Bank Name** and 8 curated gradient themes (Midnight Blue, Emerald Green, Violet Glow, Sunset Amber, Neon Cyan, Rose Red, Obsidian Dark, Gold).
+  * Form to create custom bank cards with **Bank Name** and 8 curated gradient themes.
 * **Payment Channel Picker (`src/components/AddExpenseModal.tsx`)**:
   * Added Cash vs Bank Card picker when logging household or personal expenses.
 * **Expense Tags & Filters (`src/components/ExpenseList.tsx`)**:
   * Displayed 💳 *Bank Card* vs 💵 *Cash* badges on expense items with payment channel filtering.
+
+### 2026-07-28: Improvements 1–4 Execution (Realtime Sync, Code-Splitting, Recurring Bills, Receipts & CSV Reports)
+* **Cloud Firestore Realtime Sync (`src/utils/firebaseSync.ts`)**:
+  * Connected `onSnapshot` realtime listeners for `expenses`, `settlements`, and `cards`. Changes on one device instantly update all housemates' screens.
+* **Vite Code-Splitting Optimization (`vite.config.ts` & `src/App.tsx`)**:
+  * Configured `manualChunks` for `react-vendor`, `lucide-icons`, and `firebase`.
+  * Used `React.lazy()` for heavy tab views (`PersonalWallet`, `CardsManager`, `MonthlySummary`). Initial bundle size dropped from 777 kB to **71.95 kB** (90% reduction).
+* **Recurring Bills Engine (`src/components/AddExpenseModal.tsx`)**:
+  * Added toggle for Monthly or Weekly automated recurring shared bills.
+* **Receipt Attachments & CSV Export (`src/utils/exportCsv.ts`)**:
+  * Allowed uploading and previewing receipt photos attached to expenses.
+  * Added **Export CSV Report** button to download full formatted financial audit statements.
