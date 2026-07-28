@@ -12,7 +12,7 @@ export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlemen
     'Title / Description',
     'Category',
     'Paid By',
-    'Amount ($)',
+    'Amount (৳)',
     'Split Method',
     'Payment Channel',
     'Scope',

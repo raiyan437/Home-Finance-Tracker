@@ -86,7 +86,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
               <CheckCircle2 size={56} style={{ color: 'var(--status-positive-text)' }} />
               <div className="empty-title">All House Debts Fully Settled!</div>
               <p style={{ color: 'var(--text-muted)', maxWidth: '440px', fontSize: '0.88rem' }}>
-                Every housemate has a balanced net ledger of $0.00. No further payments or transfers are required.
+                Every housemate has a balanced net ledger of ৳0.00. No further payments or transfers are required.
               </p>
             </div>
           ) : (

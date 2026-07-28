@@ -1,32 +1,34 @@
 /**
- * Currency and financial math utilities using integer cents.
+ * Currency and financial math utilities using integer cents/poisha.
  */
 
-export const dollarsToCents = (dollars: number | string): number => {
-  const parsed = typeof dollars === 'string' ? parseFloat(dollars) : dollars;
+export const dollarsToCents = (takaStr: number | string): number => {
+  const parsed = typeof takaStr === 'string' ? parseFloat(takaStr) : takaStr;
   if (isNaN(parsed)) return 0;
   return Math.round(parsed * 100);
 };
+
+export const takaToCents = dollarsToCents;
 
 export const centsToDollars = (cents: number): number => {
   return cents / 100;
 };
 
 export const formatCurrency = (cents: number, includeSign = false): string => {
-  const dollars = cents / 100;
-  const absValue = Math.abs(dollars).toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  const amount = cents / 100;
+  const absValue = Math.abs(amount).toLocaleString('en-BD', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
+  const formattedStr = `৳${absValue}`;
+
   if (includeSign && cents > 0) {
-    return `+${absValue}`;
+    return `+${formattedStr}`;
   } else if (cents < 0) {
-    return `-${absValue}`;
+    return `-${formattedStr}`;
   }
-  return absValue;
+  return formattedStr;
 };
 
 /**

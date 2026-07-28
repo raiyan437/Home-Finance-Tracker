@@ -242,7 +242,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span className="tabular-nums" style={{ fontSize: '1.85rem', fontWeight: 800 }}>$</span>
+            <span className="tabular-nums" style={{ fontSize: '1.85rem', fontWeight: 800 }}>৳</span>
             <input
               type="number"
               step="10"
@@ -409,7 +409,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Amount ($)</label>
+                <label className="form-label">Amount (৳)</label>
                 <input
                   type="number"
                   step="0.01"

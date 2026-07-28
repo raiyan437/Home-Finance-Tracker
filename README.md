@@ -3,33 +3,35 @@
 [![CI/CD Pipeline & GitHub Pages Deployment](https://github.com/raiyan437/Home-Finance-Tracker/actions/workflows/deploy.yml/badge.svg)](https://github.com/raiyan437/Home-Finance-Tracker/actions/workflows/deploy.yml)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen)](https://raiyan437.github.io/Home-Finance-Tracker/)
 
-An ultra-modern, single-page household expense tracking and debt settlement application built for **Raiyan**, **Himel**, and **Lazim**.
+An ultra-modern, cross-platform household expense tracking, payment card manager, and debt settlement application built for **Raiyan**, **Himel**, and **Lazim**.
 
 ---
 
 ## 🌟 Key Features
 
-- **Optimal Debt Simplification**: Built-in minimum-cash-flow algorithm reduces multi-party debts to minimal direct transfers.
-- **Glassmorphism UI/UX**: Sleek dark slate glass design system with backdrop blur, glowing accents, and tabular typography formatting.
-- **Spend Distribution Analytics**: Visual category spending progress bars and housemate out-of-pocket contribution ratio visualizers.
-- **3D Character Male Avatars**: Custom male character profile avatars for Raiyan, Himel, and Lazim.
-- **Flexible Expense Splitting**: Supports Equal, Custom Dollar ($), and Percentage (%) allocation split methods with live share preview.
-- **Quick Preset Templates**: One-click preset shortcuts for common household expenses (Weekly Groceries, WiFi Bill, Utilities, etc.).
-- **Audit Ledger**: Comprehensive settlement history and transaction audit logs.
+- **Taka (৳) Currency Standard**: All household expenses, balances, debt settlements, and personal budgets are tracked in Bangladeshi Taka (৳).
+- **Optimal Debt Simplification**: Solves the minimum cash flow problem to collapse complex multi-party debts into at most $N-1$ direct transfers.
+- **Cloud Firestore Realtime Sync**: Realtime multi-device database listeners (`onSnapshot`). Changes on one device instantly update all housemates' screens live.
+- **Vite 8 Rolldown Code-Splitting**: Code-split vendor chunks (`react-vendor`, `lucide-icons`, `firebase`) and `React.lazy()` views keep initial JS payload under **72 kB**.
+- **Payment Cards & Wallets**: Manage Credit & Debit bank cards with custom color gradients, bank names, and payment channel tracking (Cash vs Bank Cards).
+- **Private Personal Wallet**: Log private individual expenses with month/year filters and budget target tracking.
+- **Recurring Bills Engine**: Automate monthly or weekly recurring household expenses (WiFi, Rent, Utilities).
+- **Receipt Photo Attachments & CSV Export**: Attach receipt photos to expenses and export formatted `.csv` audit statements.
+- **3D Character Male Avatars**: Custom 3D rendered character avatars for Raiyan, Himel, and Lazim.
 
 ---
 
 ## 🚀 Tech Stack
 
-- **Framework**: React 18 / TypeScript / Vite
-- **Styling**: Vanilla CSS (CSS Custom Properties, Glassmorphism design system)
+- **Core**: React 18, TypeScript, Vite 8 (Rolldown bundler)
+- **Styling**: Vanilla CSS (Midnight Slate Glassmorphic Design Tokens)
+- **Database & Auth**: Firebase Auth & Cloud Firestore
 - **Icons**: Lucide React
-- **Linter**: Oxlint
-- **CI/CD**: GitHub Actions (Lint, Typecheck, Build, & GitHub Pages Deployment)
+- **CI/CD**: GitHub Actions (Oxlint, Typecheck, Build, & GitHub Pages Deployment)
 
 ---
 
-## 🛠️ Local Development
+## 🛠️ Portable Local Setup (Any PC: Windows, macOS, Linux)
 
 1. **Clone Repository**:
    ```bash
@@ -42,12 +44,19 @@ An ultra-modern, single-page household expense tracking and debt settlement appl
    npm install
    ```
 
-3. **Run Local Server**:
+3. **Optional - Configure Firebase**:
+   Copy `.env.example` to `.env` and fill in your Firebase credentials:
+   ```bash
+   cp .env.example .env
+   ```
+   *(If unconfigured, the app seamlessly runs on instant LocalStorage cache).*
+
+4. **Start Development Server**:
    ```bash
    npm run dev
    ```
 
-4. **Build Production Bundle**:
+5. **Build Production Bundle**:
    ```bash
    npm run build
    ```
@@ -56,12 +65,7 @@ An ultra-modern, single-page household expense tracking and debt settlement appl
 
 ## 🔄 CI/CD & Deployment
 
-Every push to the `main` branch automatically triggers the GitHub Actions workflow (`.github/workflows/deploy.yml`):
-1. **Linter & Type Checks**: Runs `oxlint` and `npx tsc -b`.
-2. **Build**: Compiles production static assets into `./dist`.
-3. **Deploy**: Automatically deploys the static application to **GitHub Pages**.
-
-### GitHub Pages Setup Instructions
-1. Navigate to your repository **Settings** -> **Pages**.
-2. Under **Build and deployment** -> **Source**, select **GitHub Actions**.
-3. Pushes to `main` will automatically build and publish to `https://raiyan437.github.io/Home-Finance-Tracker/`.
+Every push to `main` triggers GitHub Actions (`.github/workflows/deploy.yml`):
+1. **Validation**: Runs `oxlint` and `tsc` type-checks.
+2. **Build**: Compiles production static bundle into `dist/`.
+3. **Deploy**: Publishes live to **[https://raiyan437.github.io/Home-Finance-Tracker/](https://raiyan437.github.io/Home-Finance-Tracker/)**.

@@ -318,7 +318,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   className="preset-chip"
                   onClick={() => applyPreset(p)}
                 >
-                  {p.name} (${p.amount})
+                  {p.name} (৳{p.amount})
                 </button>
               ))}
             </div>
@@ -341,7 +341,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">Amount ($)</label>
+              <label className="form-label">Amount (৳)</label>
               <input
                 type="number"
                 step="0.01"
@@ -595,7 +595,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     style={{ flex: 1 }}
                     onClick={() => setSplitMethod('custom')}
                   >
-                    Custom ($)
+                    Custom (৳)
                   </button>
                   <button
                     type="button"
@@ -611,7 +611,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               {/* Custom / Percentage Inputs */}
               {splitMethod === 'custom' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Custom Dollar Amounts</div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Custom Taka Amounts</div>
                   {selectedParticipants.map((userId) => (
                     <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                       <span style={{ fontWeight: 700 }}>{USERS[userId].name}</span>
