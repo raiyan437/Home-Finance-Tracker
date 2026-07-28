@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Solar Yellow Payment Card Gradient Preset Complete  
+**Current Status**: Bangladeshi Taka (৳) Standard & Portable Cloud Architecture Complete  
 
 ---
 
@@ -107,3 +107,11 @@
 ### 2026-07-29: Solar Yellow Card Gradient Preset Integration
 * **Yellow Color Gradient (`src/components/CardsManager.tsx`)**:
   * Added vibrant **Solar Yellow** (`linear-gradient(135deg, #d97706, #eab308, #fde047)`) option to card theme color presets grid.
+
+### 2026-07-29: Bangladeshi Taka (৳) Currency Standard & Portable Cloud Setup
+* **Taka (৳) Symbol (`src/utils/currency.ts`)**:
+  * Updated `formatCurrency` to output figures using **৳** (Taka) symbol.
+  * Replaced `$0.00` and `Amount ($)` labels across all components, input fields, preset chips, and `.csv` report headers.
+* **Cloud & Cross-Platform Portability (`.env.example` & `README.md`)**:
+  * Added `.env.example` template for Firebase configuration.
+  * Verified seamless cross-platform build (`npm run build` in 273ms) on any PC (Windows, macOS, Linux).
