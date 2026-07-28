@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Personal Wallet Month & Year Selector Refinement Complete  
+**Current Status**: Solar Yellow Payment Card Gradient Preset Complete  
 
 ---
 
@@ -103,4 +103,7 @@
   * Removed the all-time spent card to keep the personal wallet layout clean and month-focused.
 * **Calendar Month/Year Selector (`src/components/PersonalWallet.tsx`)**:
   * Added a `Calendar` icon + Month/Year dropdown selector inside the **Monthly Personal Outlay** header card.
-  * Selecting a month/year updates total personal outlay, category spend breakdown, and purchase ledger for that specific month.
+
+### 2026-07-29: Solar Yellow Card Gradient Preset Integration
+* **Yellow Color Gradient (`src/components/CardsManager.tsx`)**:
+  * Added vibrant **Solar Yellow** (`linear-gradient(135deg, #d97706, #eab308, #fde047)`) option to card theme color presets grid.
