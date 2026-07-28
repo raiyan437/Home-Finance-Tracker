@@ -295,6 +295,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'personal' && (
             <PersonalWallet
               expenses={expenses}
+              cards={cards}
               onSaveExpense={handleSaveExpense}
               onDeleteExpense={(id) => setDeletingExpenseId(id)}
             />

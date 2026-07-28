@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Full CSS Layout & Design System Restored & Verified  
+**Current Status**: Credit Card vs Debit Card Classification Complete  
 
 ---
 
@@ -91,8 +91,11 @@
 * **Receipt Attachments & CSV Export (`src/utils/exportCsv.ts`)**:
   * Allowed uploading and previewing receipt photos attached to expenses with CSV audit exports.
 
-### 2026-07-28: Layout Restoration & CSS Property Fix
-* **CSS Syntax Fix (`src/index.css`)**:
-  * Corrected invalid camelCase `flexDirection` property back to standard `flex-direction: column;` in `.sidebar`.
-  * Restored full complete suite of layout classes (`.form-group`, `.form-label`, `.summary-card`, `.user-card-top`, `.badge`, `.stat-item`, `.progress-bar-container`, `.participant-checkbox-item`).
-  * Re-verified grid alignment across all screen sizes.
+### 2026-07-28: Credit Card vs Debit Card Type Classification
+* **Card Type Field (`src/types/index.ts`)**:
+  * Added `cardType?: 'debit' | 'credit'` to `PaymentCard`.
+* **Card Modal Selector (`src/components/CardsManager.tsx`)**:
+  * Added Credit Card vs Debit Card toggle selector button group when creating or editing a card.
+  * Visual 3D card layout displays prominent `CREDIT CARD` or `DEBIT CARD` text badge.
+* **Expense Dropdown & List Badges (`src/components/AddExpenseModal.tsx` & `src/components/ExpenseList.tsx`)**:
+  * Displayed Credit vs Debit labels in payment dropdowns and expense item badges.

@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import type { Expense, Category } from '../types';
+import type { Expense, Category, PaymentCard, PaymentMethodType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency, dollarsToCents } from '../utils/currency';
+import { USERS } from '../utils/settlementEngine';
 import { UserAvatar } from './UserAvatar';
-import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, PieChart } from 'lucide-react';
+import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, PieChart, CreditCard, Banknote } from 'lucide-react';
 
 interface PersonalWalletProps {
   expenses: Expense[];
+  cards?: PaymentCard[];
   onSaveExpense: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>, editingId?: string) => void;
   onDeleteExpense: (expenseId: string) => void;
 }
@@ -15,6 +17,7 @@ const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', '
 
 export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   expenses,
+  cards = [],
   onSaveExpense,
   onDeleteExpense,
 }) => {
@@ -30,7 +33,21 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   const [amountStr, setAmountStr] = useState('');
   const [category, setCategory] = useState<Category>('Personal');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentType, setPaymentType] = useState<PaymentMethodType>('cash');
+  const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [notes, setNotes] = useState('');
+
+  const userCards = useMemo(() => {
+    return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
+  }, [cards, activeUserId]);
+
+  const cardsMap = useMemo(() => {
+    const map: Record<string, PaymentCard> = {};
+    cards.forEach((c) => {
+      map[c.id] = c;
+    });
+    return map;
+  }, [cards]);
 
   // Filter personal expenses belonging strictly to the active user
   const personalExpenses = useMemo(() => {
@@ -43,7 +60,9 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
     return personalExpenses.filter((e) => e.date.startsWith(selectedMonth));
   }, [personalExpenses, selectedMonth]);
 
+  // Totals
   const totalPersonalSpentCents = monthPersonalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
+  const grandTotalPersonalSpentCents = personalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
   // Default personal monthly budget target ($500.00)
   const [monthlyBudgetDollars, setMonthlyBudgetDollars] = useState('500.00');
@@ -66,6 +85,8 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
       setAmountStr((exp.amountCents / 100).toFixed(2));
       setCategory(exp.category);
       setDate(exp.date);
+      setPaymentType(exp.paymentMethod?.type || 'cash');
+      setSelectedCardId(exp.paymentMethod?.cardId || (userCards[0]?.id || ''));
       setNotes(exp.notes || '');
     } else {
       setEditingExp(null);
@@ -73,6 +94,8 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
       setAmountStr('');
       setCategory('Personal');
       setDate(new Date().toISOString().split('T')[0]);
+      setPaymentType('cash');
+      setSelectedCardId(userCards[0]?.id || '');
       setNotes('');
     }
     setIsAddModalOpen(true);
@@ -94,6 +117,10 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
         shares: [{ userId: activeUserId, amountCents: cents }],
         scope: 'personal',
         ownerId: activeUserId,
+        paymentMethod: {
+          type: paymentType,
+          cardId: paymentType === 'card' ? (selectedCardId || userCards[0]?.id) : undefined,
+        },
         notes: notes.trim(),
       },
       editingExp ? editingExp.id : undefined
@@ -144,28 +171,46 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
         </div>
       </div>
 
-      {/* Stats & Budget Grid */}
-      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+      {/* Hero Stats & Budget Grid */}
+      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+        {/* Total Lifetime Personal Spent */}
+        <div className="glass-card summary-card">
+          <div className="summary-card-header">
+            <span className="summary-title">All-Time Total Personal Spent</span>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
+              <Wallet size={20} />
+            </div>
+          </div>
+          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+            {formatCurrency(grandTotalPersonalSpentCents)}
+          </div>
+          <div className="summary-footer">
+            <span>{personalExpenses.length} total personal purchases recorded</span>
+          </div>
+        </div>
+
+        {/* Monthly Personal Outlay */}
         <div className="glass-card summary-card">
           <div className="summary-card-header">
             <span className="summary-title">Monthly Personal Outlay</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)', color: 'var(--accent-purple)' }}>
-              <Wallet size={20} />
+              <TrendingUp size={20} />
             </div>
           </div>
           <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-purple)' }}>
             {formatCurrency(totalPersonalSpentCents)}
           </div>
           <div className="summary-footer">
-            <span>{monthPersonalExpenses.length} personal purchases this month</span>
+            <span>{monthPersonalExpenses.length} purchases in current billing period</span>
           </div>
         </div>
 
+        {/* Monthly Budget Target */}
         <div className="glass-card summary-card">
           <div className="summary-card-header">
             <span className="summary-title">Monthly Budget Target</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
-              <TrendingUp size={20} />
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
+              <ShieldCheck size={20} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -250,42 +295,62 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {personalExpenses.map((exp) => (
-              <div key={exp.id} className="expense-item-card">
-                <div className="expense-left">
-                  <UserAvatar user={userProfile} size={42} />
-                  <div className="expense-info-group">
-                    <div className="expense-title-row">
-                      <span className="expense-title">{exp.title}</span>
-                      <span className={`cat-pill cat-${exp.category}`}>{exp.category}</span>
-                    </div>
-                    <div className="expense-meta-row">
-                      <span>{exp.date}</span>
-                      {exp.notes && (
-                        <>
-                          <span>•</span>
-                          <span>{exp.notes}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            {personalExpenses.map((exp) => {
+              const pm = exp.paymentMethod;
+              const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
 
-                <div className="expense-right">
-                  <div className="expense-amount-display tabular-nums" style={{ color: 'var(--accent-purple)' }}>
-                    {formatCurrency(exp.amountCents)}
+              return (
+                <div key={exp.id} className="expense-item-card">
+                  <div className="expense-left">
+                    <UserAvatar user={userProfile} size={42} />
+                    <div className="expense-info-group">
+                      <div className="expense-title-row">
+                        <span className="expense-title">{exp.title}</span>
+                        <span className={`cat-pill cat-${exp.category}`}>{exp.category}</span>
+
+                        {/* Payment Channel Badge */}
+                        <span className="share-mini-tag" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
+                          {pm?.type === 'card' ? (
+                            <>
+                              <CreditCard size={12} style={{ color: 'var(--accent-primary)' }} />
+                              <span>{cardObj ? `${cardObj.bankName} (${cardObj.cardType === 'debit' ? 'Debit' : 'Credit'})` : 'Bank Card'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Banknote size={12} style={{ color: 'var(--accent-emerald)' }} />
+                              <span>Cash</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <div className="expense-meta-row">
+                        <span>{exp.date}</span>
+                        {exp.notes && (
+                          <>
+                            <span>•</span>
+                            <span>{exp.notes}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="expense-actions-group">
-                    <button className="btn btn-secondary btn-icon-only" onClick={() => handleOpenAdd(exp)}>
-                      <Edit size={16} />
-                    </button>
-                    <button className="btn btn-danger btn-icon-only" onClick={() => onDeleteExpense(exp.id)}>
-                      <Trash2 size={16} />
-                    </button>
+
+                  <div className="expense-right">
+                    <div className="expense-amount-display tabular-nums" style={{ color: 'var(--accent-purple)' }}>
+                      {formatCurrency(exp.amountCents)}
+                    </div>
+                    <div className="expense-actions-group">
+                      <button className="btn btn-secondary btn-icon-only" onClick={() => handleOpenAdd(exp)}>
+                        <Edit size={16} />
+                      </button>
+                      <button className="btn btn-danger btn-icon-only" onClick={() => onDeleteExpense(exp.id)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -327,6 +392,58 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
                   onChange={(e) => setAmountStr(e.target.value)}
                   required
                 />
+              </div>
+
+              {/* Payment Channel Selector (Cash vs Bank Card) */}
+              <div className="form-group">
+                <label className="form-label">Payment Channel</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className={`btn ${paymentType === 'cash' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                    onClick={() => setPaymentType('cash')}
+                  >
+                    <Banknote size={16} />
+                    <span>Cash</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${paymentType === 'card' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                    onClick={() => {
+                      setPaymentType('card');
+                      if (!selectedCardId && userCards.length > 0) {
+                        setSelectedCardId(userCards[0].id);
+                      }
+                    }}
+                  >
+                    <CreditCard size={16} />
+                    <span>Bank Card</span>
+                  </button>
+                </div>
+
+                {paymentType === 'card' && (
+                  <div style={{ marginTop: '8px' }}>
+                    {userCards.length === 0 ? (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', background: 'var(--bg-input)', padding: '10px', borderRadius: 'var(--radius-sm)' }}>
+                        No payment cards created yet. Add a card in the "Payment Cards" tab!
+                      </div>
+                    ) : (
+                      <select
+                        className="form-select"
+                        value={selectedCardId}
+                        onChange={(e) => setSelectedCardId(e.target.value)}
+                      >
+                        {userCards.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit' : 'Credit'} Card • {USERS[c.ownerId || activeUserId]?.name || 'Card'})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
