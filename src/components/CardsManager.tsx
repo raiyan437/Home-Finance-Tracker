@@ -17,6 +17,7 @@ export const CARD_COLOR_PRESETS = [
   { name: 'Midnight Blue', value: 'linear-gradient(135deg, #1e3a8a, #3b82f6)' },
   { name: 'Emerald Green', value: 'linear-gradient(135deg, #065f46, #10b981)' },
   { name: 'Violet Glow', value: 'linear-gradient(135deg, #5b21b6, #8b5cf6)' },
+  { name: 'Solar Yellow', value: 'linear-gradient(135deg, #d97706, #eab308, #fde047)' },
   { name: 'Sunset Amber', value: 'linear-gradient(135deg, #b45309, #f59e0b)' },
   { name: 'Neon Cyan', value: 'linear-gradient(135deg, #0e7490, #06b6d4)' },
   { name: 'Rose Red', value: 'linear-gradient(135deg, #be123c, #f43f5e)' },
@@ -272,7 +273,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
 
               <div className="form-group">
                 <label className="form-label">Card Theme Gradient</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: '10px', marginTop: '6px' }}>
                   {CARD_COLOR_PRESETS.map((preset) => {
                     const isSelected = selectedColor === preset.value;
                     return (
