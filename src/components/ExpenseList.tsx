@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import type { Expense, UserId, Category, PaymentCard } from '../types';
 import { USERS, ALL_USERS } from '../utils/settlementEngine';
+import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { exportAuditReportCsv } from '../utils/exportCsv';
 import { UserAvatar } from './UserAvatar';
-import { Search, Edit, Trash2, Plus, Receipt, ChevronDown, ChevronUp, Filter, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X } from 'lucide-react';
+import { Search, Edit, Trash2, Plus, Receipt, ChevronDown, ChevronUp, Filter, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -12,6 +13,7 @@ interface ExpenseListProps {
   onOpenAddExpense: () => void;
   onEditExpense: (expense: Expense) => void;
   onDeleteExpense: (expenseId: string) => void;
+  onAddComment?: (expenseId: string, commentText: string) => void;
 }
 
 const ALL_CATEGORIES: (Category | 'All')[] = ['All', 'Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
@@ -22,13 +24,17 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   onOpenAddExpense,
   onEditExpense,
   onDeleteExpense,
+  onAddComment,
 }) => {
+  const { userProfile } = useAuth();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [selectedUserFilter, setSelectedUserFilter] = useState<UserId | 'All'>('All');
   const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<'All' | 'cash' | 'card'>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
+  const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
 
   const cardsMap = useMemo(() => {
     const map: Record<string, PaymentCard> = {};
@@ -79,6 +85,14 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleSendComment = (expenseId: string) => {
+    const text = newCommentText[expenseId]?.trim();
+    if (!text || !onAddComment) return;
+
+    onAddComment(expenseId, text);
+    setNewCommentText({ ...newCommentText, [expenseId]: '' });
   };
 
   return (
@@ -208,6 +222,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             const isExpanded = expandedId === exp.id;
             const pm = exp.paymentMethod;
             const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
+            const commentCount = exp.comments?.length || 0;
 
             return (
               <div
@@ -270,6 +285,12 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                         <span>{exp.date}</span>
                         <span>•</span>
                         <span style={{ textTransform: 'capitalize' }}>{exp.splitMethod} Split</span>
+                        {commentCount > 0 && (
+                          <>
+                            <span>•</span>
+                            <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>💬 {commentCount} comments</span>
+                          </>
+                        )}
                       </div>
                       
                       {/* Mini Participant Share Pills */}
@@ -317,7 +338,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                   </div>
                 </div>
 
-                {/* Expanded Shares Breakdown */}
+                {/* Expanded Shares Breakdown & Comment Thread */}
                 {isExpanded && (
                   <div
                     style={{
@@ -326,7 +347,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       borderTop: '1px solid var(--border-subtle)',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px',
+                      gap: '16px',
                     }}
                   >
                     {exp.notes && (
@@ -377,6 +398,62 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                           </div>
                         );
                       })}
+                    </div>
+
+                    {/* Expense Comments Section */}
+                    <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                        <MessageSquare size={14} style={{ color: 'var(--accent-primary)' }} />
+                        <span>In-App Housemate Comments ({commentCount})</span>
+                      </div>
+
+                      {/* Comment Stream */}
+                      {exp.comments && exp.comments.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                          {exp.comments.map((c) => {
+                            const commenter = USERS[c.userId] || userProfile;
+                            return (
+                              <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
+                                <UserAvatar user={commenter} size={22} />
+                                <div style={{ flex: 1, fontSize: '0.82rem' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                    <strong style={{ color: 'var(--text-primary)' }}>{commenter.name}</strong>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{c.createdAt ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                  </div>
+                                  <div style={{ color: 'var(--text-secondary)' }}>{c.text}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                          No comments posted yet. Ask a question or leave a note below!
+                        </div>
+                      )}
+
+                      {/* Add Comment Input */}
+                      <div style={{ display: 'flex', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          style={{ padding: '6px 10px', fontSize: '0.82rem' }}
+                          placeholder="Type a comment or question..."
+                          value={newCommentText[exp.id] || ''}
+                          onChange={(e) => setNewCommentText({ ...newCommentText, [exp.id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSendComment(exp.id);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleSendComment(exp.id)}
+                        >
+                          <Send size={14} />
+                          <span>Post</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -1,7 +1,9 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
-import { LayoutDashboard, Receipt, ArrowLeftRight, Calendar, Plus, Sun, Moon, Home, Sparkles, Wallet, UserCheck, CreditCard } from 'lucide-react';
+import { getTranslation } from '../utils/i18n';
+import type { Language } from '../utils/i18n';
+import { LayoutDashboard, Receipt, ArrowLeftRight, Calendar, Plus, Sun, Moon, Home, Sparkles, Wallet, UserCheck, CreditCard, Languages } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards';
 
@@ -12,6 +14,8 @@ interface NavbarProps {
   onOpenAuthModal: () => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
+  lang: Language;
+  toggleLang: () => void;
   expenseCount?: number;
   settlementCount?: number;
   personalCount?: number;
@@ -25,12 +29,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuthModal,
   theme,
   toggleTheme,
+  lang,
+  toggleLang,
   expenseCount,
   settlementCount,
   personalCount,
   cardsCount,
 }) => {
   const { userProfile } = useAuth();
+  const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
 
   return (
     <>
@@ -41,10 +48,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Home size={22} />
           </div>
           <div className="brand-title-box">
-            <div className="brand-title">Home Finance</div>
+            <div className="brand-title">{t('appTitle')}</div>
             <div className="brand-subtitle">
               <span className="status-dot" />
-              <span>3 Housemates</span>
+              <span>{t('housematesCount')}</span>
             </div>
           </div>
         </div>
@@ -70,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <UserAvatar user={userProfile} size={32} />
             <div>
               <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{userProfile.name}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 700 }}>Active Profile</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 700 }}>{t('activeProfile')}</div>
             </div>
           </div>
           <UserCheck size={16} style={{ color: 'var(--text-muted)' }} />
@@ -83,7 +90,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <LayoutDashboard size={19} />
-              <span>Dashboard</span>
+              <span>{t('dashboard')}</span>
             </div>
           </button>
 
@@ -93,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <Receipt size={19} />
-              <span>Household Expenses</span>
+              <span>{t('householdExpenses')}</span>
             </div>
             {expenseCount !== undefined && <span className="nav-badge">{expenseCount}</span>}
           </button>
@@ -104,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <ArrowLeftRight size={19} />
-              <span>Settlements</span>
+              <span>{t('settlements')}</span>
             </div>
             {settlementCount !== undefined && settlementCount > 0 && (
               <span className="nav-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)' }}>
@@ -119,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <Wallet size={19} style={{ color: 'var(--accent-purple)' }} />
-              <span>Personal Wallet</span>
+              <span>{t('personalWallet')}</span>
             </div>
             {personalCount !== undefined && personalCount > 0 && (
               <span className="nav-badge" style={{ backgroundColor: 'rgba(139, 92, 246, 0.2)', color: 'var(--accent-purple)' }}>
@@ -134,7 +141,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <CreditCard size={19} style={{ color: 'var(--accent-cyan)' }} />
-              <span>Payment Cards</span>
+              <span>{t('paymentCards')}</span>
             </div>
             {cardsCount !== undefined && cardsCount > 0 && (
               <span className="nav-badge" style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', color: 'var(--accent-cyan)' }}>
@@ -149,25 +156,38 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <Calendar size={19} />
-              <span>Monthly Report</span>
+              <span>{t('monthlyReport')}</span>
             </div>
           </button>
         </nav>
 
         <button className="add-expense-btn-sidebar" onClick={onOpenAddExpense}>
           <Plus size={20} />
-          <span>New Expense</span>
+          <span>{t('newExpense')}</span>
         </button>
 
-        <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={16} style={{ color: 'var(--accent-primary)' }} />
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 700 }}>Appearance</span>
+        {/* Footer Toggles (Language & Theme) */}
+        <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Languages size={16} style={{ color: 'var(--accent-cyan)' }} />
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 700 }}>Language</span>
+            </div>
+            <button className="theme-toggle-btn" onClick={toggleLang} title="Switch English / Bangla">
+              <span>{lang === 'en' ? '🇧🇩 বাংলা' : '🇬🇧 EN'}</span>
+            </button>
           </div>
-          <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle theme">
-            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-          </button>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={16} style={{ color: 'var(--accent-primary)' }} />
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 700 }}>{t('appearance')}</span>
+            </div>
+            <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle theme">
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+              <span>{theme === 'dark' ? t('light') : t('dark')}</span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -178,7 +198,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setActiveTab('dashboard')}
         >
           <LayoutDashboard size={20} />
-          <span>Home</span>
+          <span>{t('dashboard')}</span>
         </button>
 
         <button
@@ -186,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setActiveTab('expenses')}
         >
           <Receipt size={20} />
-          <span>Expenses</span>
+          <span>{t('householdExpenses')}</span>
         </button>
 
         <button className="mobile-add-fab" onClick={onOpenAddExpense} title="Add Expense">
@@ -198,7 +218,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setActiveTab('cards')}
         >
           <CreditCard size={20} />
-          <span>Cards</span>
+          <span>{t('paymentCards')}</span>
         </button>
 
         <button
@@ -206,7 +226,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setActiveTab('personal')}
         >
           <Wallet size={20} />
-          <span>Wallet</span>
+          <span>{t('personalWallet')}</span>
         </button>
       </nav>
     </>

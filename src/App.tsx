@@ -10,6 +10,7 @@ import { AuthModal } from './components/AuthModal';
 import { ConfirmModal } from './components/ConfirmModal';
 
 import type { Expense, Settlement, SimplifiedTransaction, PaymentCard } from './types';
+import type { Language } from './utils/i18n';
 import {
   loadExpenses,
   saveExpenses,
@@ -50,6 +51,7 @@ const AppContent: React.FC = () => {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [lang, setLang] = useState<Language>('en');
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -99,9 +101,13 @@ const AppContent: React.FC = () => {
     document.documentElement.setAttribute('data-theme', nextTheme);
   };
 
-  // Filter household shared expenses vs personal expenses
+  const toggleLang = () => {
+    setLang((prev) => (prev === 'en' ? 'bn' : 'en'));
+  };
+
+  // Separate shared household expenses vs personal private wallet expenses
   const householdExpenses = useMemo(() => {
-    return expenses.filter((e) => e.scope !== 'personal');
+    return expenses.filter((e) => !e.scope || e.scope === 'household');
   }, [expenses]);
 
   const personalExpenses = useMemo(() => {
@@ -112,11 +118,16 @@ const AppContent: React.FC = () => {
     return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
   }, [cards, activeUserId]);
 
-  // Calculate pending simplified settlements for household
-  const userBalances = calculateNetBalances(householdExpenses, settlements);
-  const pendingSettlementsCount = calculateSimplifiedSettlements(userBalances).length;
+  // Derived financial balances & optimal debt transfers
+  const userBalances = useMemo(() => {
+    return calculateNetBalances(householdExpenses, settlements);
+  }, [householdExpenses, settlements]);
 
-  // Add / Edit Expense handler
+  const simplifiedSettlements = useMemo(() => {
+    return calculateSimplifiedSettlements(userBalances);
+  }, [userBalances]);
+
+  // Expense Handlers
   const handleSaveExpense = (
     expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>,
     editingId?: string
@@ -132,7 +143,6 @@ const AppContent: React.FC = () => {
         createdAt: target?.createdAt || now,
         updatedAt: now,
       };
-
       const updatedList = expenses.map((e) => (e.id === editingId ? updatedExpense : e));
       setExpenses(updatedList);
       saveExpenses(updatedList);
@@ -159,6 +169,34 @@ const AppContent: React.FC = () => {
     saveExpenses(updated);
     syncDeleteExpense(deletingExpenseId);
     setDeletingExpenseId(null);
+  };
+
+  // Comment Handler
+  const handleAddComment = (expenseId: string, commentText: string) => {
+    const now = new Date().toISOString();
+    const newComment = {
+      id: `cmt-${Date.now()}`,
+      userId: activeUserId,
+      text: commentText,
+      createdAt: now,
+    };
+
+    const updatedList = expenses.map((e) => {
+      if (e.id === expenseId) {
+        const existingComments = e.comments || [];
+        const updatedExp = {
+          ...e,
+          comments: [...existingComments, newComment],
+          updatedAt: now,
+        };
+        syncSaveExpense(updatedExp);
+        return updatedExp;
+      }
+      return e;
+    });
+
+    setExpenses(updatedList);
+    saveExpenses(updatedList);
   };
 
   // Card Management handlers
@@ -199,9 +237,10 @@ const AppContent: React.FC = () => {
     syncDeleteCard(cardId);
   };
 
-  // Mark Settlement Completed
+  // Mark Settlement Paid handler
   const handleMarkSettledConfirm = () => {
     if (!pendingSettlementTx) return;
+
     const now = new Date().toISOString();
     const newSettlement: Settlement = {
       id: `st-${Date.now()}`,
@@ -211,25 +250,27 @@ const AppContent: React.FC = () => {
       status: 'completed',
       createdAt: now,
       settledAt: now,
+      notes: `Direct settlement between ${pendingSettlementTx.fromUser.name} and ${pendingSettlementTx.toUser.name}`,
     };
 
-    const updated = [newSettlement, ...settlements];
-    setSettlements(updated);
-    saveSettlements(updated);
+    const updatedSettlements = [newSettlement, ...settlements];
+    setSettlements(updatedSettlements);
+    saveSettlements(updatedSettlements);
     syncSaveSettlement(newSettlement);
     setPendingSettlementTx(null);
   };
 
-  // Reset to Seed Data
+  // Reset Demo Data handler
   const handleResetDataConfirm = () => {
-    const { expenses: seedExp, settlements: seedSt, cards: seedCards } = resetToSeedData();
-    setExpenses(seedExp);
-    setSettlements(seedSt);
-    setCards(seedCards);
+    const seed = resetToSeedData();
+    setExpenses(seed.expenses);
+    setSettlements(seed.settlements);
+    setIsResetConfirmOpen(false);
   };
 
   return (
     <div className="app-container">
+      {/* Navigation Sidebar / Mobile Nav */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -240,58 +281,59 @@ const AppContent: React.FC = () => {
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         theme={theme}
         toggleTheme={toggleTheme}
+        lang={lang}
+        toggleLang={toggleLang}
         expenseCount={householdExpenses.length}
-        settlementCount={pendingSettlementsCount}
+        settlementCount={simplifiedSettlements.length}
         personalCount={personalExpenses.length}
         cardsCount={userCards.length}
       />
 
+      {/* Main Content Viewport */}
       <main className="main-content">
-        {activeTab === 'dashboard' && (
-          <Dashboard
-            expenses={householdExpenses}
-            settlements={settlements}
-            onOpenAddExpense={() => {
-              setEditingExpense(null);
-              setIsAddExpenseOpen(true);
-            }}
-            onNavigateToSettlement={() => setActiveTab('settlement')}
-            onNavigateToExpenses={() => setActiveTab('expenses')}
-            onResetData={() => setIsResetConfirmOpen(true)}
-          />
-        )}
-
-        {activeTab === 'expenses' && (
-          <ExpenseList
-            expenses={householdExpenses}
-            cards={cards}
-            onOpenAddExpense={() => {
-              setEditingExpense(null);
-              setIsAddExpenseOpen(true);
-            }}
-            onEditExpense={(exp) => {
-              setEditingExpense(exp);
-              setIsAddExpenseOpen(true);
-            }}
-            onDeleteExpense={(id) => setDeletingExpenseId(id)}
-          />
-        )}
-
-        {activeTab === 'settlement' && (
-          <SettlementView
-            expenses={householdExpenses}
-            settlements={settlements}
-            onMarkSettled={(tx) => setPendingSettlementTx(tx)}
-          />
-        )}
-
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '60px', color: 'var(--text-muted)', fontWeight: 700 }}>
-              Loading Module...
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--accent-primary)' }}>
+              Loading view...
             </div>
           }
         >
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              expenses={householdExpenses}
+              settlements={settlements}
+              onOpenAddExpense={() => setIsAddExpenseOpen(true)}
+              onNavigateToExpenses={() => setActiveTab('expenses')}
+              onNavigateToSettlement={() => setActiveTab('settlement')}
+              onResetData={() => setIsResetConfirmOpen(true)}
+            />
+          )}
+
+          {activeTab === 'expenses' && (
+            <ExpenseList
+              expenses={householdExpenses}
+              cards={cards}
+              onOpenAddExpense={() => {
+                setEditingExpense(null);
+                setIsAddExpenseOpen(true);
+              }}
+              onEditExpense={(exp) => {
+                setEditingExpense(exp);
+                setIsAddExpenseOpen(true);
+              }}
+              onDeleteExpense={(id) => setDeletingExpenseId(id)}
+              onAddComment={handleAddComment}
+            />
+          )}
+
+          {activeTab === 'settlement' && (
+            <SettlementView
+              expenses={householdExpenses}
+              settlements={settlements}
+              onMarkSettled={(tx: SimplifiedTransaction) => setPendingSettlementTx(tx)}
+            />
+          )}
+
           {activeTab === 'personal' && (
             <PersonalWallet
               expenses={expenses}
@@ -362,7 +404,7 @@ const AppContent: React.FC = () => {
         title="Mark Settlement as Paid"
         message={
           pendingSettlementTx
-            ? `Confirm that ${pendingSettlementTx.fromUser.name} paid ${pendingSettlementTx.toUser.name} $${(
+            ? `Confirm that ${pendingSettlementTx.fromUser.name} paid ${pendingSettlementTx.toUser.name} ৳${(
                 pendingSettlementTx.amountCents / 100
               ).toFixed(2)}? This will update current net balances.`
             : ''

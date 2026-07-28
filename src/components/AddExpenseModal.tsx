@@ -10,6 +10,7 @@ import {
   formatCurrency,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
+import { scanReceiptImage } from '../utils/ocrScanner';
 import { X, Check, AlertCircle, Sparkles, Receipt, Users, Wallet, CreditCard, Banknote, RefreshCw, Paperclip, Image as ImageIcon } from 'lucide-react';
 
 interface AddExpenseModalProps {
@@ -144,7 +145,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     setCategory(preset.category);
   };
 
-  // Handle Receipt Upload (convert file to base64)
+  const [isScanningOcr, setIsScanningOcr] = useState(false);
+
+  // Handle Receipt Upload (convert file to base64 & trigger OCR scan)
   const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -153,8 +156,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setReceiptUrl(reader.result as string);
+      reader.onloadend = async () => {
+        const b64 = reader.result as string;
+        setReceiptUrl(b64);
+        setIsScanningOcr(true);
+        const parsed = await scanReceiptImage(b64);
+        setIsScanningOcr(false);
+        if (parsed.success) {
+          if (parsed.title) setTitle(parsed.title);
+          if (parsed.amountCents) setAmountStr((parsed.amountCents / 100).toFixed(2));
+          if (parsed.date) setDate(parsed.date);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -466,7 +478,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             {receiptUrl ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-input)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
                 <img src={receiptUrl} alt="Receipt Preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
-                <div style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600 }}>Receipt photo attached</div>
+                <div style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600 }}>
+                  <div>Receipt photo attached</div>
+                  {isScanningOcr && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 800 }}>
+                      ⚡ AI OCR Scanning receipt details...
+                    </div>
+                  )}
+                </div>
                 <button type="button" className="btn btn-danger btn-sm" onClick={() => setReceiptUrl('')}>
                   Remove
                 </button>

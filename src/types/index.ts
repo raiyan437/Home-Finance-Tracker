@@ -39,6 +39,13 @@ export interface Share {
   percentage?: number;
 }
 
+export interface ExpenseComment {
+  id: string;
+  userId: UserId;
+  text: string;
+  createdAt: string;
+}
+
 export interface Expense {
   id: string;
   title: string;
@@ -54,6 +61,7 @@ export interface Expense {
   isRecurring?: boolean;
   recurringFrequency?: RecurringFrequency;
   receiptUrl?: string; // Base64 data URL or photo link
+  comments?: ExpenseComment[];
   notes?: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
