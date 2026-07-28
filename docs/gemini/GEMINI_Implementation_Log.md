@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Unconfigured Firebase Fallback & Vite Rollup Chunking Complete  
+**Current Status**: Add Expense Modal Crash-Proof Resolution Complete  
 
 ---
 
@@ -125,6 +125,10 @@
 ### 2026-07-29: Unconfigured Firebase Safe Fallback & Vite Rollup Chunking Fix
 * **Firebase Safe Fallback (`src/config/firebase.ts` & `src/context/AuthContext.tsx`)**:
   * Wrapped Firebase SDK initialization in a `try...catch` block and added null checks (`!auth`, `!db`) across listeners.
-  * Prevents initialization crashes when Firebase API keys are unconfigured, ensuring the app seamlessly runs on LocalStorage cache both locally and on GitHub Pages!
 * **Vite Rollup Config (`vite.config.ts`)**:
   * Updated `build.rollupOptions` chunking for standard Vite Rollup pipeline.
+
+### 2026-07-29: Add Expense Modal Crash-Proof Resolution
+* **Safe Avatar & User Indexing (`src/components/UserAvatar.tsx` & `src/components/AddExpenseModal.tsx`)**:
+  * Made `UserAvatar` 100% crash-proof with fallback default user prop.
+  * Added safe optional chaining (`USERS[userId]?.name || userId`) across modal participant checklists and custom/percentage split rows to eliminate undefined indexing errors.
