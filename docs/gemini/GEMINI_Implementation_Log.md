@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: AI OCR Receipt Scanner, Expense Comments & Bilingual (EN/BN) Localization Complete  
+**Current Status**: Unconfigured Firebase Fallback & Vite Rollup Chunking Complete  
 
 ---
 
@@ -121,3 +121,10 @@
   * In-app comment feed under expanded expense items with housemate avatars and timestamps.
 * **Bilingual Localization (`src/utils/i18n.ts` & `src/components/Navbar.tsx`)**:
   * English vs **বাংলা (Bengali)** language toggle in the sidebar & mobile header.
+
+### 2026-07-29: Unconfigured Firebase Safe Fallback & Vite Rollup Chunking Fix
+* **Firebase Safe Fallback (`src/config/firebase.ts` & `src/context/AuthContext.tsx`)**:
+  * Wrapped Firebase SDK initialization in a `try...catch` block and added null checks (`!auth`, `!db`) across listeners.
+  * Prevents initialization crashes when Firebase API keys are unconfigured, ensuring the app seamlessly runs on LocalStorage cache both locally and on GitHub Pages!
+* **Vite Rollup Config (`vite.config.ts`)**:
+  * Updated `build.rollupOptions` chunking for standard Vite Rollup pipeline.
