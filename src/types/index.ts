@@ -5,11 +5,15 @@ export interface User {
   name: string;
   avatar: string;
   color: string; // CSS color string or accent token
+  email?: string;
+  uid?: string; // Firebase Auth UID if authenticated
 }
 
 export type Category = 'Groceries' | 'Household' | 'Utilities' | 'Food' | 'Personal' | 'Other';
 
 export type SplitMethod = 'equal' | 'custom' | 'percentage';
+
+export type ExpenseScope = 'household' | 'personal';
 
 export interface Share {
   userId: UserId;
@@ -26,6 +30,8 @@ export interface Expense {
   date: string; // YYYY-MM-DD format
   splitMethod: SplitMethod;
   shares: Share[];
+  scope?: ExpenseScope; // 'household' (shared) vs 'personal' (private wallet)
+  ownerId?: UserId;     // Owner ID for personal private expenses
   notes?: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
@@ -62,4 +68,9 @@ export interface MonthlyStats {
   totalExpensesCents: number;
   userBalances: Record<UserId, UserBalance>;
   expenseCount: number;
+}
+
+export interface PersonalBudget {
+  userId: UserId;
+  monthlyLimitCents: number;
 }

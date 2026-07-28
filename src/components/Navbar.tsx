@@ -1,27 +1,35 @@
 import React from 'react';
-import { LayoutDashboard, Receipt, ArrowLeftRight, Calendar, Plus, Sun, Moon, Home, Sparkles } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { UserAvatar } from './UserAvatar';
+import { LayoutDashboard, Receipt, ArrowLeftRight, Calendar, Plus, Sun, Moon, Home, Sparkles, Wallet, UserCheck } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly';
+export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal';
 
 interface NavbarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   onOpenAddExpense: () => void;
+  onOpenAuthModal: () => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   expenseCount?: number;
   settlementCount?: number;
+  personalCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   onOpenAddExpense,
+  onOpenAuthModal,
   theme,
   toggleTheme,
   expenseCount,
   settlementCount,
+  personalCount,
 }) => {
+  const { userProfile } = useAuth();
+
   return (
     <>
       {/* Desktop Sidebar */}
@@ -34,9 +42,36 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="brand-title">Home Finance</div>
             <div className="brand-subtitle">
               <span className="status-dot" />
-              <span>3 Household Members</span>
+              <span>3 Housemates</span>
             </div>
           </div>
+        </div>
+
+        {/* User Account / Profile Box */}
+        <div
+          onClick={onOpenAuthModal}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--bg-input)',
+            border: '1px solid var(--border-subtle)',
+            marginBottom: '20px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          title="Click to switch profile or manage Firebase auth"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <UserAvatar user={userProfile} size={32} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{userProfile.name}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 700 }}>Active Profile</div>
+            </div>
+          </div>
+          <UserCheck size={16} style={{ color: 'var(--text-muted)' }} />
         </div>
 
         <nav className="nav-links">
@@ -56,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <Receipt size={19} />
-              <span>Expenses</span>
+              <span>Household Expenses</span>
             </div>
             {expenseCount !== undefined && <span className="nav-badge">{expenseCount}</span>}
           </button>
@@ -70,8 +105,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Settlements</span>
             </div>
             {settlementCount !== undefined && settlementCount > 0 && (
-              <span className="nav-badge" style={{ background: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)' }}>
+              <span className="nav-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)' }}>
                 {settlementCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'personal' ? 'active' : ''}`}
+            onClick={() => setActiveTab('personal')}
+          >
+            <div className="nav-item-left">
+              <Wallet size={19} style={{ color: 'var(--accent-purple)' }} />
+              <span>Personal Wallet</span>
+            </div>
+            {personalCount !== undefined && personalCount > 0 && (
+              <span className="nav-badge" style={{ backgroundColor: 'rgba(139, 92, 246, 0.2)', color: 'var(--accent-purple)' }}>
+                {personalCount}
               </span>
             )}
           </button>
@@ -82,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="nav-item-left">
               <Calendar size={19} />
-              <span>Monthly Overview</span>
+              <span>Monthly Report</span>
             </div>
           </button>
         </nav>
@@ -127,19 +177,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
+          className={`mobile-nav-item ${activeTab === 'personal' ? 'active' : ''}`}
+          onClick={() => setActiveTab('personal')}
+        >
+          <Wallet size={20} />
+          <span>Wallet</span>
+        </button>
+
+        <button
           className={`mobile-nav-item ${activeTab === 'settlement' ? 'active' : ''}`}
           onClick={() => setActiveTab('settlement')}
         >
           <ArrowLeftRight size={20} />
           <span>Settle</span>
-        </button>
-
-        <button
-          className={`mobile-nav-item ${activeTab === 'monthly' ? 'active' : ''}`}
-          onClick={() => setActiveTab('monthly')}
-        >
-          <Calendar size={20} />
-          <span>Monthly</span>
         </button>
       </nav>
     </>

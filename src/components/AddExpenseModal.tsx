@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import type { Expense, UserId, Category, SplitMethod, Share } from '../types';
+import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope } from '../types';
 import { ALL_USERS, USERS } from '../utils/settlementEngine';
+import { useAuth } from '../context/AuthContext';
 import {
   dollarsToCents,
   calculateEqualSplits,
@@ -9,7 +10,7 @@ import {
   formatCurrency,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
-import { X, Check, AlertCircle, Sparkles, Receipt } from 'lucide-react';
+import { X, Check, AlertCircle, Sparkles, Receipt, Users, Wallet } from 'lucide-react';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -34,12 +35,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onSaveExpense,
   initialExpense,
 }) => {
+  const { activeUserId } = useAuth();
+
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [paidBy, setPaidBy] = useState<UserId>('raiyan');
+  const [paidBy, setPaidBy] = useState<UserId>(activeUserId);
   const [category, setCategory] = useState<Category>('Groceries');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
+  const [scope, setScope] = useState<ExpenseScope>('household');
   const [selectedParticipants, setSelectedParticipants] = useState<UserId[]>(['raiyan', 'himel', 'lazim']);
   const [customSharesStr, setCustomSharesStr] = useState<Record<UserId, string>>({
     raiyan: '',
@@ -63,6 +67,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setCategory(initialExpense.category);
       setDate(initialExpense.date);
       setSplitMethod(initialExpense.splitMethod);
+      setScope(initialExpense.scope || 'household');
       setNotes(initialExpense.notes || '');
 
       const partIds = initialExpense.shares.map((s) => s.userId);
@@ -83,17 +88,18 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       // Reset defaults
       setTitle('');
       setAmountStr('');
-      setPaidBy('raiyan');
+      setPaidBy(activeUserId);
       setCategory('Groceries');
       setDate(new Date().toISOString().split('T')[0]);
       setSplitMethod('equal');
+      setScope('household');
       setSelectedParticipants(['raiyan', 'himel', 'lazim']);
       setCustomSharesStr({ raiyan: '', himel: '', lazim: '' });
       setPercentagesStr({ raiyan: '33.33', himel: '33.33', lazim: '33.34' });
       setNotes('');
       setErrorMessage(null);
     }
-  }, [initialExpense, isOpen]);
+  }, [initialExpense, isOpen, activeUserId]);
 
   if (!isOpen) return null;
 
@@ -134,57 +140,62 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setErrorMessage('Please enter a valid amount greater than $0.');
       return;
     }
-    if (selectedParticipants.length === 0) {
-      setErrorMessage('Please select at least one participant.');
-      return;
-    }
 
     let finalShares: Share[] = [];
 
-    if (splitMethod === 'equal') {
-      const splitMap = calculateEqualSplits(totalCents, selectedParticipants);
-      finalShares = selectedParticipants.map((userId) => ({
-        userId,
-        amountCents: splitMap[userId],
-      }));
-    } else if (splitMethod === 'custom') {
-      const customSharesCents: Record<string, number> = {};
-      selectedParticipants.forEach((userId) => {
-        customSharesCents[userId] = dollarsToCents(customSharesStr[userId] || 0);
-      });
-
-      const validation = validateCustomSplits(totalCents, customSharesCents);
-      if (!validation.isValid) {
-        const diffDollars = formatCurrency(Math.abs(validation.differenceCents));
-        setErrorMessage(
-          `Custom split total does not match the expense amount. Difference: ${diffDollars} (${
-            validation.differenceCents > 0 ? 'under-allocated' : 'over-allocated'
-          }).`
-        );
+    if (scope === 'personal') {
+      finalShares = [{ userId: paidBy, amountCents: totalCents }];
+    } else {
+      if (selectedParticipants.length === 0) {
+        setErrorMessage('Please select at least one participant.');
         return;
       }
 
-      finalShares = selectedParticipants.map((userId) => ({
-        userId,
-        amountCents: customSharesCents[userId],
-      }));
-    } else if (splitMethod === 'percentage') {
-      const percMap: Record<string, number> = {};
-      selectedParticipants.forEach((userId) => {
-        percMap[userId] = parseFloat(percentagesStr[userId] || '0');
-      });
+      if (splitMethod === 'equal') {
+        const splitMap = calculateEqualSplits(totalCents, selectedParticipants);
+        finalShares = selectedParticipants.map((userId) => ({
+          userId,
+          amountCents: splitMap[userId],
+        }));
+      } else if (splitMethod === 'custom') {
+        const customSharesCents: Record<string, number> = {};
+        selectedParticipants.forEach((userId) => {
+          customSharesCents[userId] = dollarsToCents(customSharesStr[userId] || 0);
+        });
 
-      const { shares, is100Percent } = calculatePercentageSplits(totalCents, percMap);
-      if (!is100Percent) {
-        setErrorMessage('Percentages must total exactly 100%.');
-        return;
+        const validation = validateCustomSplits(totalCents, customSharesCents);
+        if (!validation.isValid) {
+          const diffDollars = formatCurrency(Math.abs(validation.differenceCents));
+          setErrorMessage(
+            `Custom split total does not match the expense amount. Difference: ${diffDollars} (${
+              validation.differenceCents > 0 ? 'under-allocated' : 'over-allocated'
+            }).`
+          );
+          return;
+        }
+
+        finalShares = selectedParticipants.map((userId) => ({
+          userId,
+          amountCents: customSharesCents[userId],
+        }));
+      } else if (splitMethod === 'percentage') {
+        const percMap: Record<string, number> = {};
+        selectedParticipants.forEach((userId) => {
+          percMap[userId] = parseFloat(percentagesStr[userId] || '0');
+        });
+
+        const { shares, is100Percent } = calculatePercentageSplits(totalCents, percMap);
+        if (!is100Percent) {
+          setErrorMessage('Percentages must total exactly 100%.');
+          return;
+        }
+
+        finalShares = selectedParticipants.map((userId) => ({
+          userId,
+          amountCents: shares[userId],
+          percentage: percMap[userId],
+        }));
       }
-
-      finalShares = selectedParticipants.map((userId) => ({
-        userId,
-        amountCents: shares[userId],
-        percentage: percMap[userId],
-      }));
     }
 
     onSaveExpense(
@@ -194,8 +205,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         paidBy,
         category,
         date,
-        splitMethod,
+        splitMethod: scope === 'personal' ? 'equal' : splitMethod,
         shares: finalShares,
+        scope,
+        ownerId: paidBy,
         notes: notes.trim(),
       },
       initialExpense ? initialExpense.id : undefined
@@ -221,6 +234,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           </button>
         </div>
 
+        {/* Expense Scope Selector (Household Shared vs Personal Private) */}
+        <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-input)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+          <button
+            type="button"
+            className={`btn ${scope === 'household' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+            onClick={() => setScope('household')}
+          >
+            <Users size={16} />
+            <span>Shared Household Expense</span>
+          </button>
+          <button
+            type="button"
+            className={`btn ${scope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+            onClick={() => setScope('personal')}
+          >
+            <Wallet size={16} style={{ color: 'var(--accent-purple)' }} />
+            <span>Private Personal Expense</span>
+          </button>
+        </div>
+
         {errorMessage && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--status-negative-text)', backgroundColor: 'var(--status-negative-bg)', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--status-negative-border)', fontSize: '0.85rem', fontWeight: 600 }}>
             <AlertCircle size={18} />
@@ -229,7 +264,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         )}
 
         {/* Quick Preset Chips */}
-        {!initialExpense && (
+        {!initialExpense && scope === 'household' && (
           <div>
             <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
               <Sparkles size={14} style={{ color: 'var(--accent-amber)' }} />
@@ -258,7 +293,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. Weekly Groceries, Gas Bill"
+                placeholder={scope === 'personal' ? 'e.g. Personal Coffee, Shopping' : 'e.g. Weekly Groceries, Gas Bill'}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
@@ -325,135 +360,139 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* Quick Personal Purchase Shortcut */}
-          <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Personal Purchase Shortcut
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {ALL_USERS.filter((u) => u.id !== paidBy).map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handlePersonalShortcut(u.id)}
-                >
-                  <span>Bought only for {u.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Participants Checklist */}
-          <div className="form-group">
-            <label className="form-label">
-              <span>Participants (Beneficiaries)</span>
-              {splitMethod === 'equal' && liveTotalCents > 0 && (
-                <span style={{ color: 'var(--accent-primary)' }}>~{formatCurrency(liveEqualShareCents)} / person</span>
-              )}
-            </label>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {ALL_USERS.map((user) => {
-                const isChecked = selectedParticipants.includes(user.id);
-                return (
-                  <div key={user.id} className="participant-checkbox-item">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <UserAvatar user={user} size={28} />
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{user.name}</span>
-                    </div>
-
+          {scope === 'household' && (
+            <>
+              {/* Quick Personal Purchase Shortcut */}
+              <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Personal Purchase Shortcut
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {ALL_USERS.filter((u) => u.id !== paidBy).map((u) => (
                     <button
+                      key={u.id}
                       type="button"
-                      className={`btn ${isChecked ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                      onClick={() => toggleParticipant(user.id)}
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handlePersonalShortcut(u.id)}
                     >
-                      {isChecked ? <Check size={14} /> : null}
-                      <span>{isChecked ? 'Included' : 'Exclude'}</span>
+                      <span>Bought only for {u.name}</span>
                     </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Split Method Selector */}
-          <div className="form-group">
-            <label className="form-label">Split Allocation Method</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className={`btn ${splitMethod === 'equal' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1 }}
-                onClick={() => setSplitMethod('equal')}
-              >
-                Equal Split
-              </button>
-              <button
-                type="button"
-                className={`btn ${splitMethod === 'custom' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1 }}
-                onClick={() => setSplitMethod('custom')}
-              >
-                Custom ($)
-              </button>
-              <button
-                type="button"
-                className={`btn ${splitMethod === 'percentage' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1 }}
-                onClick={() => setSplitMethod('percentage')}
-              >
-                Percentage (%)
-              </button>
-            </div>
-          </div>
-
-          {/* Custom / Percentage Inputs */}
-          {splitMethod === 'custom' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Custom Dollar Amounts</div>
-              {selectedParticipants.map((userId) => (
-                <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                  <span style={{ fontWeight: 700 }}>{USERS[userId].name}</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input tabular-nums"
-                    style={{ width: '130px' }}
-                    placeholder="0.00"
-                    value={customSharesStr[userId] || ''}
-                    onChange={(e) =>
-                      setCustomSharesStr({ ...customSharesStr, [userId]: e.target.value })
-                    }
-                  />
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
 
-          {splitMethod === 'percentage' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Percentage Share Allocations</div>
-              {selectedParticipants.map((userId) => (
-                <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                  <span style={{ fontWeight: 700 }}>{USERS[userId].name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input
-                      type="number"
-                      step="0.1"
-                      className="form-input tabular-nums"
-                      style={{ width: '100px' }}
-                      placeholder="0"
-                      value={percentagesStr[userId] || ''}
-                      onChange={(e) =>
-                        setPercentagesStr({ ...percentagesStr, [userId]: e.target.value })
-                      }
-                    />
-                    <span style={{ fontWeight: 800, color: 'var(--text-muted)' }}>%</span>
-                  </div>
+              {/* Participants Checklist */}
+              <div className="form-group">
+                <label className="form-label">
+                  <span>Participants (Beneficiaries)</span>
+                  {splitMethod === 'equal' && liveTotalCents > 0 && (
+                    <span style={{ color: 'var(--accent-primary)' }}>~{formatCurrency(liveEqualShareCents)} / person</span>
+                  )}
+                </label>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {ALL_USERS.map((user) => {
+                    const isChecked = selectedParticipants.includes(user.id);
+                    return (
+                      <div key={user.id} className="participant-checkbox-item">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <UserAvatar user={user} size={28} />
+                          <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{user.name}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          className={`btn ${isChecked ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                          onClick={() => toggleParticipant(user.id)}
+                        >
+                          {isChecked ? <Check size={14} /> : null}
+                          <span>{isChecked ? 'Included' : 'Exclude'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              </div>
+
+              {/* Split Method Selector */}
+              <div className="form-group">
+                <label className="form-label">Split Allocation Method</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className={`btn ${splitMethod === 'equal' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setSplitMethod('equal')}
+                  >
+                    Equal Split
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${splitMethod === 'custom' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setSplitMethod('custom')}
+                  >
+                    Custom ($)
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${splitMethod === 'percentage' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setSplitMethod('percentage')}
+                  >
+                    Percentage (%)
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom / Percentage Inputs */}
+              {splitMethod === 'custom' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Custom Dollar Amounts</div>
+                  {selectedParticipants.map((userId) => (
+                    <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <span style={{ fontWeight: 700 }}>{USERS[userId].name}</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-input tabular-nums"
+                        style={{ width: '130px' }}
+                        placeholder="0.00"
+                        value={customSharesStr[userId] || ''}
+                        onChange={(e) =>
+                          setCustomSharesStr({ ...customSharesStr, [userId]: e.target.value })
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {splitMethod === 'percentage' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Percentage Share Allocations</div>
+                  {selectedParticipants.map((userId) => (
+                    <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <span style={{ fontWeight: 700 }}>{USERS[userId].name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="form-input tabular-nums"
+                          style={{ width: '100px' }}
+                          placeholder="0"
+                          value={percentagesStr[userId] || ''}
+                          onChange={(e) =>
+                            setPercentagesStr({ ...percentagesStr, [userId]: e.target.value })
+                          }
+                        />
+                        <span style={{ fontWeight: 800, color: 'var(--text-muted)' }}>%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {/* Optional Notes */}
@@ -474,7 +513,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              {initialExpense ? 'Save Changes' : 'Confirm Expense'}
+              {initialExpense ? 'Save Changes' : scope === 'personal' ? 'Save Personal Expense' : 'Confirm Shared Expense'}
             </button>
           </div>
         </form>

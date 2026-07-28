@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import type { TabType } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { ExpenseList } from './components/ExpenseList';
 import { SettlementView } from './components/SettlementView';
 import { MonthlySummary } from './components/MonthlySummary';
+import { PersonalWallet } from './components/PersonalWallet';
 import { AddExpenseModal } from './components/AddExpenseModal';
+import { AuthModal } from './components/AuthModal';
 import { ConfirmModal } from './components/ConfirmModal';
 
 import type { Expense, Settlement, SimplifiedTransaction } from './types';
@@ -18,7 +21,9 @@ import {
 } from './utils/storage';
 import { calculateNetBalances, calculateSimplifiedSettlements } from './utils/settlementEngine';
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { activeUserId } = useAuth();
+
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
@@ -26,6 +31,7 @@ export const App: React.FC = () => {
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -48,8 +54,17 @@ export const App: React.FC = () => {
     document.documentElement.setAttribute('data-theme', nextTheme);
   };
 
-  // Calculate pending simplified settlements for badge count
-  const userBalances = calculateNetBalances(expenses, settlements);
+  // Filter household shared expenses vs personal expenses
+  const householdExpenses = useMemo(() => {
+    return expenses.filter((e) => e.scope !== 'personal');
+  }, [expenses]);
+
+  const personalExpenses = useMemo(() => {
+    return expenses.filter((e) => e.scope === 'personal' && e.ownerId === activeUserId);
+  }, [expenses, activeUserId]);
+
+  // Calculate pending simplified settlements for household
+  const userBalances = calculateNetBalances(householdExpenses, settlements);
   const pendingSettlementsCount = calculateSimplifiedSettlements(userBalances).length;
 
   // Add / Edit Expense handler
@@ -129,16 +144,18 @@ export const App: React.FC = () => {
           setEditingExpense(null);
           setIsAddExpenseOpen(true);
         }}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
         theme={theme}
         toggleTheme={toggleTheme}
-        expenseCount={expenses.length}
+        expenseCount={householdExpenses.length}
         settlementCount={pendingSettlementsCount}
+        personalCount={personalExpenses.length}
       />
 
       <main className="main-content">
         {activeTab === 'dashboard' && (
           <Dashboard
-            expenses={expenses}
+            expenses={householdExpenses}
             settlements={settlements}
             onOpenAddExpense={() => {
               setEditingExpense(null);
@@ -152,7 +169,7 @@ export const App: React.FC = () => {
 
         {activeTab === 'expenses' && (
           <ExpenseList
-            expenses={expenses}
+            expenses={householdExpenses}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setIsAddExpenseOpen(true);
@@ -167,14 +184,22 @@ export const App: React.FC = () => {
 
         {activeTab === 'settlement' && (
           <SettlementView
-            expenses={expenses}
+            expenses={householdExpenses}
             settlements={settlements}
             onMarkSettled={(tx) => setPendingSettlementTx(tx)}
           />
         )}
 
+        {activeTab === 'personal' && (
+          <PersonalWallet
+            expenses={expenses}
+            onSaveExpense={handleSaveExpense}
+            onDeleteExpense={(id) => setDeletingExpenseId(id)}
+          />
+        )}
+
         {activeTab === 'monthly' && (
-          <MonthlySummary expenses={expenses} settlements={settlements} />
+          <MonthlySummary expenses={householdExpenses} settlements={settlements} />
         )}
       </main>
 
@@ -189,11 +214,17 @@ export const App: React.FC = () => {
         initialExpense={editingExpense}
       />
 
+      {/* Auth & Switch Profile Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+
       {/* Delete Confirm Modal */}
       <ConfirmModal
         isOpen={!!deletingExpenseId}
         title="Delete Expense"
-        message="Are you sure you want to delete this expense? All household balances and settlements will be automatically recalculated."
+        message="Are you sure you want to delete this expense record?"
         confirmText="Delete"
         variant="danger"
         onConfirm={handleDeleteExpenseConfirm}
@@ -204,7 +235,7 @@ export const App: React.FC = () => {
       <ConfirmModal
         isOpen={isResetConfirmOpen}
         title="Reset Demo Data"
-        message="This will reset all household expenses and settlements to the default sample scenarios (Scenarios A through E). Proceed?"
+        message="This will reset all household expenses and settlements to default sample scenarios. Proceed?"
         confirmText="Reset All Data"
         variant="danger"
         onConfirm={handleResetDataConfirm}
@@ -229,5 +260,11 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export const App: React.FC = () => (
+  <AuthProvider>
+    <AppContent />
+  </AuthProvider>
+);
 
 export default App;
