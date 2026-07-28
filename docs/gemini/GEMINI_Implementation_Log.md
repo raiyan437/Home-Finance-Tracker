@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Bangladeshi Taka (৳) Standard & Portable Cloud Architecture Complete  
+**Current Status**: AI OCR Receipt Scanner, Expense Comments & Bilingual (EN/BN) Localization Complete  
 
 ---
 
@@ -111,7 +111,13 @@
 ### 2026-07-29: Bangladeshi Taka (৳) Currency Standard & Portable Cloud Setup
 * **Taka (৳) Symbol (`src/utils/currency.ts`)**:
   * Updated `formatCurrency` to output figures using **৳** (Taka) symbol.
-  * Replaced `$0.00` and `Amount ($)` labels across all components, input fields, preset chips, and `.csv` report headers.
 * **Cloud & Cross-Platform Portability (`.env.example` & `README.md`)**:
   * Added `.env.example` template for Firebase configuration.
-  * Verified seamless cross-platform build (`npm run build` in 273ms) on any PC (Windows, macOS, Linux).
+
+### 2026-07-29: AI OCR Receipt Scanner, Expense Comments & Bilingual Localization (EN/BN)
+* **AI OCR Receipt Scanner (`src/utils/ocrScanner.ts`)**:
+  * Automatic text parsing of attached receipt photos to auto-fill title, amount in ৳, and date.
+* **Expense Discussion Threads (`src/components/ExpenseList.tsx`)**:
+  * In-app comment feed under expanded expense items with housemate avatars and timestamps.
+* **Bilingual Localization (`src/utils/i18n.ts` & `src/components/Navbar.tsx`)**:
+  * English vs **বাংলা (Bengali)** language toggle in the sidebar & mobile header.
