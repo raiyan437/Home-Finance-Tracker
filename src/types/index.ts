@@ -15,6 +15,21 @@ export type SplitMethod = 'equal' | 'custom' | 'percentage';
 
 export type ExpenseScope = 'household' | 'personal';
 
+export type PaymentMethodType = 'cash' | 'card';
+
+export interface PaymentCard {
+  id: string;
+  bankName: string;
+  color: string; // Gradient or CSS color token
+  ownerId?: UserId;
+  createdAt: string;
+}
+
+export interface PaymentMethodInfo {
+  type: PaymentMethodType;
+  cardId?: string; // ID of PaymentCard if type === 'card'
+}
+
 export interface Share {
   userId: UserId;
   amountCents: number;
@@ -32,6 +47,7 @@ export interface Expense {
   shares: Share[];
   scope?: ExpenseScope; // 'household' (shared) vs 'personal' (private wallet)
   ownerId?: UserId;     // Owner ID for personal private expenses
+  paymentMethod?: PaymentMethodInfo; // Cash vs specific Card
   notes?: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string

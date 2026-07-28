@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope } from '../types';
+import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType } from '../types';
 import { ALL_USERS, USERS } from '../utils/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,13 +10,14 @@ import {
   formatCurrency,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
-import { X, Check, AlertCircle, Sparkles, Receipt, Users, Wallet } from 'lucide-react';
+import { X, Check, AlertCircle, Sparkles, Receipt, Users, Wallet, CreditCard, Banknote } from 'lucide-react';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaveExpense: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>, editingId?: string) => void;
   initialExpense?: Expense | null;
+  cards?: PaymentCard[];
 }
 
 const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
@@ -34,6 +35,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onClose,
   onSaveExpense,
   initialExpense,
+  cards = [],
 }) => {
   const { activeUserId } = useAuth();
 
@@ -44,6 +46,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
   const [scope, setScope] = useState<ExpenseScope>('household');
+  const [paymentType, setPaymentType] = useState<PaymentMethodType>('cash');
+  const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [selectedParticipants, setSelectedParticipants] = useState<UserId[]>(['raiyan', 'himel', 'lazim']);
   const [customSharesStr, setCustomSharesStr] = useState<Record<UserId, string>>({
     raiyan: '',
@@ -68,6 +72,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setDate(initialExpense.date);
       setSplitMethod(initialExpense.splitMethod);
       setScope(initialExpense.scope || 'household');
+      setPaymentType(initialExpense.paymentMethod?.type || 'cash');
+      setSelectedCardId(initialExpense.paymentMethod?.cardId || (cards[0]?.id || ''));
       setNotes(initialExpense.notes || '');
 
       const partIds = initialExpense.shares.map((s) => s.userId);
@@ -93,13 +99,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setDate(new Date().toISOString().split('T')[0]);
       setSplitMethod('equal');
       setScope('household');
+      setPaymentType('cash');
+      setSelectedCardId(cards[0]?.id || '');
       setSelectedParticipants(['raiyan', 'himel', 'lazim']);
       setCustomSharesStr({ raiyan: '', himel: '', lazim: '' });
       setPercentagesStr({ raiyan: '33.33', himel: '33.33', lazim: '33.34' });
       setNotes('');
       setErrorMessage(null);
     }
-  }, [initialExpense, isOpen, activeUserId]);
+  }, [initialExpense, isOpen, activeUserId, cards]);
 
   if (!isOpen) return null;
 
@@ -209,6 +217,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         shares: finalShares,
         scope,
         ownerId: paidBy,
+        paymentMethod: {
+          type: paymentType,
+          cardId: paymentType === 'card' ? (selectedCardId || cards[0]?.id) : undefined,
+        },
         notes: notes.trim(),
       },
       initialExpense ? initialExpense.id : undefined
@@ -243,7 +255,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             onClick={() => setScope('household')}
           >
             <Users size={16} />
-            <span>Shared Household Expense</span>
+            <span>Shared Household</span>
           </button>
           <button
             type="button"
@@ -252,7 +264,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             onClick={() => setScope('personal')}
           >
             <Wallet size={16} style={{ color: 'var(--accent-purple)' }} />
-            <span>Private Personal Expense</span>
+            <span>Private Personal</span>
           </button>
         </div>
 
@@ -330,6 +342,58 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Payment Method Selector (Cash vs Bank Card) */}
+          <div className="form-group">
+            <label className="form-label">Payment Channel</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className={`btn ${paymentType === 'cash' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                onClick={() => setPaymentType('cash')}
+              >
+                <Banknote size={16} />
+                <span>Cash</span>
+              </button>
+              <button
+                type="button"
+                className={`btn ${paymentType === 'card' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                onClick={() => {
+                  setPaymentType('card');
+                  if (!selectedCardId && cards.length > 0) {
+                    setSelectedCardId(cards[0].id);
+                  }
+                }}
+              >
+                <CreditCard size={16} />
+                <span>Bank Card</span>
+              </button>
+            </div>
+
+            {paymentType === 'card' && (
+              <div style={{ marginTop: '8px' }}>
+                {cards.length === 0 ? (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', background: 'var(--bg-input)', padding: '10px', borderRadius: 'var(--radius-sm)' }}>
+                    No cards created yet. Go to "Payment Cards" tab to add your bank cards!
+                  </div>
+                ) : (
+                  <select
+                    className="form-select"
+                    value={selectedCardId}
+                    onChange={(e) => setSelectedCardId(e.target.value)}
+                  >
+                    {cards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        💳 {c.bankName} ({USERS[c.ownerId || activeUserId]?.name || 'Card'})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Category & Date Row */}

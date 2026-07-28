@@ -1,9 +1,9 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
-import { LayoutDashboard, Receipt, ArrowLeftRight, Calendar, Plus, Sun, Moon, Home, Sparkles, Wallet, UserCheck } from 'lucide-react';
+import { LayoutDashboard, Receipt, ArrowLeftRight, Calendar, Plus, Sun, Moon, Home, Sparkles, Wallet, UserCheck, CreditCard } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal';
+export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -15,6 +15,7 @@ interface NavbarProps {
   expenseCount?: number;
   settlementCount?: number;
   personalCount?: number;
+  cardsCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -27,6 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   expenseCount,
   settlementCount,
   personalCount,
+  cardsCount,
 }) => {
   const { userProfile } = useAuth();
 
@@ -127,6 +129,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
+            className={`nav-item ${activeTab === 'cards' ? 'active' : ''}`}
+            onClick={() => setActiveTab('cards')}
+          >
+            <div className="nav-item-left">
+              <CreditCard size={19} style={{ color: 'var(--accent-cyan)' }} />
+              <span>Payment Cards</span>
+            </div>
+            {cardsCount !== undefined && cardsCount > 0 && (
+              <span className="nav-badge" style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', color: 'var(--accent-cyan)' }}>
+                {cardsCount}
+              </span>
+            )}
+          </button>
+
+          <button
             className={`nav-item ${activeTab === 'monthly' ? 'active' : ''}`}
             onClick={() => setActiveTab('monthly')}
           >
@@ -177,19 +194,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
+          className={`mobile-nav-item ${activeTab === 'cards' ? 'active' : ''}`}
+          onClick={() => setActiveTab('cards')}
+        >
+          <CreditCard size={20} />
+          <span>Cards</span>
+        </button>
+
+        <button
           className={`mobile-nav-item ${activeTab === 'personal' ? 'active' : ''}`}
           onClick={() => setActiveTab('personal')}
         >
           <Wallet size={20} />
           <span>Wallet</span>
-        </button>
-
-        <button
-          className={`mobile-nav-item ${activeTab === 'settlement' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settlement')}
-        >
-          <ArrowLeftRight size={20} />
-          <span>Settle</span>
         </button>
       </nav>
     </>

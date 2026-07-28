@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import type { Expense, UserId, Category } from '../types';
+import type { Expense, UserId, Category, PaymentCard } from '../types';
 import { USERS, ALL_USERS } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
-import { Search, Edit, Trash2, Plus, Receipt, ChevronDown, ChevronUp, Filter, FileText } from 'lucide-react';
+import { Search, Edit, Trash2, Plus, Receipt, ChevronDown, ChevronUp, Filter, FileText, CreditCard, Banknote } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
+  cards?: PaymentCard[];
   onOpenAddExpense: () => void;
   onEditExpense: (expense: Expense) => void;
   onDeleteExpense: (expenseId: string) => void;
@@ -16,6 +17,7 @@ const ALL_CATEGORIES: (Category | 'All')[] = ['All', 'Groceries', 'Household', '
 
 export const ExpenseList: React.FC<ExpenseListProps> = ({
   expenses,
+  cards = [],
   onOpenAddExpense,
   onEditExpense,
   onDeleteExpense,
@@ -23,7 +25,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [selectedUserFilter, setSelectedUserFilter] = useState<UserId | 'All'>('All');
+  const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<'All' | 'cash' | 'card'>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const cardsMap = useMemo(() => {
+    const map: Record<string, PaymentCard> = {};
+    cards.forEach((c) => {
+      map[c.id] = c;
+    });
+    return map;
+  }, [cards]);
 
   // Filter logic
   const filteredExpenses = useMemo(() => {
@@ -53,10 +64,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           if (!isPayer && !isParticipant) return false;
         }
 
+        // Payment Channel filter
+        if (selectedPaymentFilter !== 'All') {
+          const type = exp.paymentMethod?.type || 'cash';
+          if (type !== selectedPaymentFilter) return false;
+        }
+
         return true;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, searchQuery, selectedCategory, selectedUserFilter]);
+  }, [expenses, searchQuery, selectedCategory, selectedUserFilter, selectedPaymentFilter]);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -69,7 +86,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
         <div className="page-title-group">
           <h1 className="page-title">Expense Log</h1>
           <p className="page-description">
-            Complete audit trail of all shared household purchases, splits, and custom allocations
+            Complete audit trail of all shared household purchases, splits, payment channels, and custom allocations
           </p>
         </div>
 
@@ -126,13 +143,26 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             ))}
           </select>
 
-          {(searchQuery || selectedCategory !== 'All' || selectedUserFilter !== 'All') && (
+          {/* Payment Method Filter */}
+          <select
+            className="form-select"
+            style={{ width: '150px' }}
+            value={selectedPaymentFilter}
+            onChange={(e) => setSelectedPaymentFilter(e.target.value as 'All' | 'cash' | 'card')}
+          >
+            <option value="All">All Payments</option>
+            <option value="cash">💵 Cash</option>
+            <option value="card">💳 Bank Card</option>
+          </select>
+
+          {(searchQuery || selectedCategory !== 'All' || selectedUserFilter !== 'All' || selectedPaymentFilter !== 'All') && (
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('All');
                 setSelectedUserFilter('All');
+                setSelectedPaymentFilter('All');
               }}
             >
               Reset Filters
@@ -153,6 +183,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
               setSearchQuery('');
               setSelectedCategory('All');
               setSelectedUserFilter('All');
+              setSelectedPaymentFilter('All');
             }}
           >
             Clear Active Filters
@@ -163,6 +194,8 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           {filteredExpenses.map((exp) => {
             const payer = USERS[exp.paidBy];
             const isExpanded = expandedId === exp.id;
+            const pm = exp.paymentMethod;
+            const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
 
             return (
               <div
@@ -179,6 +212,21 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       <div className="expense-title-row">
                         <span className="expense-title">{exp.title}</span>
                         <span className={`cat-pill cat-${exp.category}`}>{exp.category}</span>
+                        
+                        {/* Payment Channel Badge */}
+                        <span className="share-mini-tag" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
+                          {pm?.type === 'card' ? (
+                            <>
+                              <CreditCard size={12} style={{ color: 'var(--accent-primary)' }} />
+                              <span>{cardObj ? cardObj.bankName : 'Bank Card'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Banknote size={12} style={{ color: 'var(--accent-emerald)' }} />
+                              <span>Cash</span>
+                            </>
+                          )}
+                        </span>
                       </div>
                       <div className="expense-meta-row">
                         <span>Paid by <strong>{payer.name}</strong></span>

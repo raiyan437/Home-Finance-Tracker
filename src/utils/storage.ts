@@ -1,7 +1,32 @@
-import type { Expense, Settlement } from '../types';
+import type { Expense, Settlement, PaymentCard } from '../types';
 
 const EXPENSES_STORAGE_KEY = 'home_finance_expenses_v1';
 const SETTLEMENTS_STORAGE_KEY = 'home_finance_settlements_v1';
+const CARDS_STORAGE_KEY = 'home_finance_cards_v1';
+
+export const SEED_CARDS: PaymentCard[] = [
+  {
+    id: 'card-101',
+    bankName: 'Chase Sapphire Visa',
+    color: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+    ownerId: 'raiyan',
+    createdAt: '2026-07-01T00:00:00.000Z',
+  },
+  {
+    id: 'card-102',
+    bankName: 'City Emerald Debit',
+    color: 'linear-gradient(135deg, #065f46, #10b981)',
+    ownerId: 'himel',
+    createdAt: '2026-07-01T00:00:00.000Z',
+  },
+  {
+    id: 'card-103',
+    bankName: 'Amex Violet Preferred',
+    color: 'linear-gradient(135deg, #5b21b6, #8b5cf6)',
+    ownerId: 'lazim',
+    createdAt: '2026-07-01T00:00:00.000Z',
+  },
+];
 
 export const SEED_EXPENSES: Expense[] = [
   {
@@ -17,6 +42,7 @@ export const SEED_EXPENSES: Expense[] = [
       { userId: 'himel', amountCents: 3000 },
       { userId: 'lazim', amountCents: 3000 },
     ],
+    paymentMethod: { type: 'card', cardId: 'card-101' },
     notes: 'Supermarket haul for household essentials',
     createdAt: '2026-07-20T10:00:00.000Z',
     updatedAt: '2026-07-20T10:00:00.000Z',
@@ -34,6 +60,7 @@ export const SEED_EXPENSES: Expense[] = [
       { userId: 'himel', amountCents: 2000 },
       { userId: 'lazim', amountCents: 2000 },
     ],
+    paymentMethod: { type: 'card', cardId: 'card-102' },
     notes: 'Paper towels, dish soap, trash bags',
     createdAt: '2026-07-22T14:30:00.000Z',
     updatedAt: '2026-07-22T14:30:00.000Z',
@@ -50,6 +77,7 @@ export const SEED_EXPENSES: Expense[] = [
       { userId: 'raiyan', amountCents: 2250 },
       { userId: 'lazim', amountCents: 2250 },
     ],
+    paymentMethod: { type: 'cash' },
     notes: 'Shared between Raiyan and Lazim',
     createdAt: '2026-07-24T16:15:00.000Z',
     updatedAt: '2026-07-24T16:15:00.000Z',
@@ -63,6 +91,7 @@ export const SEED_EXPENSES: Expense[] = [
     date: '2026-07-25',
     splitMethod: 'equal',
     shares: [{ userId: 'himel', amountCents: 2500 }],
+    paymentMethod: { type: 'card', cardId: 'card-101' },
     notes: 'Personal purchase made on behalf of Himel',
     createdAt: '2026-07-25T11:20:00.000Z',
     updatedAt: '2026-07-25T11:20:00.000Z',
@@ -76,6 +105,7 @@ export const SEED_EXPENSES: Expense[] = [
     date: '2026-07-26',
     splitMethod: 'equal',
     shares: [{ userId: 'raiyan', amountCents: 1500 }],
+    paymentMethod: { type: 'cash' },
     notes: 'Personal item bought for Raiyan',
     createdAt: '2026-07-26T18:45:00.000Z',
     updatedAt: '2026-07-26T18:45:00.000Z',
@@ -123,8 +153,31 @@ export const saveSettlements = (settlements: Settlement[]): void => {
   }
 };
 
-export const resetToSeedData = (): { expenses: Expense[]; settlements: Settlement[] } => {
+export const loadCards = (): PaymentCard[] => {
+  try {
+    const data = localStorage.getItem(CARDS_STORAGE_KEY);
+    if (!data) {
+      saveCards(SEED_CARDS);
+      return SEED_CARDS;
+    }
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('Failed to load cards from localStorage', err);
+    return SEED_CARDS;
+  }
+};
+
+export const saveCards = (cards: PaymentCard[]): void => {
+  try {
+    localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify(cards));
+  } catch (err) {
+    console.error('Failed to save cards to localStorage', err);
+  }
+};
+
+export const resetToSeedData = (): { expenses: Expense[]; settlements: Settlement[]; cards: PaymentCard[] } => {
   saveExpenses(SEED_EXPENSES);
   saveSettlements([]);
-  return { expenses: SEED_EXPENSES, settlements: [] };
+  saveCards(SEED_CARDS);
+  return { expenses: SEED_EXPENSES, settlements: [], cards: SEED_CARDS };
 };

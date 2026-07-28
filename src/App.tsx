@@ -7,16 +7,19 @@ import { ExpenseList } from './components/ExpenseList';
 import { SettlementView } from './components/SettlementView';
 import { MonthlySummary } from './components/MonthlySummary';
 import { PersonalWallet } from './components/PersonalWallet';
+import { CardsManager } from './components/CardsManager';
 import { AddExpenseModal } from './components/AddExpenseModal';
 import { AuthModal } from './components/AuthModal';
 import { ConfirmModal } from './components/ConfirmModal';
 
-import type { Expense, Settlement, SimplifiedTransaction } from './types';
+import type { Expense, Settlement, SimplifiedTransaction, PaymentCard } from './types';
 import {
   loadExpenses,
   saveExpenses,
   loadSettlements,
   saveSettlements,
+  loadCards,
+  saveCards,
   resetToSeedData,
 } from './utils/storage';
 import { calculateNetBalances, calculateSimplifiedSettlements } from './utils/settlementEngine';
@@ -27,6 +30,7 @@ const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [cards, setCards] = useState<PaymentCard[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   // Modals state
@@ -41,6 +45,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     setExpenses(loadExpenses());
     setSettlements(loadSettlements());
+    setCards(loadCards());
 
     const savedTheme = (localStorage.getItem('home_finance_theme') as 'dark' | 'light') || 'dark';
     setTheme(savedTheme);
@@ -62,6 +67,10 @@ const AppContent: React.FC = () => {
   const personalExpenses = useMemo(() => {
     return expenses.filter((e) => e.scope === 'personal' && e.ownerId === activeUserId);
   }, [expenses, activeUserId]);
+
+  const userCards = useMemo(() => {
+    return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
+  }, [cards, activeUserId]);
 
   // Calculate pending simplified settlements for household
   const userBalances = calculateNetBalances(householdExpenses, settlements);
@@ -108,6 +117,36 @@ const AppContent: React.FC = () => {
     setDeletingExpenseId(null);
   };
 
+  // Card Management handlers
+  const handleAddCard = (
+    cardData: Omit<PaymentCard, 'id' | 'createdAt'>,
+    editingId?: string
+  ) => {
+    const now = new Date().toISOString();
+    if (editingId) {
+      const updated = cards.map((c) =>
+        c.id === editingId ? { ...c, ...cardData } : c
+      );
+      setCards(updated);
+      saveCards(updated);
+    } else {
+      const newCard: PaymentCard = {
+        ...cardData,
+        id: `card-${Date.now()}`,
+        createdAt: now,
+      };
+      const updated = [...cards, newCard];
+      setCards(updated);
+      saveCards(updated);
+    }
+  };
+
+  const handleDeleteCard = (cardId: string) => {
+    const updated = cards.filter((c) => c.id !== cardId);
+    setCards(updated);
+    saveCards(updated);
+  };
+
   // Mark Settlement Completed
   const handleMarkSettledConfirm = () => {
     if (!pendingSettlementTx) return;
@@ -130,9 +169,10 @@ const AppContent: React.FC = () => {
 
   // Reset to Seed Data
   const handleResetDataConfirm = () => {
-    const { expenses: seedExp, settlements: seedSt } = resetToSeedData();
+    const { expenses: seedExp, settlements: seedSt, cards: seedCards } = resetToSeedData();
     setExpenses(seedExp);
     setSettlements(seedSt);
+    setCards(seedCards);
   };
 
   return (
@@ -150,6 +190,7 @@ const AppContent: React.FC = () => {
         expenseCount={householdExpenses.length}
         settlementCount={pendingSettlementsCount}
         personalCount={personalExpenses.length}
+        cardsCount={userCards.length}
       />
 
       <main className="main-content">
@@ -170,6 +211,7 @@ const AppContent: React.FC = () => {
         {activeTab === 'expenses' && (
           <ExpenseList
             expenses={householdExpenses}
+            cards={cards}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setIsAddExpenseOpen(true);
@@ -198,6 +240,15 @@ const AppContent: React.FC = () => {
           />
         )}
 
+        {activeTab === 'cards' && (
+          <CardsManager
+            cards={cards}
+            expenses={expenses}
+            onAddCard={handleAddCard}
+            onDeleteCard={handleDeleteCard}
+          />
+        )}
+
         {activeTab === 'monthly' && (
           <MonthlySummary expenses={householdExpenses} settlements={settlements} />
         )}
@@ -212,6 +263,7 @@ const AppContent: React.FC = () => {
         }}
         onSaveExpense={handleSaveExpense}
         initialExpense={editingExpense}
+        cards={cards}
       />
 
       {/* Auth & Switch Profile Modal */}
@@ -235,7 +287,7 @@ const AppContent: React.FC = () => {
       <ConfirmModal
         isOpen={isResetConfirmOpen}
         title="Reset Demo Data"
-        message="This will reset all household expenses and settlements to default sample scenarios. Proceed?"
+        message="This will reset all household expenses, settlements, and cards to default sample scenarios. Proceed?"
         confirmText="Reset All Data"
         variant="danger"
         onConfirm={handleResetDataConfirm}
