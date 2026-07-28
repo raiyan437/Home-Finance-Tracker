@@ -1,8 +1,8 @@
 # GEMINI Implementation Log
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
-**Last Updated**: 2026-07-28  
-**Current Status**: Credit Card vs Debit Card Classification Complete  
+**Last Updated**: 2026-07-29  
+**Current Status**: Personal Wallet Payment Channels & All-Time Total Spent Card Complete  
 
 ---
 
@@ -97,5 +97,10 @@
 * **Card Modal Selector (`src/components/CardsManager.tsx`)**:
   * Added Credit Card vs Debit Card toggle selector button group when creating or editing a card.
   * Visual 3D card layout displays prominent `CREDIT CARD` or `DEBIT CARD` text badge.
-* **Expense Dropdown & List Badges (`src/components/AddExpenseModal.tsx` & `src/components/ExpenseList.tsx`)**:
-  * Displayed Credit vs Debit labels in payment dropdowns and expense item badges.
+
+### 2026-07-29: Personal Wallet Payment Channel Selector & All-Time Total Spent Summary
+* **Payment Channel Selector (`src/components/PersonalWallet.tsx`)**:
+  * Added Cash vs Bank Cards picker (supporting user's created Credit & Debit cards) inside `PersonalWallet`'s expense logging modal.
+  * Displayed payment channel badges (e.g. 💳 *Chase Sapphire (Credit)* or 💵 *Cash*) on personal purchase items.
+* **All-Time Total Personal Spent Stat Card (`src/components/PersonalWallet.tsx`)**:
+  * Added hero stat card displaying **All-Time Total Personal Spent** (`grandTotalPersonalSpentCents`), alongside monthly outlay and target budget progress.
