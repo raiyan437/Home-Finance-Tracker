@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Add Expense Modal Crash-Proof Resolution Complete  
+**Current Status**: Render Loop & ErrorBoundary Resolution Complete  
 
 ---
 
@@ -128,7 +128,8 @@
 * **Vite Rollup Config (`vite.config.ts`)**:
   * Updated `build.rollupOptions` chunking for standard Vite Rollup pipeline.
 
-### 2026-07-29: Add Expense Modal Crash-Proof Resolution
-* **Safe Avatar & User Indexing (`src/components/UserAvatar.tsx` & `src/components/AddExpenseModal.tsx`)**:
-  * Made `UserAvatar` 100% crash-proof with fallback default user prop.
-  * Added safe optional chaining (`USERS[userId]?.name || userId`) across modal participant checklists and custom/percentage split rows to eliminate undefined indexing errors.
+### 2026-07-29: Add Expense Modal Render Loop Fix & ErrorBoundary Integration
+* **Render Loop Fix (`src/components/AddExpenseModal.tsx`)**:
+  * Fixed `useEffect` dependency array `[isOpen, initialExpense]` with `if (!isOpen) return;` guard to eliminate re-render loops caused by array prop reference changes.
+* **React Error Boundary (`src/components/ErrorBoundary.tsx` & `src/App.tsx`)**:
+  * Wrapped entire application in `ErrorBoundary` class component to catch any uncaught UI exceptions and render a recovery screen instead of letting the DOM turn blank.
