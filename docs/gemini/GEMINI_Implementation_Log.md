@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Credit Card vs Debit Card Classification Complete  
+**Current Status**: Dribbble Modern Finance UI/UX Redesign Complete  
 
 ---
 
@@ -91,11 +91,10 @@
 * **Receipt Attachments & CSV Export (`src/utils/exportCsv.ts`)**:
   * Allowed uploading and previewing receipt photos attached to expenses with CSV audit exports.
 
-### 2026-07-28: Credit Card vs Debit Card Type Classification
-* **Card Type Field (`src/types/index.ts`)**:
-  * Added `cardType?: 'debit' | 'credit'` to `PaymentCard`.
-* **Card Modal Selector (`src/components/CardsManager.tsx`)**:
-  * Added Credit Card vs Debit Card toggle selector button group when creating or editing a card.
-  * Visual 3D card layout displays prominent `CREDIT CARD` or `DEBIT CARD` text badge.
-* **Expense Dropdown & List Badges (`src/components/AddExpenseModal.tsx` & `src/components/ExpenseList.tsx`)**:
-  * Displayed Credit vs Debit labels in payment dropdowns and expense item badges.
+### 2026-07-28: Dribbble Modern Finance UI/UX Redesign
+* **Modern Slate Obsidian Theme (`src/index.css`)**:
+  * Applied `#060911` midnight background with `#0f172a` glass surface cards, `Plus Jakarta Sans` typography, monospaced tabular figures, and glowing status borders.
+* **Dashboard Hero Stat Grid (`src/components/Dashboard.tsx`)**:
+  * Designed 4 metric hero cards featuring percentage trend badges, icon circles, and interactive housemate balance ledgers.
+* **Mobile Responsiveness**:
+  * Floating glass bottom navigation bar with safe-area insets and vertically stacking mobile cards.
