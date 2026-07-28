@@ -1,22 +1,26 @@
 import type { User, UserId, Expense, Settlement, UserBalance, SimplifiedTransaction } from '../types';
 
+import raiyanAvatar from '../assets/avatars/raiyan.png';
+import himelAvatar from '../assets/avatars/himel.png';
+import lazimAvatar from '../assets/avatars/lazim.png';
+
 export const USERS: Record<UserId, User> = {
   raiyan: {
     id: 'raiyan',
     name: 'Raiyan',
-    avatar: '/avatars/raiyan.png',
+    avatar: raiyanAvatar,
     color: '#3b82f6', // Ocean Blue
   },
   himel: {
     id: 'himel',
     name: 'Himel',
-    avatar: '/avatars/himel.png',
+    avatar: himelAvatar,
     color: '#10b981', // Emerald Green
   },
   lazim: {
     id: 'lazim',
     name: 'Lazim',
-    avatar: '/avatars/lazim.png',
+    avatar: lazimAvatar,
     color: '#8b5cf6', // Violet Purple
   },
 };

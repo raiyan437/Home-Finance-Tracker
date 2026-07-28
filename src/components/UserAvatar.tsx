@@ -9,7 +9,7 @@ interface UserAvatarProps {
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, className = '', style = {} }) => {
-  const isImage = user.avatar.startsWith('/') || user.avatar.startsWith('http') || user.avatar.endsWith('.png') || user.avatar.endsWith('.jpg');
+  const isImage = typeof user.avatar === 'string' && (user.avatar.includes('/') || user.avatar.includes('.') || user.avatar.startsWith('data:'));
 
   return (
     <div
