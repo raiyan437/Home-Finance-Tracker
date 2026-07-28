@@ -6,7 +6,7 @@ import type { Expense, Settlement, PaymentCard } from '../types';
  * Listens for realtime changes to the Firestore `expenses` collection.
  */
 export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void) => {
-  if (!isFirebaseConfigured) return () => {};
+  if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'expenses');
@@ -33,7 +33,7 @@ export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void) => {
  * Saves or updates an expense in Firestore.
  */
 export const syncSaveExpense = async (expense: Expense) => {
-  if (!isFirebaseConfigured) return;
+  if (!isFirebaseConfigured || !db) return;
   try {
     const docRef = doc(db, 'expenses', expense.id);
     await setDoc(docRef, expense, { merge: true });
@@ -46,7 +46,7 @@ export const syncSaveExpense = async (expense: Expense) => {
  * Deletes an expense from Firestore.
  */
 export const syncDeleteExpense = async (expenseId: string) => {
-  if (!isFirebaseConfigured) return;
+  if (!isFirebaseConfigured || !db) return;
   try {
     await deleteDoc(doc(db, 'expenses', expenseId));
   } catch (err) {
@@ -58,7 +58,7 @@ export const syncDeleteExpense = async (expenseId: string) => {
  * Listens for realtime changes to the Firestore `settlements` collection.
  */
 export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => void) => {
-  if (!isFirebaseConfigured) return () => {};
+  if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'settlements');
@@ -84,7 +84,7 @@ export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => vo
  * Saves a settlement in Firestore.
  */
 export const syncSaveSettlement = async (settlement: Settlement) => {
-  if (!isFirebaseConfigured) return;
+  if (!isFirebaseConfigured || !db) return;
   try {
     const docRef = doc(db, 'settlements', settlement.id);
     await setDoc(docRef, settlement, { merge: true });
@@ -97,7 +97,7 @@ export const syncSaveSettlement = async (settlement: Settlement) => {
  * Listens for realtime changes to the Firestore `cards` collection.
  */
 export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void) => {
-  if (!isFirebaseConfigured) return () => {};
+  if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'cards');
@@ -123,7 +123,7 @@ export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void) => {
  * Saves a card in Firestore.
  */
 export const syncSaveCard = async (card: PaymentCard) => {
-  if (!isFirebaseConfigured) return;
+  if (!isFirebaseConfigured || !db) return;
   try {
     const docRef = doc(db, 'cards', card.id);
     await setDoc(docRef, card, { merge: true });
@@ -136,7 +136,7 @@ export const syncSaveCard = async (card: PaymentCard) => {
  * Deletes a card from Firestore.
  */
 export const syncDeleteCard = async (cardId: string) => {
-  if (!isFirebaseConfigured) return;
+  if (!isFirebaseConfigured || !db) return;
   try {
     await deleteDoc(doc(db, 'cards', cardId));
   } catch (err) {

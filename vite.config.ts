@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   base: './', // Ensures relative asset resolution for GitHub Pages and local builds
   build: {
-    rolldownOptions: {
+    rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/firebase')) {

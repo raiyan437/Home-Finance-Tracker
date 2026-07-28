@@ -35,6 +35,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth) {
+      setLoading(false);
+      return () => {};
+    }
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
       setFirebaseUser(fbUser);
       setLoading(false);
@@ -51,17 +55,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
+    if (!auth) throw new Error('Firebase Auth is not configured');
     const cred = await signInWithEmailAndPassword(auth, email, pass);
     setFirebaseUser(cred.user);
   };
 
   const signUpWithEmail = async (email: string, pass: string, housemateId: UserId) => {
+    if (!auth) throw new Error('Firebase Auth is not configured');
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     setFirebaseUser(cred.user);
     switchProfile(housemateId);
   };
 
   const logout = async () => {
+    if (!auth) return;
     await signOut(auth);
     setFirebaseUser(null);
   };
