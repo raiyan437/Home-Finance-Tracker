@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Personal Wallet Payment Channels & All-Time Total Spent Card Complete  
+**Current Status**: Personal Wallet Month & Year Selector Refinement Complete  
 
 ---
 
@@ -98,9 +98,9 @@
   * Added Credit Card vs Debit Card toggle selector button group when creating or editing a card.
   * Visual 3D card layout displays prominent `CREDIT CARD` or `DEBIT CARD` text badge.
 
-### 2026-07-29: Personal Wallet Payment Channel Selector & All-Time Total Spent Summary
-* **Payment Channel Selector (`src/components/PersonalWallet.tsx`)**:
-  * Added Cash vs Bank Cards picker (supporting user's created Credit & Debit cards) inside `PersonalWallet`'s expense logging modal.
-  * Displayed payment channel badges (e.g. 💳 *Chase Sapphire (Credit)* or 💵 *Cash*) on personal purchase items.
-* **All-Time Total Personal Spent Stat Card (`src/components/PersonalWallet.tsx`)**:
-  * Added hero stat card displaying **All-Time Total Personal Spent** (`grandTotalPersonalSpentCents`), alongside monthly outlay and target budget progress.
+### 2026-07-29: Personal Wallet Month & Year Selector Refinement
+* **Removed All-Time Spent Section (`src/components/PersonalWallet.tsx`)**:
+  * Removed the all-time spent card to keep the personal wallet layout clean and month-focused.
+* **Calendar Month/Year Selector (`src/components/PersonalWallet.tsx`)**:
+  * Added a `Calendar` icon + Month/Year dropdown selector inside the **Monthly Personal Outlay** header card.
+  * Selecting a month/year updates total personal outlay, category spend breakdown, and purchase ledger for that specific month.
