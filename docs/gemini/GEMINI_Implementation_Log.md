@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Dribbble Modern Finance UI/UX Redesign Complete  
+**Current Status**: Full CSS Layout & Design System Restored & Verified  
 
 ---
 
@@ -91,10 +91,8 @@
 * **Receipt Attachments & CSV Export (`src/utils/exportCsv.ts`)**:
   * Allowed uploading and previewing receipt photos attached to expenses with CSV audit exports.
 
-### 2026-07-28: Dribbble Modern Finance UI/UX Redesign
-* **Modern Slate Obsidian Theme (`src/index.css`)**:
-  * Applied `#060911` midnight background with `#0f172a` glass surface cards, `Plus Jakarta Sans` typography, monospaced tabular figures, and glowing status borders.
-* **Dashboard Hero Stat Grid (`src/components/Dashboard.tsx`)**:
-  * Designed 4 metric hero cards featuring percentage trend badges, icon circles, and interactive housemate balance ledgers.
-* **Mobile Responsiveness**:
-  * Floating glass bottom navigation bar with safe-area insets and vertically stacking mobile cards.
+### 2026-07-28: Layout Restoration & CSS Property Fix
+* **CSS Syntax Fix (`src/index.css`)**:
+  * Corrected invalid camelCase `flexDirection` property back to standard `flex-direction: column;` in `.sidebar`.
+  * Restored full complete suite of layout classes (`.form-group`, `.form-label`, `.summary-card`, `.user-card-top`, `.badge`, `.stat-item`, `.progress-bar-container`, `.participant-checkbox-item`).
+  * Re-verified grid alignment across all screen sizes.
