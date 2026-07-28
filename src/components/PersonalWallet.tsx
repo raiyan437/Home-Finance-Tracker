@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatCurrency, dollarsToCents } from '../utils/currency';
 import { USERS } from '../utils/settlementEngine';
 import { UserAvatar } from './UserAvatar';
-import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, PieChart, CreditCard, Banknote } from 'lucide-react';
+import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, PieChart, CreditCard, Banknote, Calendar } from 'lucide-react';
 
 interface PersonalWalletProps {
   expenses: Expense[];
@@ -24,7 +24,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   const { userProfile, activeUserId } = useAuth();
 
   const currentMonthKey = new Date().toISOString().slice(0, 7);
-  const [selectedMonth] = useState(currentMonthKey);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingExp, setEditingExp] = useState<Expense | null>(null);
 
@@ -56,13 +56,25 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [expenses, activeUserId]);
 
+  // Available months list for month selector
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    months.add(currentMonthKey);
+    personalExpenses.forEach((exp) => {
+      if (exp.date) {
+        months.add(exp.date.slice(0, 7));
+      }
+    });
+    return Array.from(months).sort().reverse();
+  }, [personalExpenses, currentMonthKey]);
+
+  // Filter expenses by selected month/year
   const monthPersonalExpenses = useMemo(() => {
     return personalExpenses.filter((e) => e.date.startsWith(selectedMonth));
   }, [personalExpenses, selectedMonth]);
 
   // Totals
   const totalPersonalSpentCents = monthPersonalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
-  const grandTotalPersonalSpentCents = personalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
   // Default personal monthly budget target ($500.00)
   const [monthlyBudgetDollars, setMonthlyBudgetDollars] = useState('500.00');
@@ -172,36 +184,52 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
       </div>
 
       {/* Hero Stats & Budget Grid */}
-      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-        {/* Total Lifetime Personal Spent */}
+      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+        {/* Monthly Personal Outlay with Calendar Month Selector */}
         <div className="glass-card summary-card">
-          <div className="summary-card-header">
-            <span className="summary-title">All-Time Total Personal Spent</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
-              <Wallet size={20} />
+          <div className="summary-card-header" style={{ alignItems: 'flex-start' }}>
+            <div>
+              <span className="summary-title">Monthly Personal Outlay</span>
+              {/* Calendar Icon + Month/Year Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                <Calendar size={15} style={{ color: 'var(--accent-purple)' }} />
+                <select
+                  className="form-select"
+                  style={{
+                    padding: '3px 8px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    width: 'auto',
+                    backgroundColor: 'var(--bg-input)',
+                    borderRadius: 'var(--radius-sm)',
+                  }}
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
+                  {availableMonths.map((mKey) => {
+                    const [y, m] = mKey.split('-');
+                    const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+                    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    return (
+                      <option key={mKey} value={mKey}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
             </div>
-          </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-primary)' }}>
-            {formatCurrency(grandTotalPersonalSpentCents)}
-          </div>
-          <div className="summary-footer">
-            <span>{personalExpenses.length} total personal purchases recorded</span>
-          </div>
-        </div>
 
-        {/* Monthly Personal Outlay */}
-        <div className="glass-card summary-card">
-          <div className="summary-card-header">
-            <span className="summary-title">Monthly Personal Outlay</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)', color: 'var(--accent-purple)' }}>
               <TrendingUp size={20} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-purple)' }}>
+
+          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-purple)', marginTop: '12px' }}>
             {formatCurrency(totalPersonalSpentCents)}
           </div>
           <div className="summary-footer">
-            <span>{monthPersonalExpenses.length} purchases in current billing period</span>
+            <span>{monthPersonalExpenses.length} personal purchases logged for this month</span>
           </div>
         </div>
 
@@ -252,7 +280,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
         {Object.keys(categoryTotals).length === 0 ? (
           <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '24px' }}>
-            No personal expenses recorded for this month.
+            No personal expenses recorded for the selected month.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -284,18 +312,18 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
       <div>
         <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '16px' }}>Personal Purchases</h2>
 
-        {personalExpenses.length === 0 ? (
+        {monthPersonalExpenses.length === 0 ? (
           <div className="glass-card empty-state">
             <Wallet className="empty-icon" />
-            <div className="empty-title">Your Personal Wallet is Empty</div>
+            <div className="empty-title">No Personal Expenses For Selected Month</div>
             <p style={{ fontSize: '0.85rem' }}>Log your private expenses here to manage personal budgets independently.</p>
             <button className="btn btn-primary" onClick={() => handleOpenAdd()}>
-              <Plus size={16} /> Add First Personal Expense
+              <Plus size={16} /> Add Personal Expense
             </button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {personalExpenses.map((exp) => {
+            {monthPersonalExpenses.map((exp) => {
               const pm = exp.paymentMethod;
               const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
 
