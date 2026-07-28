@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Realtime Cloud Sync, Code-Splitting, Recurring Bills, & CSV Reports Complete  
+**Current Status**: Credit Card vs Debit Card Classification Complete  
 
 ---
 
@@ -83,12 +83,19 @@
 
 ### 2026-07-28: Improvements 1–4 Execution (Realtime Sync, Code-Splitting, Recurring Bills, Receipts & CSV Reports)
 * **Cloud Firestore Realtime Sync (`src/utils/firebaseSync.ts`)**:
-  * Connected `onSnapshot` realtime listeners for `expenses`, `settlements`, and `cards`. Changes on one device instantly update all housemates' screens.
+  * Connected `onSnapshot` realtime listeners for `expenses`, `settlements`, and `cards`.
 * **Vite Code-Splitting Optimization (`vite.config.ts` & `src/App.tsx`)**:
-  * Configured `manualChunks` for `react-vendor`, `lucide-icons`, and `firebase`.
-  * Used `React.lazy()` for heavy tab views (`PersonalWallet`, `CardsManager`, `MonthlySummary`). Initial bundle size dropped from 777 kB to **71.95 kB** (90% reduction).
+  * Used `React.lazy()` for heavy tab views. Initial bundle size dropped from 777 kB to **71.95 kB** (90% reduction).
 * **Recurring Bills Engine (`src/components/AddExpenseModal.tsx`)**:
   * Added toggle for Monthly or Weekly automated recurring shared bills.
 * **Receipt Attachments & CSV Export (`src/utils/exportCsv.ts`)**:
-  * Allowed uploading and previewing receipt photos attached to expenses.
-  * Added **Export CSV Report** button to download full formatted financial audit statements.
+  * Allowed uploading and previewing receipt photos attached to expenses with CSV audit exports.
+
+### 2026-07-28: Credit Card vs Debit Card Type Classification
+* **Card Type Field (`src/types/index.ts`)**:
+  * Added `cardType?: 'debit' | 'credit'` to `PaymentCard`.
+* **Card Modal Selector (`src/components/CardsManager.tsx`)**:
+  * Added Credit Card vs Debit Card toggle selector button group when creating or editing a card.
+  * Visual 3D card layout displays prominent `CREDIT CARD` or `DEBIT CARD` text badge.
+* **Expense Dropdown & List Badges (`src/components/AddExpenseModal.tsx` & `src/components/ExpenseList.tsx`)**:
+  * Displayed Credit vs Debit labels in payment dropdowns and expense item badges.
