@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { USERS } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
-import { CreditCard, Plus, Trash2, Edit, X, ShieldCheck, Wallet } from 'lucide-react';
+import { CreditCard, Plus, Trash2, Edit, X, ShieldCheck, Wallet, Landmark } from 'lucide-react';
 
 interface CardsManagerProps {
   cards: PaymentCard[];
@@ -35,6 +35,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<PaymentCard | null>(null);
   const [bankName, setBankName] = useState('');
+  const [cardType, setCardType] = useState<'credit' | 'debit'>('credit');
   const [selectedColor, setSelectedColor] = useState(CARD_COLOR_PRESETS[0].value);
 
   // Filter cards by active user or show all household cards
@@ -58,10 +59,12 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
     if (card) {
       setEditingCard(card);
       setBankName(card.bankName);
+      setCardType(card.cardType || 'credit');
       setSelectedColor(card.color);
     } else {
       setEditingCard(null);
       setBankName('');
+      setCardType('credit');
       setSelectedColor(CARD_COLOR_PRESETS[0].value);
     }
     setIsModalOpen(true);
@@ -74,6 +77,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
     onAddCard(
       {
         bankName: bankName.trim(),
+        cardType,
         color: selectedColor,
         ownerId: activeUserId,
       },
@@ -126,6 +130,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
             {userCards.map((card) => {
               const spentCents = cardSpentTotals[card.id] || 0;
               const owner = USERS[card.ownerId || activeUserId];
+              const cardTypeLabel = card.cardType === 'debit' ? 'DEBIT CARD' : 'CREDIT CARD';
 
               return (
                 <div
@@ -156,8 +161,8 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
                           boxShadow: 'inset 0 0 4px rgba(0,0,0,0.3)',
                         }}
                       />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.8, letterSpacing: '0.06em' }}>
-                        DEBIT / CREDIT
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.06em' }}>
+                        {cardTypeLabel}
                       </span>
                     </div>
 
@@ -240,6 +245,31 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
                 />
               </div>
 
+              {/* Card Type Selector (Credit Card vs Debit Card) */}
+              <div className="form-group">
+                <label className="form-label">Card Type</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className={`btn ${cardType === 'credit' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                    onClick={() => setCardType('credit')}
+                  >
+                    <CreditCard size={16} />
+                    <span>Credit Card</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${cardType === 'debit' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                    onClick={() => setCardType('debit')}
+                  >
+                    <Landmark size={16} />
+                    <span>Debit Card</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="form-group">
                 <label className="form-label">Card Theme Gradient</label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '6px' }}>
@@ -279,9 +309,15 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
                     color: 'white',
                     fontSize: '1rem',
                     fontWeight: 800,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                   }}
                 >
-                  {bankName.trim() || 'Bank Name'}
+                  <span>{bankName.trim() || 'Bank Name'}</span>
+                  <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', opacity: 0.85, background: 'rgba(255,255,255,0.2)', padding: '3px 8px', borderRadius: '4px' }}>
+                    {cardType === 'credit' ? 'CREDIT CARD' : 'DEBIT CARD'}
+                  </span>
                 </div>
               </div>
 

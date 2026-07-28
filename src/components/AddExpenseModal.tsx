@@ -415,7 +415,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   >
                     {cards.map((c) => (
                       <option key={c.id} value={c.id}>
-                        💳 {c.bankName} ({USERS[c.ownerId || activeUserId]?.name || 'Card'})
+                        💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit' : 'Credit'} Card • {USERS[c.ownerId || activeUserId]?.name || 'Card'})
                       </option>
                     ))}
                   </select>

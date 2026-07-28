@@ -8,6 +8,7 @@ export const SEED_CARDS: PaymentCard[] = [
   {
     id: 'card-101',
     bankName: 'Chase Sapphire Visa',
+    cardType: 'credit',
     color: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
     ownerId: 'raiyan',
     createdAt: '2026-07-01T00:00:00.000Z',
@@ -15,6 +16,7 @@ export const SEED_CARDS: PaymentCard[] = [
   {
     id: 'card-102',
     bankName: 'City Emerald Debit',
+    cardType: 'debit',
     color: 'linear-gradient(135deg, #065f46, #10b981)',
     ownerId: 'himel',
     createdAt: '2026-07-01T00:00:00.000Z',
@@ -22,6 +24,7 @@ export const SEED_CARDS: PaymentCard[] = [
   {
     id: 'card-103',
     bankName: 'Amex Violet Preferred',
+    cardType: 'credit',
     color: 'linear-gradient(135deg, #5b21b6, #8b5cf6)',
     ownerId: 'lazim',
     createdAt: '2026-07-01T00:00:00.000Z',

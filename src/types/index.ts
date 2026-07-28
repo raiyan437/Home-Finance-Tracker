@@ -22,6 +22,7 @@ export type RecurringFrequency = 'monthly' | 'weekly';
 export interface PaymentCard {
   id: string;
   bankName: string;
+  cardType?: 'debit' | 'credit'; // 'debit' vs 'credit'
   color: string; // Gradient or CSS color token
   ownerId?: UserId;
   createdAt: string;

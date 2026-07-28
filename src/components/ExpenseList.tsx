@@ -230,7 +230,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                           {pm?.type === 'card' ? (
                             <>
                               <CreditCard size={12} style={{ color: 'var(--accent-primary)' }} />
-                              <span>{cardObj ? cardObj.bankName : 'Bank Card'}</span>
+                              <span>{cardObj ? `${cardObj.bankName} (${cardObj.cardType === 'debit' ? 'Debit' : 'Credit'})` : 'Bank Card'}</span>
                             </>
                           ) : (
                             <>
