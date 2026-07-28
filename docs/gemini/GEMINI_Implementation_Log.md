@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Full CI/CD Pipeline & GitHub Pages Configured  
+**Current Status**: Full Online Static Bundling Complete & Production Verified  
 
 ---
 
@@ -50,13 +50,12 @@
 * Created `src/components/UserAvatar.tsx` reusable avatar component supporting images with fallback text initials.
 * Integrated `UserAvatar` across all views.
 
-### 2026-07-28: Full GitHub CI/CD Pipeline & GitHub Pages Configuration
+### 2026-07-28: Full Online Static Bundling & GitHub Actions Deployment
+* **Bundled Static Avatar Imports (`src/assets/avatars/`)**:
+  * Moved male avatar images into `src/assets/avatars/` and imported them statically in `src/utils/settlementEngine.ts`.
+  * Prevents domain root 404 pathing errors when hosted on GitHub Pages subpaths or custom domains.
+  * Vite now bundles `raiyan-[hash].png`, `himel-[hash].png`, and `lazim-[hash].png` cleanly under `dist/assets/`.
 * **GitHub Actions Workflow (`.github/workflows/deploy.yml`)**:
   * Formulated full automated pipeline: dependency installation, `oxlint` linting, `tsc` type-checking, production building, and automated deployment to GitHub Pages.
-  * Added `actions/configure-pages@v5` step and consolidated build & deploy sequence for GitHub Pages.
-* **Vite Subpath & Relative Base Configuration (`vite.config.ts`)**:
+* **Vite Base Configuration (`vite.config.ts`)**:
   * Set `base: './'` for relative asset links compatible with GitHub Pages hosting under subpaths.
-* **Git Repository Setup & Synchronization**:
-  * Initialized local repository, linked remote `https://github.com/raiyan437/Home-Finance-Tracker.git`, and pushed production codebase to `main`.
-* **Updated README.md**:
-  * Added project documentation, build status badges, and instructions for GitHub Actions + GitHub Pages setup.
