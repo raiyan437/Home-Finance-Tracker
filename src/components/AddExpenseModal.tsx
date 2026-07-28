@@ -42,7 +42,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [paidBy, setPaidBy] = useState<UserId>(activeUserId);
+  const [paidBy, setPaidBy] = useState<UserId>(activeUserId || 'raiyan');
   const [category, setCategory] = useState<Category>('Groceries');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
@@ -52,6 +52,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('monthly');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
+  const [isScanningOcr, setIsScanningOcr] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<UserId[]>(['raiyan', 'himel', 'lazim']);
   const [customSharesStr, setCustomSharesStr] = useState<Record<UserId, string>>({
     raiyan: '',
@@ -68,13 +69,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   // Initialize form when opening or editing
   useEffect(() => {
+    if (!isOpen) return;
+
     if (initialExpense) {
-      setTitle(initialExpense.title);
+      setTitle(initialExpense.title || '');
       setAmountStr((initialExpense.amountCents / 100).toFixed(2));
-      setPaidBy(initialExpense.paidBy);
-      setCategory(initialExpense.category);
-      setDate(initialExpense.date);
-      setSplitMethod(initialExpense.splitMethod);
+      setPaidBy(initialExpense.paidBy || activeUserId || 'raiyan');
+      setCategory(initialExpense.category || 'Groceries');
+      setDate(initialExpense.date || new Date().toISOString().split('T')[0]);
+      setSplitMethod(initialExpense.splitMethod || 'equal');
       setScope(initialExpense.scope || 'household');
       setPaymentType(initialExpense.paymentMethod?.type || 'cash');
       setSelectedCardId(initialExpense.paymentMethod?.cardId || (cards[0]?.id || ''));
@@ -83,25 +86,29 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setReceiptUrl(initialExpense.receiptUrl || '');
       setNotes(initialExpense.notes || '');
 
-      const partIds = initialExpense.shares.map((s) => s.userId);
+      const partIds: UserId[] = initialExpense.shares && initialExpense.shares.length > 0
+        ? initialExpense.shares.map((s) => s.userId)
+        : ['raiyan', 'himel', 'lazim'];
       setSelectedParticipants(partIds);
 
       const customObj: Record<UserId, string> = { raiyan: '', himel: '', lazim: '' };
       const percObj: Record<UserId, string> = { raiyan: '', himel: '', lazim: '' };
 
-      initialExpense.shares.forEach((s) => {
-        customObj[s.userId] = (s.amountCents / 100).toFixed(2);
-        if (s.percentage !== undefined) {
-          percObj[s.userId] = s.percentage.toString();
-        }
-      });
+      if (initialExpense.shares) {
+        initialExpense.shares.forEach((s) => {
+          customObj[s.userId] = (s.amountCents / 100).toFixed(2);
+          if (s.percentage !== undefined) {
+            percObj[s.userId] = s.percentage.toString();
+          }
+        });
+      }
       setCustomSharesStr(customObj);
       setPercentagesStr(percObj);
     } else {
       // Reset defaults
       setTitle('');
       setAmountStr('');
-      setPaidBy(activeUserId);
+      setPaidBy(activeUserId || 'raiyan');
       setCategory('Groceries');
       setDate(new Date().toISOString().split('T')[0]);
       setSplitMethod('equal');
@@ -117,7 +124,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setNotes('');
       setErrorMessage(null);
     }
-  }, [initialExpense, isOpen, activeUserId, cards]);
+  }, [isOpen, initialExpense]);
 
   if (!isOpen) return null;
 
@@ -144,8 +151,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     setAmountStr(preset.amount);
     setCategory(preset.category);
   };
-
-  const [isScanningOcr, setIsScanningOcr] = useState(false);
 
   // Handle Receipt Upload (convert file to base64 & trigger OCR scan)
   const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,7 +187,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       return;
     }
     if (totalCents <= 0) {
-      setErrorMessage('Please enter a valid amount greater than $0.');
+      setErrorMessage('Please enter a valid amount greater than ৳0.');
       return;
     }
 
@@ -200,7 +205,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         const splitMap = calculateEqualSplits(totalCents, selectedParticipants);
         finalShares = selectedParticipants.map((userId) => ({
           userId,
-          amountCents: splitMap[userId],
+          amountCents: splitMap[userId] || 0,
         }));
       } else if (splitMethod === 'custom') {
         const customSharesCents: Record<string, number> = {};
@@ -221,7 +226,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
         finalShares = selectedParticipants.map((userId) => ({
           userId,
-          amountCents: customSharesCents[userId],
+          amountCents: customSharesCents[userId] || 0,
         }));
       } else if (splitMethod === 'percentage') {
         const percMap: Record<string, number> = {};
@@ -237,7 +242,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
         finalShares = selectedParticipants.map((userId) => ({
           userId,
-          amountCents: shares[userId],
+          amountCents: shares[userId] || 0,
           percentage: percMap[userId],
         }));
       }
@@ -303,26 +308,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
             onClick={() => setScope('personal')}
           >
-            <Wallet size={16} style={{ color: 'var(--accent-purple)' }} />
-            <span>Private Personal</span>
+            <Wallet size={16} />
+            <span>Personal Wallet</span>
           </button>
         </div>
 
-        {errorMessage && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--status-negative-text)', backgroundColor: 'var(--status-negative-bg)', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--status-negative-border)', fontSize: '0.85rem', fontWeight: 600 }}>
-            <AlertCircle size={18} />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {/* Quick Preset Chips */}
-        {!initialExpense && scope === 'household' && (
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-              <Sparkles size={14} style={{ color: 'var(--accent-amber)' }} />
-              <span>Quick Preset Templates</span>
+        {/* Quick Presets */}
+        {scope === 'household' && (
+          <div className="preset-container">
+            <div className="preset-title">
+              <Sparkles size={14} style={{ color: 'var(--accent-primary)' }} />
+              <span>Quick Bill Templates</span>
             </div>
-            <div className="form-presets-row">
+            <div className="preset-chips">
               {PRESETS.map((p) => (
                 <button
                   key={p.name}
@@ -338,6 +336,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* Error Message Alert */}
+          {errorMessage && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(244, 63, 94, 0.15)', color: 'var(--accent-rose)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: 600 }}>
+              <AlertCircle size={16} />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           {/* Title & Amount Row */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
             <div className="form-group">
@@ -348,7 +354,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 placeholder={scope === 'personal' ? 'e.g. Personal Coffee, Shopping' : 'e.g. Weekly Groceries, Gas Bill'}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                autoFocus
               />
             </div>
 
@@ -448,22 +453,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 className={`btn ${isRecurring ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                 onClick={() => setIsRecurring(!isRecurring)}
               >
-                <span>{isRecurring ? 'Enabled' : 'Disabled'}</span>
+                <span>{isRecurring ? 'Recurring On' : 'One-Time'}</span>
               </button>
             </div>
 
             {isRecurring && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Repeat Schedule:</span>
-                <select
-                  className="form-select"
-                  style={{ width: '150px', padding: '6px 10px', fontSize: '0.82rem' }}
-                  value={recurringFrequency}
-                  onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  className={`btn ${recurringFrequency === 'monthly' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                  style={{ flex: 1 }}
+                  onClick={() => setRecurringFrequency('monthly')}
                 >
-                  <option value="monthly">Every Month</option>
-                  <option value="weekly">Every Week</option>
-                </select>
+                  Monthly Recurring
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${recurringFrequency === 'weekly' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                  style={{ flex: 1 }}
+                  onClick={() => setRecurringFrequency('weekly')}
+                >
+                  Weekly Recurring
+                </button>
               </div>
             )}
           </div>
@@ -683,19 +694,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <input
               type="text"
               className="form-input"
-              placeholder="e.g. Receipt breakdown or extra context..."
+              placeholder="e.g. Bought from Shwapno Supermarket"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </div>
 
-          {/* Submit Action */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+          {/* Actions */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              {initialExpense ? 'Save Changes' : scope === 'personal' ? 'Save Personal Expense' : 'Confirm Shared Expense'}
+              {initialExpense ? 'Save Changes' : 'Save Expense'}
             </button>
           </div>
         </form>

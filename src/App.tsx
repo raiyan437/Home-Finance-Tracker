@@ -8,6 +8,7 @@ import { SettlementView } from './components/SettlementView';
 import { AddExpenseModal } from './components/AddExpenseModal';
 import { AuthModal } from './components/AuthModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import type { Expense, Settlement, SimplifiedTransaction, PaymentCard } from './types';
 import type { Language } from './utils/i18n';
@@ -418,9 +419,11 @@ const AppContent: React.FC = () => {
 };
 
 export const App: React.FC = () => (
-  <AuthProvider>
-    <AppContent />
-  </AuthProvider>
+  <ErrorBoundary>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  </ErrorBoundary>
 );
 
 export default App;
