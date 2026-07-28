@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-28  
-**Current Status**: Image Asset Optimization & Complete Mobile Responsiveness Overhaul  
+**Current Status**: Payment Cards Management & Channel Tracking Complete  
 
 ---
 
@@ -71,5 +71,12 @@
   * Enables instant image loading over all web and mobile connections.
 * **Mobile Responsiveness Overhaul (`src/index.css`)**:
   * Added comprehensive media queries for `< 768px`, `< 640px`, and `< 480px` viewports.
-  * Formatted settlement flow cards to stack cleanly vertically on small phones.
-  * Adapted modal cards, user profile selectors, expense item cards, filter toolbars, and mobile bottom navigation with safe area inset padding.
+
+### 2026-07-28: Payment Cards Management & Channel Tracking
+* **Payment Cards View (`src/components/CardsManager.tsx`)**:
+  * Added **Payment Cards** section to sidebar and mobile navigation with `CreditCard` icon.
+  * Form to create custom bank cards with **Bank Name** and 8 curated gradient themes (Midnight Blue, Emerald Green, Violet Glow, Sunset Amber, Neon Cyan, Rose Red, Obsidian Dark, Gold).
+* **Payment Channel Picker (`src/components/AddExpenseModal.tsx`)**:
+  * Added Cash vs Bank Card picker when logging household or personal expenses.
+* **Expense Tags & Filters (`src/components/ExpenseList.tsx`)**:
+  * Displayed 💳 *Bank Card* vs 💵 *Cash* badges on expense items with payment channel filtering.
