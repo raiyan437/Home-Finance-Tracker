@@ -53,8 +53,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   personalCount,
   cardsCount,
 }) => {
-  const { userProfile, dbUserProfile, currentHouse, firebaseUser, logout } = useAuth();
+  const { userProfile, dbUserProfile, currentHouse, logout } = useAuth();
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
+
+  const handleLogoutClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await logout();
+    onOpenAuthModal();
+  };
 
   return (
     <>
@@ -78,8 +84,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="user-profile-card"
           onClick={onOpenAuthModal}
           title="Click to switch account profile or manage Firebase auth"
+          style={{ position: 'relative' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
             <UserAvatar
               user={{
                 id: userProfile.id,
@@ -89,7 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }}
               size={40}
             />
-            <div className="user-profile-info">
+            <div className="user-profile-info" style={{ flex: 1 }}>
               <div className="user-name-row">
                 <span className="user-name">{dbUserProfile?.displayName || userProfile.name}</span>
                 {dbUserProfile?.role === 'leader' && (
@@ -223,16 +230,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {firebaseUser && (
-            <button
-              className="btn btn-danger btn-sm"
-              style={{ width: '100%', marginTop: '4px', justifyContent: 'center' }}
-              onClick={() => logout()}
-            >
-              <LogOut size={15} />
-              <span>Log Out</span>
-            </button>
-          )}
+          {/* ALWAYS VISIBLE PROMINENT LOGOUT BUTTON */}
+          <button
+            className="btn btn-danger"
+            style={{ width: '100%', marginTop: '6px', justifyContent: 'center', fontWeight: 800, padding: '10px' }}
+            onClick={handleLogoutClick}
+          >
+            <LogOut size={16} />
+            <span>Log Out / Switch User</span>
+          </button>
         </div>
       </aside>
 

@@ -421,12 +421,10 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {firebaseUser && (
-          <button className="btn btn-danger" onClick={() => logout()}>
-            <LogOut size={16} />
-            <span>Log Out</span>
-          </button>
-        )}
+        <button className="btn btn-danger" onClick={() => logout()}>
+          <LogOut size={16} />
+          <span>Log Out / Switch Account</span>
+        </button>
       </div>
     </div>
   );
