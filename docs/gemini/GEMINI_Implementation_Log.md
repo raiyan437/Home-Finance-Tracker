@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Standalone Login & Sign Up Pages & Local Multi-User Database Engine Complete  
+**Current Status**: Strict Dummy Account Authentication Enforcement Complete  
 
 ---
 
@@ -160,10 +160,17 @@
 ### 2026-07-29: Standalone Login & Sign Up Pages & Offline Multi-User Database Engine
 * **Local Multi-User Database Engine (`src/utils/mockAuthDatabase.ts`)**:
   * Built an offline multi-user authentication & database engine pre-populated with **Raiyan** (`raiyan@gmail.com` / `dummy123`), **Himel** (`himel@gmail.com` / `dummy123`), and **Lazim** (`lazim@gmail.com` / `dummy123`).
-  * Completely resolves `auth/api-key-not-valid` error by seamlessly authenticating users locally without requiring live external API keys!
 * **Standalone Login Page (`src/components/LoginPage.tsx`)**:
   * Replaced login modal with a full-screen glassmorphism Login Page featuring 1-click quick demo buttons for Raiyan, Himel, and Lazim.
 * **Standalone Sign Up Page (`src/components/SignUpPage.tsx`)**:
   * Created dedicated full-screen Sign Up Page for registering new accounts.
 * **Redirect on Logout (`src/App.tsx`)**:
   * Logging out immediately redirects the application to the standalone **Login Page**.
+
+### 2026-07-29: Strict Pre-Approved Dummy Account Enforcement
+* **Strict Authentication Guards (`src/context/AuthContext.tsx`)**:
+  * Restricted authentication and registration exclusively to pre-approved housemate accounts:
+    - **Raiyan**: `raiyan@gmail.com` | `dummy123`
+    - **Himel**: `himel@gmail.com` | `dummy123`
+    - **Lazim**: `lazim@gmail.com` | `dummy123`
+  * Any other email or password combination is strictly rejected with a clear access denied message across both local and live git links!
