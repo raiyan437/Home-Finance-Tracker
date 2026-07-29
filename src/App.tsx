@@ -332,7 +332,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'dashboard' && (
             <Dashboard
               expenses={householdExpenses}
-              settlements={settlements}
+              settlements={houseSettlements}
               onNavigateToExpenses={() => setActiveTab('expenses')}
               onNavigateToSettlement={() => setActiveTab('settlement')}
             />
@@ -358,7 +358,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'settlement' && (
             <SettlementView
               expenses={householdExpenses}
-              settlements={settlements}
+              settlements={houseSettlements}
               onMarkSettled={(tx: SimplifiedTransaction) => setPendingSettlementTx(tx)}
             />
           )}
@@ -382,7 +382,7 @@ const AppContent: React.FC = () => {
           )}
 
           {activeTab === 'monthly' && (
-            <MonthlySummary expenses={householdExpenses} settlements={settlements} />
+            <MonthlySummary expenses={householdExpenses} settlements={houseSettlements} />
           )}
 
           {activeTab === 'settings' && <SettingsView />}

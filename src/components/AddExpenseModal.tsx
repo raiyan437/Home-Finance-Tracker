@@ -4,9 +4,7 @@ import { getHouseUsers, USERS } from '../utils/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import {
   dollarsToCents,
-  calculateEqualSplits,
   validateCustomSplits,
-  calculatePercentageSplits,
   formatCurrency,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
@@ -211,10 +209,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
 
       if (splitMethod === 'equal') {
-        const splitMap = calculateEqualSplits(totalCents, selectedParticipants);
+        const count = selectedParticipants.length;
+        const baseShare = Math.floor(totalCents / count);
+        const remainder = totalCents % count;
+        const primaryPayerId = selectedParticipants.includes(paidBy) ? paidBy : selectedParticipants[0];
+
         finalShares = selectedParticipants.map((userId) => ({
           userId,
-          amountCents: splitMap[userId] || 0,
+          amountCents: baseShare + (userId === primaryPayerId ? remainder : 0),
         }));
       } else if (splitMethod === 'custom') {
         const customSharesCents: Record<string, number> = {};
@@ -243,15 +245,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           percMap[userId] = parseFloat(percentagesStr[userId] || '0');
         });
 
-        const { shares, is100Percent } = calculatePercentageSplits(totalCents, percMap);
-        if (!is100Percent) {
+        const totalPercent = Object.values(percMap).reduce((a, b) => a + b, 0);
+        if (Math.abs(totalPercent - 100) > 0.01) {
           setErrorMessage('Percentages must total exactly 100%.');
           return;
         }
 
+        const primaryPayerId = selectedParticipants.includes(paidBy) ? paidBy : selectedParticipants[0];
+        let sumAssigned = 0;
+        const tempShares: Record<string, number> = {};
+
+        selectedParticipants.forEach((userId) => {
+          const cents = Math.floor((totalCents * (percMap[userId] || 0)) / 100);
+          tempShares[userId] = cents;
+          sumAssigned += cents;
+        });
+
+        const remainder = totalCents - sumAssigned;
+        tempShares[primaryPayerId] = (tempShares[primaryPayerId] || 0) + remainder;
+
         finalShares = selectedParticipants.map((userId) => ({
           userId,
-          amountCents: shares[userId] || 0,
+          amountCents: tempShares[userId] || 0,
           percentage: percMap[userId],
         }));
       }

@@ -34,10 +34,12 @@ export const ALL_USERS: User[] = Object.values(USERS);
 export const getHouseUsers = (house?: House | null): User[] => {
   if (house && house.members && house.members.length > 0) {
     return house.members.map((m) => {
-      const cleanName = m.displayName.toLowerCase().trim();
-      const staticUser = USERS[cleanName] || Object.values(USERS).find((u) => u.name.toLowerCase() === cleanName);
+      const staticUser = Object.values(USERS).find(
+        (u) => u.id === m.uid || (u as any).uid === m.uid || u.name.toLowerCase() === m.displayName.toLowerCase().trim()
+      );
+      const userId = m.uid || staticUser?.id || m.displayName.toLowerCase().trim();
       return {
-        id: staticUser?.id || m.uid,
+        id: userId,
         name: m.displayName,
         avatar: staticUser?.avatar || m.avatar || m.displayName.toLowerCase().slice(0, 5),
         color: staticUser?.color || '#3b82f6',
@@ -61,38 +63,48 @@ export const calculateNetBalances = (
   const totals: Record<string, { paid: number; share: number; settlementDelta: number }> = {};
 
   activeUsers.forEach((u) => {
-    usersMap[u.id] = u;
-    totals[u.id] = { paid: 0, share: 0, settlementDelta: 0 };
+    const key = u.id;
+    usersMap[key] = u;
+    totals[key] = { paid: 0, share: 0, settlementDelta: 0 };
   });
 
-  // 1. Process active expenses
+  // Helper for strict UID / ID lookup
+  const findUserKey = (targetIdStr: string) => {
+    if (!targetIdStr) return undefined;
+    if (totals[targetIdStr]) return targetIdStr;
+    const targetClean = targetIdStr.toLowerCase().trim();
+    return Object.keys(totals).find((k) => {
+      const u = usersMap[k];
+      if (!u) return false;
+      return (
+        k.toLowerCase() === targetClean ||
+        (u.uid && u.uid.toLowerCase() === targetClean) ||
+        (u.id && u.id.toLowerCase() === targetClean) ||
+        u.name.toLowerCase().trim() === targetClean
+      );
+    });
+  };
+
+  // 1. Process active expenses strictly by UID / ID
   expenses.forEach((exp) => {
-    const payerKey = Object.keys(totals).find(
-      (k) => k === exp.paidBy || usersMap[k]?.name.toLowerCase() === exp.paidBy.toLowerCase()
-    );
+    const payerKey = findUserKey(exp.paidBy);
     if (payerKey) {
       totals[payerKey].paid += exp.amountCents;
     }
 
     exp.shares.forEach((share) => {
-      const shareKey = Object.keys(totals).find(
-        (k) => k === share.userId || usersMap[k]?.name.toLowerCase() === share.userId.toLowerCase()
-      );
+      const shareKey = findUserKey(share.userId);
       if (shareKey) {
         totals[shareKey].share += share.amountCents;
       }
     });
   });
 
-  // 2. Process completed settlements
+  // 2. Process completed settlements strictly by UID / ID
   settlements.forEach((st) => {
     if (st.status === 'completed') {
-      const fromKey = Object.keys(totals).find(
-        (k) => k === st.fromUserId || usersMap[k]?.name.toLowerCase() === st.fromUserId.toLowerCase()
-      );
-      const toKey = Object.keys(totals).find(
-        (k) => k === st.toUserId || usersMap[k]?.name.toLowerCase() === st.toUserId.toLowerCase()
-      );
+      const fromKey = findUserKey(st.fromUserId);
+      const toKey = findUserKey(st.toUserId);
 
       if (fromKey) totals[fromKey].settlementDelta += st.amountCents;
       if (toKey) totals[toKey].settlementDelta -= st.amountCents;
