@@ -42,26 +42,26 @@
 - **Expected Result**: Login is rejected with error banner:  
   `"Access Denied: Only pre-approved housemate accounts (raiyan@gmail.com, himel@gmail.com, lazim@gmail.com) with password "dummy123" are authorized."`
 
-### TC-1.3: 1-Click Demo Login Buttons
-- **Objective**: Test 1-click demo login buttons on `LoginPage.tsx`.
+### TC-1.3: 1-Click Demo Login & Strict User Switching
+- **Objective**: Test 1-click demo login buttons on `LoginPage.tsx` and verify user switching is only possible via Log Out.
 - **Steps**:
-  1. Click **"Raiyan (raiyan@gmail.com)"** button.
-  2. Verify Raiyan is logged in. Click **Log Out**.
-  3. Click **"Himel (himel@gmail.com)"** button.
-  4. Verify Himel is logged in.
-- **Expected Result**: 1-click button authenticates and switches user profile instantly.
+  1. Click **"Raiyan (raiyan@gmail.com)"** button on `LoginPage.tsx`.
+  2. Verify Raiyan is logged in and Dashboard opens with NO popup modals.
+  3. Click **"Log Out"** button in sidebar footer or Settings page.
+  4. Verify app redirects to standalone `LoginPage.tsx`. Click **"Himel (himel@gmail.com)"**.
+- **Expected Result**: 1-click button authenticates user. No modal overlays pop up after login or logout. User switching occurs strictly via Log Out and Login.
 
 ---
 
 ## Test Suite 2: Standalone Auth Routing & Session Management
 
-### TC-2.1: Standalone Login & Sign Up Pages
-- **Objective**: Ensure Login and Sign Up render as full standalone pages, not modal overlays.
+### TC-2.1: Standalone Login & Sign Up Pages (Zero Auth Modals)
+- **Objective**: Ensure Login and Sign Up render as full standalone pages without modal overlays.
 - **Steps**:
   1. Access root URL when unauthenticated.
   2. Observe full-screen `LoginPage.tsx`.
   3. Click **"Sign Up Here"** link.
-- **Expected Result**: App smoothly transitions to standalone `SignUpPage.tsx`.
+- **Expected Result**: App smoothly transitions to standalone `SignUpPage.tsx`. All modal overlays are removed.
 
 ### TC-2.2: Log Out Session Clearing & Redirect
 - **Objective**: Verify that clicking Log Out clears active session and returns user to LoginPage.

@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Complete Testing Directory & Tester.md Feature Manual Created  
+**Current Status**: AuthModal Removed & User Switching Restricted Exclusively to Log Out  
 
 ---
 
@@ -175,8 +175,8 @@
     - **Lazim**: `lazim@gmail.com` | `dummy123`
   * Any other email or password combination is strictly rejected with a clear access denied message across both local and live git links!
 
-### 2026-07-29: Created Tester Folder & Master Testing Manual (Tester/Tester.md)
-* **Root Tester Directory (`/Tester/`)**:
-  * Created project root directory `Tester/` containing `README.md` and master feature specification manual `Tester.md`.
-* **Testing Manual (`Tester/Tester.md`)**:
-  * Documented 9 complete test suites covering strict authentication guards, standalone auth routing, leader house powers, financial balance calculation accuracy, payment card theme classification, private personal wallet, AI OCR scanner, in-app comments, and realtime Firestore cloud resilience.
+### 2026-07-29: AuthModal Removal & User Switching Restricted Exclusively to Log Out
+* **Removed AuthModal Overlay (`src/App.tsx` & `src/components/Navbar.tsx`)**:
+  * Completely removed `AuthModal.tsx` and all references to prevent any modal popup from re-appearing after login or logout.
+* **Strict Logout & Login User Switching**:
+  * User switching can now ONLY be accomplished by clicking **"Log Out"**, which terminates the active session and renders the standalone `LoginPage.tsx`.
