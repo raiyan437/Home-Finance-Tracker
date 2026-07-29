@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: AuthModal Removed & User Switching Restricted Exclusively to Log Out  
+**Current Status**: Dashboard Cleaned (Reset Demo Data & Add Expense Removed from Dashboard Header Only)  
 
 ---
 
@@ -180,3 +180,8 @@
   * Completely removed `AuthModal.tsx` and all references to prevent any modal popup from re-appearing after login or logout.
 * **Strict Logout & Login User Switching**:
   * User switching can now ONLY be accomplished by clicking **"Log Out"**, which terminates the active session and renders the standalone `LoginPage.tsx`.
+
+### 2026-07-29: Dashboard Cleaned (Buttons Removed from Dashboard Header Only)
+* **Removed Dashboard Buttons (`src/components/Dashboard.tsx`)**:
+  * Removed the **"Reset Demo Data"** button and **"Add Expense"** button from the Dashboard page header.
+  * The **"+ New Expense"** button in the left sidebar and mobile navigation remains active and fully functional.
