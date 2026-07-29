@@ -32,7 +32,7 @@ import {
   syncSaveCard,
   syncDeleteCard,
 } from './utils/firebaseSync';
-import { calculateNetBalances, calculateSimplifiedSettlements } from './utils/settlementEngine';
+import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from './utils/settlementEngine';
 
 // Code-split heavy views for instant page loads
 const MonthlySummary = lazy(() =>
@@ -125,15 +125,17 @@ const AppContent: React.FC = () => {
     return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
   }, [cards, activeUserId]);
 
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+
   // Derived financial computations
   const netBalances = useMemo(
-    () => calculateNetBalances(householdExpenses, settlements),
-    [householdExpenses, settlements]
+    () => calculateNetBalances(householdExpenses, settlements, houseUsers),
+    [householdExpenses, settlements, houseUsers]
   );
 
   const simplifiedSettlements = useMemo(
-    () => calculateSimplifiedSettlements(netBalances),
-    [netBalances]
+    () => calculateSimplifiedSettlements(netBalances, houseUsers),
+    [netBalances, houseUsers]
   );
 
   // Add / Edit expense handler

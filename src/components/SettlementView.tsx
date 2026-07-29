@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import type { Expense, Settlement, SimplifiedTransaction } from '../types';
-import { calculateNetBalances, calculateSimplifiedSettlements, USERS } from '../utils/settlementEngine';
+import React, { useState, useMemo } from 'react';
+import type { Expense, Settlement, SimplifiedTransaction, User as UserType } from '../types';
+import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers, USERS } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
+import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
-import { ArrowRight, CheckCircle2, History, Check, ShieldCheck, ArrowLeftRight } from 'lucide-react';
+import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight } from 'lucide-react';
 
 interface SettlementViewProps {
   expenses: Expense[];
@@ -16,14 +17,30 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
   settlements,
   onMarkSettled,
 }) => {
+  const { currentHouse } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
 
-  const userBalances = calculateNetBalances(expenses, settlements);
-  const simplifiedTransactions = calculateSimplifiedSettlements(userBalances);
+  const userBalances = useMemo(
+    () => calculateNetBalances(expenses, settlements, houseUsers),
+    [expenses, settlements, houseUsers]
+  );
+
+  const simplifiedTransactions = useMemo(
+    () => calculateSimplifiedSettlements(userBalances, houseUsers),
+    [userBalances, houseUsers]
+  );
 
   const completedSettlements = [...settlements]
     .filter((s) => s.status === 'completed')
     .sort((a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime());
+
+  const getUser = (userId: string): UserType => {
+    const found = houseUsers.find((u) => u.id === userId || u.name.toLowerCase() === userId.toLowerCase());
+    if (found) return found;
+    return USERS[userId] || { id: userId, name: userId, avatar: userId, color: '#3b82f6' };
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -52,83 +69,63 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
           onClick={() => setActiveTab('history')}
         >
           <History size={16} />
-          <span>Settlement Audit History ({completedSettlements.length})</span>
+          <span>Settlement Audit Log ({completedSettlements.length})</span>
         </button>
       </div>
 
+      {/* TAB 1: PENDING MIN-CASH-FLOW RECOMMENDATIONS */}
       {activeTab === 'pending' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Status Explanation Header */}
-          {simplifiedTransactions.length > 0 ? (
-            <div
-              className="glass-card"
-              style={{
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.12))',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-              }}
-            >
-              <ShieldCheck size={32} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Optimal Debt Simplification Calculated</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Instead of complex multiple payments, completing these <strong>{simplifiedTransactions.length} transfer(s)</strong> will clear all household debts completely.
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {/* List of recommended transfers */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {simplifiedTransactions.length === 0 ? (
             <div className="glass-card empty-state">
-              <CheckCircle2 size={56} style={{ color: 'var(--status-positive-text)' }} />
-              <div className="empty-title">All House Debts Fully Settled!</div>
-              <p style={{ color: 'var(--text-muted)', maxWidth: '440px', fontSize: '0.88rem' }}>
-                Every housemate has a balanced net ledger of ৳0.00. No further payments or transfers are required.
+              <CheckCircle2 className="empty-icon" style={{ color: 'var(--accent-emerald)' }} />
+              <div className="empty-title">All Household Debts Fully Settled!</div>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                Every housemate has a ৳0.00 net balance position. No peer-to-peer transfers required.
               </p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {simplifiedTransactions.map((tx) => (
                 <div key={tx.id} className="settlement-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="badge badge-negative">Debt Payment Pending</span>
+                    <span className="tabular-nums" style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-amber)' }}>
+                      {formatCurrency(tx.amountCents)}
+                    </span>
+                  </div>
+
                   <div className="settlement-flow">
-                    {/* Debtor */}
                     <div className="flow-user">
-                      <UserAvatar user={tx.fromUser} size={54} />
-                      <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{tx.fromUser.name}</div>
-                      <span className="badge badge-negative">Debtor (Owes)</span>
+                      <UserAvatar user={tx.fromUser} size={48} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{tx.fromUser.name}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--accent-rose)', fontWeight: 700 }}>
+                          Payer (Owes Money)
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Transfer Amount Arrow */}
                     <div className="flow-arrow">
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        DIRECT TRANSFER
-                      </span>
+                      <ArrowRight size={28} className="flow-arrow-icon" style={{ color: 'var(--accent-amber)' }} />
                       <div className="flow-amount tabular-nums">{formatCurrency(tx.amountCents)}</div>
-                      <ArrowRight size={26} style={{ color: 'var(--accent-amber)' }} />
                     </div>
 
-                    {/* Creditor */}
                     <div className="flow-user">
-                      <UserAvatar user={tx.toUser} size={54} />
-                      <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{tx.toUser.name}</div>
-                      <span className="badge badge-positive">Creditor (Receives)</span>
+                      <UserAvatar user={tx.toUser} size={48} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{tx.toUser.name}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>
+                          Receiver (Gets Paid)
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      After this payment, {tx.fromUser.name}'s balance with {tx.toUser.name} will be resolved.
-                    </span>
-
-                    <button
-                      className="btn btn-success"
-                      onClick={() => onMarkSettled(tx)}
-                    >
-                      <Check size={17} />
-                      <span>Confirm & Mark Paid</span>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px' }}>
+                    <button className="btn btn-success" onClick={() => onMarkSettled(tx)}>
+                      <Check size={18} />
+                      <span>Confirm & Mark as Settled</span>
                     </button>
                   </div>
                 </div>
@@ -138,6 +135,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
         </div>
       )}
 
+      {/* TAB 2: SETTLEMENT AUDIT HISTORY */}
       {activeTab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {completedSettlements.length === 0 ? (
@@ -151,8 +149,8 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
           ) : (
             <div>
               {completedSettlements.map((st) => {
-                const fromUser = USERS[st.fromUserId];
-                const toUser = USERS[st.toUserId];
+                const fromUser = getUser(st.fromUserId);
+                const toUser = getUser(st.toUserId);
                 const settledDate = new Date(st.settledAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -175,7 +173,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '-6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
                         <UserAvatar user={fromUser} size={36} />
                         <UserAvatar user={toUser} size={36} style={{ marginLeft: '-10px' }} />
                       </div>

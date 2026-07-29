@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Expense, Category, User as UserType } from '../types';
 import { formatCurrency } from '../utils/currency';
-import { ALL_USERS } from '../utils/settlementEngine';
+import { getHouseUsers } from '../utils/settlementEngine';
+import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import { ShoppingCart, Home, Zap, Utensils, User, HelpCircle } from 'lucide-react';
 
@@ -29,6 +30,9 @@ const CATEGORIES: CategoryItem[] = [
 ];
 
 export const CategoryChart: React.FC<CategoryChartProps> = ({ expenses }) => {
+  const { currentHouse } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+
   // Aggregate total expenses by category
   const categoryTotals: Record<Category, number> = {
     Groceries: 0,
@@ -46,10 +50,10 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({ expenses }) => {
     grandTotalCents += e.amountCents;
   });
 
-  // Calculate member contribution ratios
-  const userContributions = ALL_USERS.map((user: UserType) => {
+  // Calculate member contribution ratios dynamically
+  const userContributions = houseUsers.map((user: UserType) => {
     const totalPaid = expenses
-      .filter((e) => e.paidBy === user.id)
+      .filter((e) => e.paidBy === user.id || e.paidBy.toLowerCase() === user.name.toLowerCase())
       .reduce((sum, e) => sum + e.amountCents, 0);
 
     const percentage = grandTotalCents > 0 ? (totalPaid / grandTotalCents) * 100 : 0;

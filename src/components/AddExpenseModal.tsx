@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType, RecurringFrequency } from '../types';
-import { ALL_USERS, USERS } from '../utils/settlementEngine';
+import { getHouseUsers, USERS } from '../utils/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import {
   dollarsToCents,
@@ -11,7 +11,7 @@ import {
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
 import { scanReceiptImage } from '../utils/ocrScanner';
-import { X, Check, AlertCircle, Sparkles, Receipt, Users, Wallet, CreditCard, Banknote, RefreshCw, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { X, Check, AlertCircle, Sparkles, Users, Wallet, CreditCard, Banknote, Image as ImageIcon } from 'lucide-react';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -38,7 +38,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   initialExpense,
   cards = [],
 }) => {
-  const { activeUserId } = useAuth();
+  const { currentHouse, activeUserId } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
 
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
@@ -53,17 +54,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('monthly');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
   const [isScanningOcr, setIsScanningOcr] = useState(false);
-  const [selectedParticipants, setSelectedParticipants] = useState<UserId[]>(['raiyan', 'himel', 'lazim']);
-  const [customSharesStr, setCustomSharesStr] = useState<Record<UserId, string>>({
-    raiyan: '',
-    himel: '',
-    lazim: '',
-  });
-  const [percentagesStr, setPercentagesStr] = useState<Record<UserId, string>>({
-    raiyan: '33.33',
-    himel: '33.33',
-    lazim: '33.34',
-  });
+  const [selectedParticipants, setSelectedParticipants] = useState<UserId[]>([]);
+  const [customSharesStr, setCustomSharesStr] = useState<Record<UserId, string>>({});
+  const [percentagesStr, setPercentagesStr] = useState<Record<UserId, string>>({});
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -71,10 +64,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    const allUserIds = houseUsers.map((u) => u.id);
+
     if (initialExpense) {
       setTitle(initialExpense.title || '');
       setAmountStr((initialExpense.amountCents / 100).toFixed(2));
-      setPaidBy(initialExpense.paidBy || activeUserId || 'raiyan');
+      setPaidBy(initialExpense.paidBy || activeUserId || allUserIds[0] || 'raiyan');
       setCategory(initialExpense.category || 'Groceries');
       setDate(initialExpense.date || new Date().toISOString().split('T')[0]);
       setSplitMethod(initialExpense.splitMethod || 'equal');
@@ -88,11 +83,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
       const partIds: UserId[] = initialExpense.shares && initialExpense.shares.length > 0
         ? initialExpense.shares.map((s) => s.userId)
-        : ['raiyan', 'himel', 'lazim'];
+        : allUserIds;
       setSelectedParticipants(partIds);
 
-      const customObj: Record<UserId, string> = { raiyan: '', himel: '', lazim: '' };
-      const percObj: Record<UserId, string> = { raiyan: '', himel: '', lazim: '' };
+      const customObj: Record<UserId, string> = {};
+      const percObj: Record<UserId, string> = {};
+
+      allUserIds.forEach((id) => {
+        customObj[id] = '';
+        percObj[id] = (100 / Math.max(1, allUserIds.length)).toFixed(2);
+      });
 
       if (initialExpense.shares) {
         initialExpense.shares.forEach((s) => {
@@ -105,10 +105,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setCustomSharesStr(customObj);
       setPercentagesStr(percObj);
     } else {
-      // Reset defaults
+      // Reset defaults dynamically based on active house users
       setTitle('');
       setAmountStr('');
-      setPaidBy(activeUserId || 'raiyan');
+      setPaidBy(activeUserId || allUserIds[0] || 'raiyan');
       setCategory('Groceries');
       setDate(new Date().toISOString().split('T')[0]);
       setSplitMethod('equal');
@@ -118,13 +118,23 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setIsRecurring(false);
       setRecurringFrequency('monthly');
       setReceiptUrl('');
-      setSelectedParticipants(['raiyan', 'himel', 'lazim']);
-      setCustomSharesStr({ raiyan: '', himel: '', lazim: '' });
-      setPercentagesStr({ raiyan: '33.33', himel: '33.33', lazim: '33.34' });
+      setSelectedParticipants(allUserIds);
+
+      const customObj: Record<UserId, string> = {};
+      const percObj: Record<UserId, string> = {};
+      const equalPerc = (100 / Math.max(1, allUserIds.length)).toFixed(2);
+
+      allUserIds.forEach((id) => {
+        customObj[id] = '';
+        percObj[id] = equalPerc;
+      });
+
+      setCustomSharesStr(customObj);
+      setPercentagesStr(percObj);
       setNotes('');
       setErrorMessage(null);
     }
-  }, [isOpen, initialExpense]);
+  }, [isOpen, initialExpense, houseUsers, activeUserId, cards]);
 
   if (!isOpen) return null;
 
@@ -152,7 +162,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     setCategory(preset.category);
   };
 
-  // Handle Receipt Upload (convert file to base64 & trigger OCR scan)
   const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -258,74 +267,79 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         splitMethod: scope === 'personal' ? 'equal' : splitMethod,
         shares: finalShares,
         scope,
-        ownerId: paidBy,
         paymentMethod: {
           type: paymentType,
-          cardId: paymentType === 'card' ? (selectedCardId || cards[0]?.id) : undefined,
+          cardId: paymentType === 'card' ? selectedCardId : undefined,
         },
         isRecurring,
         recurringFrequency: isRecurring ? recurringFrequency : undefined,
         receiptUrl: receiptUrl || undefined,
-        notes: notes.trim(),
+        notes: notes.trim() || undefined,
       },
-      initialExpense ? initialExpense.id : undefined
+      initialExpense?.id
     );
 
     onClose();
   };
 
-  // Preview split calculations live
   const liveTotalCents = dollarsToCents(amountStr);
-  const liveEqualShareCents = selectedParticipants.length > 0 ? Math.round(liveTotalCents / selectedParticipants.length) : 0;
+  const liveEqualShareCents =
+    selectedParticipants.length > 0 ? Math.round(liveTotalCents / selectedParticipants.length) : 0;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title-group">
-            <Receipt size={22} style={{ color: 'var(--accent-primary)' }} />
-            <h2 className="modal-title">{initialExpense ? 'Edit Expense' : 'Log New Expense'}</h2>
+    <div className="modal-backdrop">
+      <div className="glass-card modal-card" style={{ maxWidth: '620px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>
+              {initialExpense ? 'Edit Expense' : 'Add New Expense'}
+            </h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Log shared household outlays or private personal purchases
+            </p>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="btn btn-secondary btn-icon-only" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
-        {/* Expense Scope Selector (Household Shared vs Personal Private) */}
-        <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-input)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+        {/* Scope Selector: Shared Household vs Private Personal */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', backgroundColor: 'var(--bg-input)', padding: '6px', borderRadius: 'var(--radius-md)' }}>
           <button
             type="button"
             className={`btn ${scope === 'household' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+            style={{ flex: 1, padding: '10px', fontSize: '0.88rem' }}
             onClick={() => setScope('household')}
           >
-            <Users size={16} />
-            <span>Shared Household</span>
+            <Users size={18} />
+            <span>Shared Household Expense</span>
           </button>
+
           <button
             type="button"
             className={`btn ${scope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+            style={{ flex: 1, padding: '10px', fontSize: '0.88rem' }}
             onClick={() => setScope('personal')}
           >
-            <Wallet size={16} />
-            <span>Personal Wallet</span>
+            <Wallet size={18} />
+            <span>Private Personal Expense</span>
           </button>
         </div>
 
-        {/* Quick Presets */}
-        {scope === 'household' && (
-          <div className="preset-container">
-            <div className="preset-title">
-              <Sparkles size={14} style={{ color: 'var(--accent-primary)' }} />
-              <span>Quick Bill Templates</span>
+        {/* Quick Template Presets Bar */}
+        {!initialExpense && scope === 'household' && (
+          <div style={{ marginBottom: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <Sparkles size={14} style={{ color: 'var(--accent-amber)' }} />
+              <span>Quick Template Presets</span>
             </div>
-            <div className="preset-chips">
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {PRESETS.map((p) => (
                 <button
                   key={p.name}
                   type="button"
-                  className="preset-chip"
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
                   onClick={() => applyPreset(p)}
                 >
                   {p.name} (৳{p.amount})
@@ -336,7 +350,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {/* Error Message Alert */}
           {errorMessage && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(244, 63, 94, 0.15)', color: 'var(--accent-rose)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: 600 }}>
               <AlertCircle size={16} />
@@ -375,7 +388,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           <div className="form-group">
             <label className="form-label">Who Paid Out-of-Pocket?</label>
             <div className="user-selector-grid">
-              {ALL_USERS.map((user) => (
+              {houseUsers.map((user) => (
                 <button
                   key={user.id}
                   type="button"
@@ -441,61 +454,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             )}
           </div>
 
-          {/* Recurring Bill & Frequency Section */}
-          <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <RefreshCw size={16} style={{ color: 'var(--accent-primary)' }} />
-                <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>Recurring Bill Automation</span>
-              </div>
-              <button
-                type="button"
-                className={`btn ${isRecurring ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                onClick={() => setIsRecurring(!isRecurring)}
-              >
-                <span>{isRecurring ? 'Recurring On' : 'One-Time'}</span>
-              </button>
-            </div>
-
-            {isRecurring && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                <button
-                  type="button"
-                  className={`btn ${recurringFrequency === 'monthly' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{ flex: 1 }}
-                  onClick={() => setRecurringFrequency('monthly')}
-                >
-                  Monthly Recurring
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${recurringFrequency === 'weekly' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{ flex: 1 }}
-                  onClick={() => setRecurringFrequency('weekly')}
-                >
-                  Weekly Recurring
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Receipt Image File Attachment */}
+          {/* AI OCR Scanner & Receipt Attachment */}
           <div className="form-group">
-            <label className="form-label">
-              <span>Attach Receipt Image</span>
-              <Paperclip size={14} style={{ color: 'var(--text-muted)' }} />
-            </label>
-
+            <label className="form-label">Receipt Photo & AI OCR Scanner</label>
             {receiptUrl ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-input)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                <img src={receiptUrl} alt="Receipt Preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
-                <div style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600 }}>
-                  <div>Receipt photo attached</div>
-                  {isScanningOcr && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 800 }}>
-                      ⚡ AI OCR Scanning receipt details...
-                    </div>
-                  )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', backgroundColor: 'var(--bg-input)', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-medium)' }}>
+                <img src={receiptUrl} alt="Receipt" style={{ width: '54px', height: '54px', objectFit: 'cover', borderRadius: '8px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>Receipt Attached</div>
+                  <div style={{ fontSize: '0.75rem', color: isScanningOcr ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>
+                    {isScanningOcr ? 'Scanning receipt text via OCR...' : '✓ OCR scan completed'}
+                  </div>
                 </div>
                 <button type="button" className="btn btn-danger btn-sm" onClick={() => setReceiptUrl('')}>
                   Remove
@@ -561,7 +530,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   Personal Purchase Shortcut
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {ALL_USERS.filter((u) => u.id !== paidBy).map((u) => (
+                  {houseUsers.filter((u) => u.id !== paidBy).map((u) => (
                     <button
                       key={u.id}
                       type="button"
@@ -584,7 +553,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 </label>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {ALL_USERS.map((user) => {
+                  {houseUsers.map((user) => {
                     const isChecked = selectedParticipants.includes(user.id);
                     return (
                       <div key={user.id} className="participant-checkbox-item">
@@ -642,47 +611,53 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               {splitMethod === 'custom' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Custom Taka Amounts</div>
-                  {selectedParticipants.map((userId) => (
-                    <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                      <span style={{ fontWeight: 700 }}>{USERS[userId]?.name || userId}</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="form-input tabular-nums"
-                        style={{ width: '130px' }}
-                        placeholder="0.00"
-                        value={customSharesStr[userId] || ''}
-                        onChange={(e) =>
-                          setCustomSharesStr({ ...customSharesStr, [userId]: e.target.value })
-                        }
-                      />
-                    </div>
-                  ))}
+                  {selectedParticipants.map((userId) => {
+                    const uObj = houseUsers.find((u) => u.id === userId);
+                    return (
+                      <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <span style={{ fontWeight: 700 }}>{uObj?.name || USERS[userId]?.name || userId}</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-input tabular-nums"
+                          style={{ width: '130px' }}
+                          placeholder="0.00"
+                          value={customSharesStr[userId] || ''}
+                          onChange={(e) =>
+                            setCustomSharesStr({ ...customSharesStr, [userId]: e.target.value })
+                          }
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
               {splitMethod === 'percentage' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Percentage Share Allocations</div>
-                  {selectedParticipants.map((userId) => (
-                    <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                      <span style={{ fontWeight: 700 }}>{USERS[userId]?.name || userId}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <input
-                          type="number"
-                          step="0.1"
-                          className="form-input tabular-nums"
-                          style={{ width: '100px' }}
-                          placeholder="0"
-                          value={percentagesStr[userId] || ''}
-                          onChange={(e) =>
-                            setPercentagesStr({ ...percentagesStr, [userId]: e.target.value })
-                          }
-                        />
-                        <span style={{ fontWeight: 800, color: 'var(--text-muted)' }}>%</span>
+                  {selectedParticipants.map((userId) => {
+                    const uObj = houseUsers.find((u) => u.id === userId);
+                    return (
+                      <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <span style={{ fontWeight: 700 }}>{uObj?.name || USERS[userId]?.name || userId}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <input
+                            type="number"
+                            step="0.1"
+                            className="form-input tabular-nums"
+                            style={{ width: '100px' }}
+                            placeholder="0"
+                            value={percentagesStr[userId] || ''}
+                            onChange={(e) =>
+                              setPercentagesStr({ ...percentagesStr, [userId]: e.target.value })
+                            }
+                          />
+                          <span style={{ fontWeight: 800, color: 'var(--text-muted)' }}>%</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
