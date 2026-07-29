@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Leader-Based Multi-User Household Management System Complete  
+**Current Status**: Log Out Buttons & 3 Dummy Test Accounts Complete  
 
 ---
 
@@ -156,3 +156,12 @@
   * Added Settings ⚙️ tab to sidebar and mobile bottom nav, displaying live House Name and House Code.
 * **Realtime Firestore Scoping (`src/utils/firebaseSync.ts`)**:
   * Scoped realtime listeners (`expenses`, `settlements`, `cards`) by `houseId`.
+
+### 2026-07-29: Log Out Buttons & 3 Dummy Test Accounts Integration
+* **Prominent Log Out Buttons (`src/components/Navbar.tsx` & `src/components/SettingsView.tsx`)**:
+  * Placed a **Log Out** button at the bottom of the sidebar footer and inside the Settings view.
+* **3 Pre-Configured Dummy Test Accounts (`src/components/AuthModal.tsx` & `src/context/AuthContext.tsx`)**:
+  * 1: Display Name: **Raiyan**, Email: `raiyan@gmail.com`, Password: `dummy123`
+  * 2: Display Name: **Himel**, Email: `himel@gmail.com`, Password: `dummy123`
+  * 3: Display Name: **Lazim**, Email: `lazim@gmail.com`, Password: `dummy123`
+  * Added 1-Click quick login buttons for all 3 accounts in `AuthModal.tsx`.
