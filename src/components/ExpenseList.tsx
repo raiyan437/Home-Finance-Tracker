@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Expense, UserId, Category, PaymentCard } from '../types';
-import { USERS, ALL_USERS } from '../utils/settlementEngine';
+import { USERS, getHouseUsers } from '../utils/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { exportAuditReportCsv } from '../utils/exportCsv';
@@ -26,7 +26,8 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   onDeleteExpense,
   onAddComment,
 }) => {
-  const { userProfile } = useAuth();
+  const { currentHouse } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
@@ -162,7 +163,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             onChange={(e) => setSelectedUserFilter(e.target.value as UserId | 'All')}
           >
             <option value="All">All Housemates</option>
-            {ALL_USERS.map((u) => (
+            {houseUsers.map((u) => (
               <option key={u.id} value={u.id}>
                 Payer/Participant: {u.name}
               </option>
@@ -218,7 +219,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {filteredExpenses.map((exp) => {
-            const payer = USERS[exp.paidBy] || { id: exp.paidBy, name: exp.paidBy, avatar: exp.paidBy?.charAt(0) || 'U', color: '#3b82f6' };
+            const payer = houseUsers.find((u) => u.id === exp.paidBy || u.name.toLowerCase() === exp.paidBy.toLowerCase()) || USERS[exp.paidBy] || { id: exp.paidBy, name: exp.paidBy, avatar: exp.paidBy?.charAt(0) || 'U', color: '#3b82f6' };
             const isExpanded = expandedId === exp.id;
             const pm = exp.paymentMethod;
             const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
@@ -411,7 +412,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       {exp.comments && exp.comments.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                           {exp.comments.map((c) => {
-                            const commenter = USERS[c.userId] || userProfile;
+                            const commenter = houseUsers.find((u) => u.id === c.userId || u.name.toLowerCase() === c.userId.toLowerCase()) || USERS[c.userId] || { id: c.userId, name: c.userId, avatar: c.userId?.charAt(0) || 'U', color: '#3b82f6' };
                             return (
                               <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
                                 <UserAvatar user={commenter} size={22} />

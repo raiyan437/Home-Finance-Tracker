@@ -267,6 +267,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         splitMethod: scope === 'personal' ? 'equal' : splitMethod,
         shares: finalShares,
         scope,
+        ownerId: activeUserId,
         paymentMethod: {
           type: paymentType,
           cardId: paymentType === 'card' ? selectedCardId : undefined,

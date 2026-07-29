@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import type { Expense, Settlement } from '../types';
-import { calculateNetBalances, ALL_USERS } from '../utils/settlementEngine';
+import { calculateNetBalances, getHouseUsers } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { exportAuditReportCsv } from '../utils/exportCsv';
+import { useAuth } from '../context/AuthContext';
 import { CategoryChart } from './CategoryChart';
 import { UserAvatar } from './UserAvatar';
 import { Calendar, Users, Download } from 'lucide-react';
@@ -13,6 +14,9 @@ interface MonthlySummaryProps {
 }
 
 export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settlements }) => {
+  const { currentHouse } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthKey);
 
@@ -32,8 +36,8 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settle
   }, [expenses, selectedMonth]);
 
   const monthBalances = useMemo(() => {
-    return calculateNetBalances(monthExpenses, settlements);
-  }, [monthExpenses, settlements]);
+    return calculateNetBalances(monthExpenses, settlements, houseUsers);
+  }, [monthExpenses, settlements, houseUsers]);
 
   const totalMonthSpentCents = monthExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
@@ -117,8 +121,8 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settle
           <span>{formattedMonthLabel} Housemate Performance</span>
         </div>
         <div className="grid-3">
-          {ALL_USERS.map((user) => {
-            const b = monthBalances[user.id];
+          {houseUsers.map((user) => {
+            const b = monthBalances[user.id] || { totalPaidCents: 0, totalShareCents: 0, netBalanceCents: 0 };
             const net = b.netBalanceCents;
 
             return (

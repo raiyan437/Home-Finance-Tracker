@@ -19,9 +19,7 @@ export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void, house
         snapshot.forEach((doc) => {
           list.push(doc.data() as Expense);
         });
-        if (list.length > 0) {
-          onUpdate(list);
-        }
+        onUpdate(list);
       },
       (err) => console.warn('Firestore Expenses Sync Warning (using local storage fallback):', err)
     );
@@ -74,9 +72,7 @@ export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => vo
         snapshot.forEach((doc) => {
           list.push(doc.data() as Settlement);
         });
-        if (list.length > 0) {
-          onUpdate(list);
-        }
+        onUpdate(list);
       },
       (err) => console.warn('Firestore Settlements Sync Warning:', err)
     );
@@ -116,9 +112,7 @@ export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void, houseId
         snapshot.forEach((doc) => {
           list.push(doc.data() as PaymentCard);
         });
-        if (list.length > 0) {
-          onUpdate(list);
-        }
+        onUpdate(list);
       },
       (err) => console.warn('Firestore Cards Sync Warning:', err)
     );

@@ -1,10 +1,19 @@
 import type { Expense, Settlement } from '../types';
 import { USERS } from '../utils/settlementEngine';
+import { loadUsersDB } from '../utils/mockAuthDatabase';
 
 /**
  * Converts expenses and settlements to a formatted CSV file and triggers a browser download.
  */
 export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlement[] = [], filename = 'household_finance_report.csv') => {
+  const usersDB = loadUsersDB();
+  const getName = (id: string) => {
+    if (USERS[id]?.name) return USERS[id].name;
+    const u = usersDB.find((usr) => usr.uid === id || usr.displayName.toLowerCase() === id.toLowerCase());
+    if (u?.displayName) return u.displayName;
+    return id;
+  };
+
   const headers = [
     'Type',
     'ID',
@@ -23,7 +32,7 @@ export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlemen
 
   // 1. Process Expenses
   expenses.forEach((e) => {
-    const payerName = USERS[e.paidBy]?.name || e.paidBy;
+    const payerName = getName(e.paidBy);
     const amountDollars = (e.amountCents / 100).toFixed(2);
     const channel = e.paymentMethod?.type === 'card' ? 'Bank Card' : 'Cash';
     const scopeLabel = e.scope === 'personal' ? 'Personal' : 'Household';
@@ -45,8 +54,8 @@ export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlemen
 
   // 2. Process Settlements
   settlements.forEach((s) => {
-    const fromName = USERS[s.fromUserId]?.name || s.fromUserId;
-    const toName = USERS[s.toUserId]?.name || s.toUserId;
+    const fromName = getName(s.fromUserId);
+    const toName = getName(s.toUserId);
     const amountDollars = (s.amountCents / 100).toFixed(2);
     const dateStr = s.settledAt ? s.settledAt.split('T')[0] : '';
 

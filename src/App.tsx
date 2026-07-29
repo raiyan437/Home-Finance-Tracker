@@ -114,8 +114,24 @@ const AppContent: React.FC = () => {
 
   // Filter household expenses (shared scope) vs personal expenses (private scope)
   const householdExpenses = useMemo(() => {
-    return expenses.filter((e) => !e.scope || e.scope === 'household');
-  }, [expenses]);
+    return expenses.filter((e) => {
+      const isHousehold = !e.scope || e.scope === 'household';
+      if (!isHousehold) return false;
+      if (currentHouse) {
+        return !e.houseId || e.houseId === currentHouse.id;
+      }
+      return true;
+    });
+  }, [expenses, currentHouse]);
+
+  const houseSettlements = useMemo(() => {
+    return settlements.filter((s) => {
+      if (currentHouse) {
+        return !(s as any).houseId || (s as any).houseId === currentHouse.id;
+      }
+      return true;
+    });
+  }, [settlements, currentHouse]);
 
   const personalExpenses = useMemo(() => {
     return expenses.filter((e) => e.scope === 'personal' && (e.ownerId === activeUserId || e.paidBy === activeUserId));
@@ -129,8 +145,8 @@ const AppContent: React.FC = () => {
 
   // Derived financial computations
   const netBalances = useMemo(
-    () => calculateNetBalances(householdExpenses, settlements, houseUsers),
-    [householdExpenses, settlements, houseUsers]
+    () => calculateNetBalances(householdExpenses, houseSettlements, houseUsers),
+    [householdExpenses, houseSettlements, houseUsers]
   );
 
   const simplifiedSettlements = useMemo(
