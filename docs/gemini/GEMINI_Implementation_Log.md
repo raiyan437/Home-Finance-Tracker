@@ -157,11 +157,13 @@
 * **Realtime Firestore Scoping (`src/utils/firebaseSync.ts`)**:
   * Scoped realtime listeners (`expenses`, `settlements`, `cards`) by `houseId`.
 
-### 2026-07-29: Log Out Buttons & 3 Dummy Test Accounts Integration
-* **Prominent Log Out Buttons (`src/components/Navbar.tsx` & `src/components/SettingsView.tsx`)**:
-  * Placed a **Log Out** button at the bottom of the sidebar footer and inside the Settings view.
-* **3 Pre-Configured Dummy Test Accounts (`src/components/AuthModal.tsx` & `src/context/AuthContext.tsx`)**:
+### 2026-07-29: Always-Visible Log Out / Switch Account Action Buttons
+* **Always-Visible Sidebar Logout (`src/components/Navbar.tsx`)**:
+  * Made the **Log Out / Switch User** button always rendered in the sidebar footer regardless of authentication state.
+  * Triggers session logout and immediately opens the Auth Modal for profile selection.
+* **Always-Visible Settings Logout (`src/components/SettingsView.tsx`)**:
+  * Made the **Log Out / Switch Account** button always rendered at the bottom of the Settings view.
+* **3 Pre-Configured Test Accounts (`src/components/AuthModal.tsx`)**:
   * 1: Display Name: **Raiyan**, Email: `raiyan@gmail.com`, Password: `dummy123`
   * 2: Display Name: **Himel**, Email: `himel@gmail.com`, Password: `dummy123`
   * 3: Display Name: **Lazim**, Email: `lazim@gmail.com`, Password: `dummy123`
-  * Added 1-Click quick login buttons for all 3 accounts in `AuthModal.tsx`.
