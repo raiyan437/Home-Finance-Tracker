@@ -315,10 +315,8 @@ const AppContent: React.FC = () => {
             <Dashboard
               expenses={householdExpenses}
               settlements={settlements}
-              onOpenAddExpense={() => setIsAddExpenseOpen(true)}
               onNavigateToExpenses={() => setActiveTab('expenses')}
               onNavigateToSettlement={() => setActiveTab('settlement')}
-              onResetData={() => setIsResetConfirmOpen(true)}
             />
           )}
 
