@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Complete Realtime House Member Synchronization & Roster Alignment  
+**Current Status**: Complete Project Functional Logic Audit & Resolved  
 
 ---
 
@@ -214,3 +214,15 @@
 * **Synchronized Session & House State Loading (`src/context/AuthContext.tsx`)**:
   * Added explicit `syncHouseForUser(userProfile)` handler on login, sign up, profile switch, and member kick/leave actions.
   * Ensured `useEffect` re-reads fresh house objects from `localStorage` whenever `dbUserProfile` updates.
+
+### 2026-07-29: Comprehensive Functional Logic Audit & Resolved
+* **House Expense & Settlement Isolation (`src/App.tsx`)**:
+  * Added strict `currentHouse.id` filtering for `householdExpenses` and `houseSettlements` to guarantee zero data bleed across houses.
+* **Personal Expense Owner Scoping (`src/components/PersonalWallet.tsx` & `src/components/AddExpenseModal.tsx`)**:
+  * Added `ownerId: activeUserId` to `AddExpenseModal` creation payload and updated `PersonalWallet` filter to `(e.ownerId === activeUserId || e.paidBy === activeUserId)`.
+* **Dynamic House Users in Expense List & Monthly Summary (`src/components/ExpenseList.tsx` & `src/components/MonthlySummary.tsx`)**:
+  * Replaced hardcoded `ALL_USERS` in `ExpenseList` dropdowns and `MonthlySummary` breakdown cards with dynamic `getHouseUsers(currentHouse)`.
+* **Firestore Empty Snapshot Listener Fix (`src/utils/firebaseSync.ts`)**:
+  * Removed `if (list.length > 0)` condition in snapshot listeners so clearing items correctly updates React state with empty array `[]`.
+* **Dynamic CSV Export Resolution (`src/utils/exportCsv.ts`)**:
+  * Added fallback user display name resolution for custom user accounts in exported CSV audit files.
