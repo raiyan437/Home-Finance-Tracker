@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: 5 SQA Logic Bug Fixes Executed  
+**Current Status**: Single User Fallback Resolution & Roster Dynamic Scoping Complete  
 
 ---
 
@@ -238,3 +238,9 @@
   * Scoped queries with `where('houseId', '==', houseId)` and exported `subscribeToExpenses` and `subscribeToSettlements` aliases.
 * **React Hook Dependencies (`src/components/AddExpenseModal.tsx`)**:
   * Included `[isOpen, initialExpense, houseUsers, activeUserId, cards]` in the modal initialization `useEffect`.
+
+### 2026-07-29: Single User Fallback Resolution for Unassigned Accounts
+* **Single User Resolution (`src/utils/settlementEngine.ts`)**:
+  * Refactored `getHouseUsers(currentHouse, dbUserProfile)` so that when a user is not in any house (`currentHouse` is `null`), `getHouseUsers` returns **ONLY that user** (e.g. `[Himel]`), instead of defaulting to all users.
+* **Component Integration Across All Views**:
+  * Updated `App.tsx`, `Dashboard.tsx`, `SettlementView.tsx`, `ExpenseList.tsx`, `MonthlySummary.tsx`, `CategoryChart.tsx`, and `AddExpenseModal.tsx` to pass `dbUserProfile` to `getHouseUsers`.
