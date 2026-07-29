@@ -1,10 +1,10 @@
 import type { UserProfile, House } from '../types';
 
-const USERS_DB_KEY = 'home_finance_users_db_v2';
-const HOUSES_DB_KEY = 'home_finance_houses_db_v2';
-const ACTIVE_SESSION_KEY = 'home_finance_active_session_v2';
+const USERS_DB_KEY = 'home_finance_users_db_v3';
+const HOUSES_DB_KEY = 'home_finance_houses_db_v3';
+const ACTIVE_SESSION_KEY = 'home_finance_active_session_v3';
 
-// Default Seed Accounts
+// Default Seed Accounts: Raiyan (Leader) & Lazim (Member) belong to house-demo-001. Himel is unassigned initially.
 const DEFAULT_USERS: UserProfile[] = [
   {
     uid: 'user-raiyan-001',
@@ -16,21 +16,21 @@ const DEFAULT_USERS: UserProfile[] = [
     createdAt: new Date().toISOString(),
   },
   {
-    uid: 'user-himel-002',
-    displayName: 'Himel',
-    email: 'himel@gmail.com',
-    avatar: 'himel',
-    houseId: 'house-demo-001',
-    role: 'member',
-    createdAt: new Date().toISOString(),
-  },
-  {
     uid: 'user-lazim-003',
     displayName: 'Lazim',
     email: 'lazim@gmail.com',
     avatar: 'lazim',
     houseId: 'house-demo-001',
     role: 'member',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    uid: 'user-himel-002',
+    displayName: 'Himel',
+    email: 'himel@gmail.com',
+    avatar: 'himel',
+    houseId: null,
+    role: null,
     createdAt: new Date().toISOString(),
   },
 ];
@@ -46,13 +46,6 @@ const DEFAULT_HOUSE: House = {
       displayName: 'Raiyan',
       email: 'raiyan@gmail.com',
       role: 'leader',
-      joinedAt: new Date().toISOString(),
-    },
-    {
-      uid: 'user-himel-002',
-      displayName: 'Himel',
-      email: 'himel@gmail.com',
-      role: 'member',
       joinedAt: new Date().toISOString(),
     },
     {

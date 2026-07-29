@@ -53,16 +53,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentHouse, setCurrentHouse] = useState<House | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Sync House state whenever dbUserProfile changes
-  useEffect(() => {
-    if (!dbUserProfile?.houseId) {
+  // Helper: Refresh house object from DB based on user profile
+  const syncHouseForUser = (profile: UserProfile | null) => {
+    if (!profile?.houseId) {
       setCurrentHouse(null);
       return;
     }
     const houses = loadHousesDB();
-    const house = houses.find((h) => h.id === dbUserProfile.houseId) || null;
-    setCurrentHouse(house);
-  }, [dbUserProfile?.houseId]);
+    const house = houses.find((h) => h.id === profile.houseId) || null;
+    setCurrentHouse(house ? { ...house } : null);
+  };
+
+  // Sync House state whenever dbUserProfile reference or values change
+  useEffect(() => {
+    syncHouseForUser(dbUserProfile);
+  }, [dbUserProfile]);
 
   const switchProfile = (userId: UserId) => {
     if (USERS[userId]) {
@@ -71,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Login Handler (Strict Demo Account Enforcement)
+  // Login Handler (Strict Demo Account Enforcement & Realtime House Sync)
   const loginWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
@@ -100,8 +105,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: `user-${demo.id}-001`,
         displayName: demo.displayName,
         email: cleanEmail,
-        houseId: 'house-demo-001',
-        role: demo.id === 'raiyan' ? 'leader' : 'member',
+        houseId: demo.id === 'himel' ? null : 'house-demo-001',
+        role: demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null,
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existingUser]);
@@ -110,10 +115,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     switchProfile(demo.id);
     setActiveSession(existingUser);
     setDbUserProfile(existingUser);
+    syncHouseForUser(existingUser);
     setLoading(false);
   };
 
-  // Sign Up Handler (Strict Demo Account Enforcement)
+  // Sign Up Handler (Strict Demo Account Enforcement & Realtime House Sync)
   const signUpWithEmail = async (email: string, pass: string, displayName: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
@@ -142,8 +148,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: `user-${demo.id}-001`,
         displayName: displayName.trim() || demo.displayName,
         email: cleanEmail,
-        houseId: 'house-demo-001',
-        role: demo.id === 'raiyan' ? 'leader' : 'member',
+        houseId: demo.id === 'himel' ? null : 'house-demo-001',
+        role: demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null,
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existing]);
@@ -155,6 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     switchProfile(demo.id);
     setActiveSession(existing);
     setDbUserProfile(existing);
+    syncHouseForUser(existing);
     setLoading(false);
   };
 
@@ -261,7 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedProfile = { ...dbUserProfile, houseId: house.id, role: 'member' as const };
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
-    setCurrentHouse(house);
+    setCurrentHouse({ ...house });
   };
 
   // Update House Name Handler (Leader Power)
