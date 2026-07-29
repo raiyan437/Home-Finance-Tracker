@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Complete Project Functional Logic Audit & Resolved  
+**Current Status**: 5 SQA Logic Bug Fixes Executed  
 
 ---
 
@@ -226,3 +226,15 @@
   * Removed `if (list.length > 0)` condition in snapshot listeners so clearing items correctly updates React state with empty array `[]`.
 * **Dynamic CSV Export Resolution (`src/utils/exportCsv.ts`)**:
   * Added fallback user display name resolution for custom user accounts in exported CSV audit files.
+
+### 2026-07-29: SQA Logic Bug Fixes Execution
+* **House Settlement Prop Leakage Fix (`src/App.tsx`)**:
+  * Passed `houseSettlements` to `<Dashboard>`, `<SettlementView>`, and `<MonthlySummary>` instead of raw `settlements`.
+* **Exact Remainder Cent Allocation (`src/components/AddExpenseModal.tsx`)**:
+  * Base shares use integer division (`Math.floor(totalCents / count)`) with remainder cents allocated to the primary payer/participant, ensuring `sum(share.amountCents)` EXACTLY matches `totalExpense.amountCents`.
+* **Strict UID Matching in Debt Engine (`src/utils/settlementEngine.ts`)**:
+  * Refactored `calculateNetBalances` and `getHouseUsers` to match users by unique `uid`/`id` rather than display name strings.
+* **Firestore Listener House Scoping & Aliases (`src/utils/firebaseSync.ts`)**:
+  * Scoped queries with `where('houseId', '==', houseId)` and exported `subscribeToExpenses` and `subscribeToSettlements` aliases.
+* **React Hook Dependencies (`src/components/AddExpenseModal.tsx`)**:
+  * Included `[isOpen, initialExpense, houseUsers, activeUserId, cards]` in the modal initialization `useEffect`.
