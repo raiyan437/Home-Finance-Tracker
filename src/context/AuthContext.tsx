@@ -27,6 +27,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   createHouse: (houseName: string) => Promise<void>;
   joinHouse: (houseCode: string) => Promise<void>;
+  updateHouseName: (newName: string) => Promise<void>;
   kickMember: (targetUid: string) => Promise<void>;
   leaveHouse: () => Promise<void>;
 }
@@ -76,7 +77,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanEmail = email.trim().toLowerCase();
     const demo = AUTHORIZED_DEMO_ACCOUNTS[cleanEmail];
 
-    // STRICT VALIDATION: Reject any non-approved email or password combination
     if (!demo || pass !== demo.pass) {
       setLoading(false);
       throw new Error(
@@ -84,7 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
     }
 
-    // 1. Attempt optional Firebase login if configured
     if (auth) {
       try {
         await signInWithEmailAndPassword(auth, cleanEmail, pass);
@@ -93,7 +92,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Local Database Authentication
     const users = loadUsersDB();
     let existingUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
 
@@ -266,10 +264,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentHouse(house);
   };
 
+  // Update House Name Handler (Leader Power)
+  const updateHouseName = async (newName: string) => {
+    if (!dbUserProfile || !currentHouse) throw new Error('No active house session found');
+    if (currentHouse.leaderUid !== dbUserProfile.uid && dbUserProfile.role !== 'leader') {
+      throw new Error('Only the House Leader can update the house name');
+    }
+    const cleanName = newName.trim();
+    if (!cleanName) {
+      throw new Error('House name cannot be empty');
+    }
+
+    const houses = loadHousesDB();
+    const house = houses.find((h) => h.id === currentHouse.id);
+    if (house) {
+      house.name = cleanName;
+      saveHousesDB(houses);
+      setCurrentHouse({ ...house });
+    }
+  };
+
   // Kick Member Handler
   const kickMember = async (targetUid: string) => {
     if (!dbUserProfile || !currentHouse) return;
-    if (currentHouse.leaderUid !== dbUserProfile.uid) {
+    if (currentHouse.leaderUid !== dbUserProfile.uid && dbUserProfile.role !== 'leader') {
       throw new Error('Only the House Leader can kick members');
     }
 
@@ -336,6 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         createHouse,
         joinHouse,
+        updateHouseName,
         kickMember,
         leaveHouse,
       }}

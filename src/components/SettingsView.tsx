@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   AlertCircle,
   Users,
+  Edit3,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -24,6 +25,7 @@ export const SettingsView: React.FC = () => {
     currentHouse,
     createHouse,
     joinHouse,
+    updateHouseName,
     kickMember,
     leaveHouse,
     logout,
@@ -36,6 +38,10 @@ export const SettingsView: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [kickingUid, setKickingUid] = useState<string | null>(null);
+
+  // House Name Edit States
+  const [isEditingHouseName, setIsEditingHouseName] = useState(false);
+  const [newHouseNameInput, setNewHouseNameInput] = useState('');
 
   const isLeader =
     Boolean(firebaseUser && currentHouse && currentHouse.leaderUid === firebaseUser.uid) ||
@@ -77,6 +83,23 @@ export const SettingsView: React.FC = () => {
       setSuccessMsg('Successfully joined house!');
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to join house.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveHouseName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setIsSubmitting(true);
+
+    try {
+      await updateHouseName(newHouseNameInput);
+      setIsEditingHouseName(false);
+      setSuccessMsg(`House name successfully updated to "${newHouseNameInput.trim()}"!`);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to update house name.');
     } finally {
       setIsSubmitting(false);
     }
@@ -168,67 +191,75 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* CASE A: USER HAS NO HOUSE ASSIGNED */}
+      {/* SECTION 1: HOUSE SETUP (If User is NOT in a house) */}
       {!currentHouse ? (
-        <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
-          {/* Create House Card */}
-          <div className="glass-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+          {/* Create House Form */}
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div
                 style={{
-                  backgroundColor: 'rgba(59, 130, 246, 0.18)',
-                  color: 'var(--accent-primary)',
-                  padding: '10px',
+                  width: '42px',
+                  height: '42px',
                   borderRadius: 'var(--radius-md)',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  color: 'var(--accent-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                <Plus size={24} />
+                <Plus size={22} />
               </div>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Create a New House</h2>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Create New House</h3>
                 <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  Start a new household, become the 👑 Leader, and get a unique House Code.
+                  Become the House Leader & generate a unique join code
                 </p>
               </div>
             </div>
 
             <form onSubmit={handleCreateHouseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="form-group">
-                <label className="form-label">Household Name</label>
+                <label className="form-label">House Name</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Raiyan & Friends Villa, Flat 4B"
+                  placeholder="e.g. Bachelor Villa 4B"
                   value={createHouseName}
                   onChange={(e) => setCreateHouseName(e.target.value)}
                   required
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={isSubmitting}>
                 <Crown size={16} />
-                <span>{isSubmitting ? 'Creating...' : 'Create House & Become Leader'}</span>
+                <span>{isSubmitting ? 'Creating House...' : 'Create House (Leader)'}</span>
               </button>
             </form>
           </div>
 
-          {/* Join Existing House Card */}
-          <div className="glass-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          {/* Join House Form */}
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div
                 style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                  color: 'var(--accent-emerald)',
-                  padding: '10px',
+                  width: '42px',
+                  height: '42px',
                   borderRadius: 'var(--radius-md)',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: 'var(--accent-emerald)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                <LogIn size={24} />
+                <LogIn size={22} />
               </div>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Join an Existing House</h2>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Join Existing House</h3>
                 <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  Ask your House Leader for the 6-character House Code (e.g., HM-8823).
+                  Enter the 6-character code provided by your House Leader
                 </p>
               </div>
             </div>
@@ -239,24 +270,25 @@ export const SettingsView: React.FC = () => {
                 <input
                   type="text"
                   className="form-input tabular-nums"
-                  placeholder="HM-8823"
+                  placeholder="e.g. HM-8823"
                   value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(e.target.value)}
-                  style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}
+                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                  maxLength={7}
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}
                   required
                 />
               </div>
 
-              <button type="submit" className="btn btn-secondary" disabled={isSubmitting}>
-                <LogIn size={16} />
-                <span>{isSubmitting ? 'Joining...' : 'Join House'}</span>
+              <button type="submit" className="btn btn-success" style={{ width: '100%' }} disabled={isSubmitting}>
+                <UserCheck size={16} />
+                <span>{isSubmitting ? 'Joining...' : 'Join Household'}</span>
               </button>
             </form>
           </div>
         </div>
       ) : (
-        /* CASE B: ACTIVE HOUSE MEMBER / LEADER VIEW */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+        /* SECTION 2: HOUSE DASHBOARD (If User is in a house) */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Permanent House Code Banner */}
           <div
             className="glass-card"
@@ -272,9 +304,46 @@ export const SettingsView: React.FC = () => {
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px', flexWrap: 'wrap' }}>
                 <Home size={24} style={{ color: 'var(--accent-primary)' }} />
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{currentHouse.name}</h2>
+                {isEditingHouseName ? (
+                  <form onSubmit={handleSaveHouseName} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={newHouseNameInput}
+                      onChange={(e) => setNewHouseNameInput(e.target.value)}
+                      placeholder="Enter new house name"
+                      style={{ padding: '6px 12px', fontSize: '1rem', width: '220px' }}
+                      required
+                    />
+                    <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmitting}>
+                      Save
+                    </button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditingHouseName(false)}>
+                      Cancel
+                    </button>
+                  </form>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{currentHouse.name}</h2>
+                    {isLeader && (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                        onClick={() => {
+                          setNewHouseNameInput(currentHouse.name);
+                          setIsEditingHouseName(true);
+                        }}
+                        title="Edit House Name"
+                      >
+                        <Edit3 size={13} />
+                        <span>Edit Name</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {isLeader ? (
                   <span className="badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)', fontSize: '0.78rem' }}>
                     <Crown size={12} /> House Leader
@@ -348,9 +417,11 @@ export const SettingsView: React.FC = () => {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '14px 18px',
-                      backgroundColor: 'var(--bg-input)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--border-subtle)',
+                      flexWrap: 'wrap',
+                      gap: '12px',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -358,21 +429,17 @@ export const SettingsView: React.FC = () => {
                         user={{
                           id: member.uid,
                           name: member.displayName,
-                          avatar: member.avatar || member.displayName?.charAt(0) || 'U',
-                          color: memberIsLeader ? '#f59e0b' : '#3b82f6',
+                          avatar: member.displayName.toLowerCase().slice(0, 5),
+                          color: '#3b82f6',
                         }}
                         size={40}
                       />
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontWeight: 800, fontSize: '0.98rem' }}>{member.displayName}</span>
-                          {memberIsLeader ? (
-                            <span className="badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)', fontSize: '0.72rem' }}>
-                              <Crown size={12} /> Leader
-                            </span>
-                          ) : (
-                            <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--accent-emerald)', fontSize: '0.72rem' }}>
-                              <UserCheck size={12} /> Member
+                          {memberIsLeader && (
+                            <span className="badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)', fontSize: '0.7rem', padding: '2px 8px' }}>
+                              Leader
                             </span>
                           )}
                         </div>
@@ -380,17 +447,18 @@ export const SettingsView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Kick Button for Leader */}
-                    {canKick && (
-                      <button
-                        className="btn btn-danger btn-sm"
-                        disabled={kickingUid === member.uid}
-                        onClick={() => handleKickConfirm(member.uid)}
-                      >
-                        <UserX size={14} />
-                        <span>{kickingUid === member.uid ? 'Kicking...' : 'Kick Member'}</span>
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {canKick && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleKickConfirm(member.uid)}
+                          disabled={kickingUid === member.uid}
+                        >
+                          <UserX size={14} />
+                          <span>{kickingUid === member.uid ? 'Kicking...' : 'Kick Member'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
