@@ -6,7 +6,6 @@ import { Dashboard } from './components/Dashboard';
 import { ExpenseList } from './components/ExpenseList';
 import { SettlementView } from './components/SettlementView';
 import { AddExpenseModal } from './components/AddExpenseModal';
-import { AuthModal } from './components/AuthModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginPage } from './components/LoginPage';
@@ -62,7 +61,6 @@ const AppContent: React.FC = () => {
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -294,7 +292,6 @@ const AppContent: React.FC = () => {
           setEditingExpense(null);
           setIsAddExpenseOpen(true);
         }}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
         theme={theme}
         toggleTheme={toggleTheme}
         lang={lang}
@@ -387,8 +384,6 @@ const AppContent: React.FC = () => {
         initialExpense={editingExpense}
         cards={cards}
       />
-
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
       {/* Delete Expense Confirm Modal */}
       <ConfirmModal

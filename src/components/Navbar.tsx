@@ -28,7 +28,6 @@ interface NavbarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   onOpenAddExpense: () => void;
-  onOpenAuthModal: () => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   lang: Language;
@@ -43,7 +42,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   onOpenAddExpense,
-  onOpenAuthModal,
   theme,
   toggleTheme,
   lang,
@@ -56,10 +54,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { userProfile, dbUserProfile, currentHouse, logout } = useAuth();
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
 
-  const handleLogoutClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleLogoutClick = async () => {
     await logout();
-    onOpenAuthModal();
   };
 
   return (
@@ -79,13 +75,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* User Account / Profile Box */}
-        <div
-          className="user-profile-card"
-          onClick={onOpenAuthModal}
-          title="Click to switch account profile or manage Firebase auth"
-          style={{ position: 'relative' }}
-        >
+        {/* User Account / Profile Box (Clean non-modal profile card) */}
+        <div className="user-profile-card" style={{ cursor: 'default' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
             <UserAvatar
               user={{
@@ -207,7 +198,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>{t('newExpense')}</span>
         </button>
 
-        {/* Footer Toggles (Language, Theme & Logout) */}
+        {/* Footer Toggles (Language, Theme & Log Out) */}
         <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -230,14 +221,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* ALWAYS VISIBLE PROMINENT LOGOUT BUTTON */}
+          {/* Clean Log Out Button */}
           <button
             className="btn btn-danger"
             style={{ width: '100%', marginTop: '6px', justifyContent: 'center', fontWeight: 800, padding: '10px' }}
             onClick={handleLogoutClick}
           >
             <LogOut size={16} />
-            <span>Log Out / Switch User</span>
+            <span>Log Out</span>
           </button>
         </div>
       </aside>

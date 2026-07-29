@@ -423,7 +423,7 @@ export const SettingsView: React.FC = () => {
 
         <button className="btn btn-danger" onClick={() => logout()}>
           <LogOut size={16} />
-          <span>Log Out / Switch Account</span>
+          <span>Log Out</span>
         </button>
       </div>
     </div>
