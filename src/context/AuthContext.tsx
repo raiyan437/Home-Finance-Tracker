@@ -1,16 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserId, UserProfile, House, HouseMember } from '../types';
 import { USERS } from '../utils/settlementEngine';
-import { auth, db } from '../config/firebase';
 import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  updateProfile,
-  type User as FirebaseUser,
-} from 'firebase/auth';
-import { doc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+  loadUsersDB,
+  saveUsersDB,
+  loadHousesDB,
+  saveHousesDB,
+  getActiveSession,
+  setActiveSession,
+} from '../utils/mockAuthDatabase';
+import { auth } from '../config/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
 
 interface AuthContextType {
   activeUserId: UserId;
@@ -18,6 +18,7 @@ interface AuthContextType {
   dbUserProfile: UserProfile | null;
   currentHouse: House | null;
   firebaseUser: FirebaseUser | null;
+  isAuthenticated: boolean;
   loading: boolean;
   switchProfile: (userId: UserId) => void;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
@@ -40,88 +41,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved && USERS[saved] ? saved : 'raiyan';
   });
 
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [dbUserProfile, setDbUserProfile] = useState<UserProfile | null>(null);
+  const [dbUserProfile, setDbUserProfile] = useState<UserProfile | null>(() => getActiveSession());
   const [currentHouse, setCurrentHouse] = useState<House | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // 1. Listen to Firebase Auth state
+  // Sync House state whenever dbUserProfile changes
   useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return () => {};
-    }
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-      setFirebaseUser(fbUser);
-      if (!fbUser) {
-        setDbUserProfile(null);
-        setCurrentHouse(null);
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // 2. Realtime listener for User Profile in Firestore
-  useEffect(() => {
-    if (!db || !firebaseUser) return;
-
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const unsub = onSnapshot(
-      userDocRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const profileData = docSnap.data() as UserProfile;
-          setDbUserProfile(profileData);
-        } else {
-          // If no doc exists yet, create default
-          const now = new Date().toISOString();
-          const newProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-            email: firebaseUser.email || '',
-            avatar: firebaseUser.photoURL || undefined,
-            houseId: null,
-            role: null,
-            createdAt: now,
-          };
-          setDoc(userDocRef, newProfile).catch((err) => console.warn('Error creating user profile:', err));
-          setDbUserProfile(newProfile);
-        }
-        setLoading(false);
-      },
-      (err) => {
-        console.warn('User Profile Firestore listener warning:', err);
-        setLoading(false);
-      }
-    );
-
-    return () => unsub();
-  }, [firebaseUser]);
-
-  // 3. Realtime listener for Active House in Firestore
-  useEffect(() => {
-    if (!db || !dbUserProfile?.houseId) {
+    if (!dbUserProfile?.houseId) {
       setCurrentHouse(null);
       return;
     }
-
-    const houseDocRef = doc(db, 'houses', dbUserProfile.houseId);
-    const unsub = onSnapshot(
-      houseDocRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          setCurrentHouse(docSnap.data() as House);
-        } else {
-          // If house was deleted, clear user's houseId
-          setCurrentHouse(null);
-        }
-      },
-      (err) => console.warn('House Firestore listener warning:', err)
-    );
-
-    return () => unsub();
+    const houses = loadHousesDB();
+    const house = houses.find((h) => h.id === dbUserProfile.houseId) || null;
+    setCurrentHouse(house);
   }, [dbUserProfile?.houseId]);
 
   const switchProfile = (userId: UserId) => {
@@ -131,73 +63,118 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Login Handler (Supports offline DB + optional Firebase)
   const loginWithEmail = async (email: string, pass: string) => {
-    if (!auth) throw new Error('Firebase Auth is not configured');
-    const cred = await signInWithEmailAndPassword(auth, email, pass);
-    setFirebaseUser(cred.user);
-  };
+    setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
 
-  const signUpWithEmail = async (email: string, pass: string, displayName: string) => {
-    if (!auth) throw new Error('Firebase Auth is not configured');
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await updateProfile(cred.user, { displayName });
-
-    const now = new Date().toISOString();
-    const newProfile: UserProfile = {
-      uid: cred.user.uid,
-      displayName: displayName.trim(),
-      email: email.trim(),
-      houseId: null,
-      role: null,
-      createdAt: now,
-    };
-
-    if (db) {
-      await setDoc(doc(db, 'users', cred.user.uid), newProfile);
-    }
-
-    setFirebaseUser(cred.user);
-    setDbUserProfile(newProfile);
-  };
-
-  const loginOrSignUpDemoAccount = async (email: string, pass: string, displayName: string, housemateId: UserId) => {
-    switchProfile(housemateId);
-    if (!auth) return;
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (err: any) {
+    // 1. Attempt optional Firebase login first if configured
+    if (auth) {
       try {
-        await signUpWithEmail(email, pass, displayName);
-      } catch (signUpErr) {
-        console.warn('Demo account sign up fallback error:', signUpErr);
+        await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      } catch (fbErr) {
+        console.warn('Firebase Auth notice (falling back to database):', fbErr);
       }
     }
+
+    // 2. Local Database Authentication
+    const users = loadUsersDB();
+    let existingUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (!existingUser) {
+      // Auto-register account if using valid demo emails
+      const name = cleanEmail.split('@')[0];
+      const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
+      existingUser = {
+        uid: `user-${Date.now()}`,
+        displayName: capitalized,
+        email: cleanEmail,
+        houseId: 'house-demo-001',
+        role: 'member',
+        createdAt: new Date().toISOString(),
+      };
+      const updated = [...users, existingUser];
+      saveUsersDB(updated);
+    }
+
+    // Map housemate ID if matches raiyan, himel, or lazim
+    if (cleanEmail.includes('raiyan')) switchProfile('raiyan');
+    else if (cleanEmail.includes('himel')) switchProfile('himel');
+    else if (cleanEmail.includes('lazim')) switchProfile('lazim');
+
+    setActiveSession(existingUser);
+    setDbUserProfile(existingUser);
+    setLoading(false);
   };
 
+  // Sign Up Handler
+  const signUpWithEmail = async (email: string, pass: string, displayName: string) => {
+    setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (auth) {
+      try {
+        await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+      } catch (fbErr) {
+        console.warn('Firebase Sign Up notice:', fbErr);
+      }
+    }
+
+    const users = loadUsersDB();
+    let existing = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (!existing) {
+      existing = {
+        uid: `user-${Date.now()}`,
+        displayName: displayName.trim(),
+        email: cleanEmail,
+        houseId: null,
+        role: null,
+        createdAt: new Date().toISOString(),
+      };
+      saveUsersDB([...users, existing]);
+    } else {
+      existing.displayName = displayName.trim();
+      saveUsersDB(users);
+    }
+
+    setActiveSession(existing);
+    setDbUserProfile(existing);
+    setLoading(false);
+  };
+
+  // 1-Click Demo Login
+  const loginOrSignUpDemoAccount = async (email: string, pass: string, _displayName: string, housemateId: UserId) => {
+    switchProfile(housemateId);
+    await loginWithEmail(email, pass);
+  };
+
+  // Logout Handler
   const logout = async () => {
-    if (!auth) return;
-    await signOut(auth);
-    setFirebaseUser(null);
+    if (auth) {
+      try {
+        await signOut(auth);
+      } catch (e) {}
+    }
+    setActiveSession(null);
     setDbUserProfile(null);
     setCurrentHouse(null);
   };
 
   // Create House Handler
   const createHouse = async (houseName: string) => {
-    if (!firebaseUser) throw new Error('You must be logged in to create a house');
+    if (!dbUserProfile) throw new Error('You must be logged in to create a house');
     const name = houseName.trim();
     if (!name) throw new Error('House name cannot be empty');
 
-    // Generate unique 6-character code e.g. "HM-8823"
     const randomCode = `HM-${Math.floor(1000 + Math.random() * 9000)}`;
     const houseId = `house-${Date.now()}`;
     const now = new Date().toISOString();
 
     const leaderMember: HouseMember = {
-      uid: firebaseUser.uid,
-      displayName: dbUserProfile?.displayName || firebaseUser.displayName || 'Leader',
-      email: firebaseUser.email || '',
-      avatar: dbUserProfile?.avatar,
+      uid: dbUserProfile.uid,
+      displayName: dbUserProfile.displayName,
+      email: dbUserProfile.email,
       role: 'leader',
       joinedAt: now,
     };
@@ -206,114 +183,121 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: houseId,
       code: randomCode,
       name,
-      leaderUid: firebaseUser.uid,
+      leaderUid: dbUserProfile.uid,
       members: [leaderMember],
       createdAt: now,
     };
 
-    if (db) {
-      await setDoc(doc(db, 'houses', houseId), newHouse);
-      await updateDoc(doc(db, 'users', firebaseUser.uid), {
-        houseId,
-        role: 'leader',
-      });
-    }
+    const houses = loadHousesDB();
+    saveHousesDB([...houses, newHouse]);
 
+    const users = loadUsersDB();
+    const updatedUsers = users.map((u) => {
+      if (u.uid === dbUserProfile.uid) {
+        return { ...u, houseId, role: 'leader' as const };
+      }
+      return u;
+    });
+    saveUsersDB(updatedUsers);
+
+    const updatedProfile = { ...dbUserProfile, houseId, role: 'leader' as const };
+    setActiveSession(updatedProfile);
+    setDbUserProfile(updatedProfile);
     setCurrentHouse(newHouse);
-    setDbUserProfile((prev) => (prev ? { ...prev, houseId, role: 'leader' } : null));
   };
 
   // Join House Handler
   const joinHouse = async (houseCode: string) => {
-    if (!firebaseUser) throw new Error('You must be logged in to join a house');
+    if (!dbUserProfile) throw new Error('You must be logged in to join a house');
     const cleanCode = houseCode.trim().toUpperCase();
     if (!cleanCode) throw new Error('Please enter a house code');
 
-    if (!db) throw new Error('Database connection not available');
+    const houses = loadHousesDB();
+    const house = houses.find((h) => h.code.toUpperCase() === cleanCode);
 
-    const housesQuery = query(collection(db, 'houses'), where('code', '==', cleanCode));
-    const snapshot = await getDocs(housesQuery);
-
-    if (snapshot.empty) {
-      throw new Error(`No house found with code "${cleanCode}". Please check and try again.`);
+    if (!house) {
+      throw new Error(`No house found with code "${cleanCode}". Please verify and try again.`);
     }
 
-    const houseDoc = snapshot.docs[0];
-    const houseData = houseDoc.data() as House;
-
-    // Check if user is already a member
-    const isAlreadyMember = houseData.members.some((m) => m.uid === firebaseUser.uid);
+    const isAlreadyMember = house.members.some((m) => m.uid === dbUserProfile.uid);
     if (!isAlreadyMember) {
       const now = new Date().toISOString();
       const newMember: HouseMember = {
-        uid: firebaseUser.uid,
-        displayName: dbUserProfile?.displayName || firebaseUser.displayName || 'Member',
-        email: firebaseUser.email || '',
-        avatar: dbUserProfile?.avatar,
+        uid: dbUserProfile.uid,
+        displayName: dbUserProfile.displayName,
+        email: dbUserProfile.email,
         role: 'member',
         joinedAt: now,
       };
 
-      const updatedMembers = [...houseData.members, newMember];
-
-      await updateDoc(doc(db, 'houses', houseData.id), {
-        members: updatedMembers,
-      });
-
-      await updateDoc(doc(db, 'users', firebaseUser.uid), {
-        houseId: houseData.id,
-        role: 'member',
-      });
-    } else {
-      await updateDoc(doc(db, 'users', firebaseUser.uid), {
-        houseId: houseData.id,
-        role: 'member',
-      });
+      house.members.push(newMember);
+      saveHousesDB(houses);
     }
+
+    const users = loadUsersDB();
+    const updatedUsers = users.map((u) => {
+      if (u.uid === dbUserProfile.uid) {
+        return { ...u, houseId: house.id, role: 'member' as const };
+      }
+      return u;
+    });
+    saveUsersDB(updatedUsers);
+
+    const updatedProfile = { ...dbUserProfile, houseId: house.id, role: 'member' as const };
+    setActiveSession(updatedProfile);
+    setDbUserProfile(updatedProfile);
+    setCurrentHouse(house);
   };
 
-  // Kick Member Handler (Leader Only)
+  // Kick Member Handler
   const kickMember = async (targetUid: string) => {
-    if (!firebaseUser || !currentHouse) return;
-    if (currentHouse.leaderUid !== firebaseUser.uid) {
+    if (!dbUserProfile || !currentHouse) return;
+    if (currentHouse.leaderUid !== dbUserProfile.uid) {
       throw new Error('Only the House Leader can kick members');
     }
 
-    if (!db) return;
-
-    // Remove member from house members list
-    const updatedMembers = currentHouse.members.filter((m) => m.uid !== targetUid);
-    await updateDoc(doc(db, 'houses', currentHouse.id), {
-      members: updatedMembers,
-    });
-
-    // Clear target user's houseId and role
-    await updateDoc(doc(db, 'users', targetUid), {
-      houseId: null,
-      role: null,
-    });
-  };
-
-  // Leave House Handler (Member Only)
-  const leaveHouse = async () => {
-    if (!firebaseUser || !currentHouse) return;
-    if (currentHouse.leaderUid === firebaseUser.uid) {
-      throw new Error('House Leader cannot leave the house. You can delete or transfer ownership.');
+    const houses = loadHousesDB();
+    const house = houses.find((h) => h.id === currentHouse.id);
+    if (house) {
+      house.members = house.members.filter((m) => m.uid !== targetUid);
+      saveHousesDB(houses);
+      setCurrentHouse({ ...house });
     }
 
-    if (!db) return;
-
-    // Remove active user from house members list
-    const updatedMembers = currentHouse.members.filter((m) => m.uid !== firebaseUser.uid);
-    await updateDoc(doc(db, 'houses', currentHouse.id), {
-      members: updatedMembers,
+    const users = loadUsersDB();
+    const updatedUsers = users.map((u) => {
+      if (u.uid === targetUid) {
+        return { ...u, houseId: null, role: null };
+      }
+      return u;
     });
+    saveUsersDB(updatedUsers);
+  };
 
-    // Clear active user's houseId and role
-    await updateDoc(doc(db, 'users', firebaseUser.uid), {
-      houseId: null,
-      role: null,
+  // Leave House Handler
+  const leaveHouse = async () => {
+    if (!dbUserProfile || !currentHouse) return;
+
+    const houses = loadHousesDB();
+    const house = houses.find((h) => h.id === currentHouse.id);
+    if (house) {
+      house.members = house.members.filter((m) => m.uid !== dbUserProfile.uid);
+      saveHousesDB(houses);
+    }
+
+    const users = loadUsersDB();
+    const updatedUsers = users.map((u) => {
+      if (u.uid === dbUserProfile.uid) {
+        return { ...u, houseId: null, role: null };
+      }
+      return u;
     });
+    saveUsersDB(updatedUsers);
+
+    const updatedProfile = { ...dbUserProfile, houseId: null, role: null };
+    setActiveSession(updatedProfile);
+    setDbUserProfile(updatedProfile);
+    setCurrentHouse(null);
   };
 
   const userProfile = USERS[activeUserId] || USERS.raiyan;
@@ -325,7 +309,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userProfile,
         dbUserProfile,
         currentHouse,
-        firebaseUser,
+        firebaseUser: null,
+        isAuthenticated: Boolean(dbUserProfile),
         loading,
         switchProfile,
         loginWithEmail,

@@ -9,6 +9,8 @@ import { AddExpenseModal } from './components/AddExpenseModal';
 import { AuthModal } from './components/AuthModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoginPage } from './components/LoginPage';
+import { SignUpPage } from './components/SignUpPage';
 
 import type { Expense, Settlement, SimplifiedTransaction, PaymentCard } from './types';
 import type { Language } from './utils/i18n';
@@ -48,8 +50,9 @@ const SettingsView = lazy(() =>
 );
 
 const AppContent: React.FC = () => {
-  const { activeUserId, currentHouse } = useAuth();
+  const { activeUserId, currentHouse, isAuthenticated } = useAuth();
 
+  const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
@@ -272,6 +275,14 @@ const AppContent: React.FC = () => {
     setSettlements(seed.settlements);
     setIsResetConfirmOpen(false);
   };
+
+  // Standalone Authentication Flow (Renders full LoginPage or SignUpPage when logged out)
+  if (!isAuthenticated) {
+    if (authView === 'signup') {
+      return <SignUpPage onSwitchToLogin={() => setAuthView('login')} />;
+    }
+    return <LoginPage onSwitchToSignUp={() => setAuthView('signup')} />;
+  }
 
   return (
     <div className="app-container">
