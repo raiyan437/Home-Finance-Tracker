@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: House Name Editing Capability for House Leaders Implemented  
+**Current Status**: Dynamic House Member Scoping for Dashboard, Settlement Engine, Splits, and Analytics Implemented  
 
 ---
 
@@ -197,3 +197,12 @@
 * **Inline House Name Editing (`src/components/SettingsView.tsx`)**:
   * Added an **"Edit Name ✏️"** action button inside the House Code Banner for Leaders.
   * Features inline edit form, text validation, and instant realtime updates across the sidebar title and settings header.
+
+### 2026-07-29: Dynamic House Member Scoping for Dashboard, Settlement Engine, Splits, and Analytics
+* **Dynamic House User Resolution (`src/utils/settlementEngine.ts`)**:
+  * Created `getHouseUsers(currentHouse)` helper mapping active house members dynamically from `currentHouse.members`.
+  * Refactored `calculateNetBalances` and `calculateSimplifiedSettlements` to accept `activeUsers`.
+* **Dashboard Dynamic Rendering (`src/components/Dashboard.tsx`)**:
+  * Dashboard net balances, housemate cards, and average per member (`totalSpent / memberCount`) are dynamically rendered ONLY for the active members currently in the house.
+* **Add Expense Modal & Analytics Scoping (`src/components/AddExpenseModal.tsx` & `src/components/CategoryChart.tsx`)**:
+  * Expense split checkboxes, equal share calculations, payer pickers, and out-of-pocket ratio charts dynamically scope exclusively to active members of the current house!
