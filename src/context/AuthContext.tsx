@@ -35,6 +35,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ACTIVE_USER_STORAGE_KEY = 'home_finance_active_user_v1';
 
+// Strict Authorized Accounts Map
+const AUTHORIZED_DEMO_ACCOUNTS: Record<string, { pass: string; id: UserId; displayName: string }> = {
+  'raiyan@gmail.com': { pass: 'dummy123', id: 'raiyan', displayName: 'Raiyan' },
+  'himel@gmail.com': { pass: 'dummy123', id: 'himel', displayName: 'Himel' },
+  'lazim@gmail.com': { pass: 'dummy123', id: 'lazim', displayName: 'Lazim' },
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeUserId, setActiveUserId] = useState<UserId>(() => {
     const saved = localStorage.getItem(ACTIVE_USER_STORAGE_KEY) as UserId;
@@ -63,17 +70,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Login Handler (Supports offline DB + optional Firebase)
+  // Login Handler (Strict Demo Account Enforcement)
   const loginWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
+    const demo = AUTHORIZED_DEMO_ACCOUNTS[cleanEmail];
 
-    // 1. Attempt optional Firebase login first if configured
+    // STRICT VALIDATION: Reject any non-approved email or password combination
+    if (!demo || pass !== demo.pass) {
+      setLoading(false);
+      throw new Error(
+        'Access Denied: Only pre-approved housemate accounts (raiyan@gmail.com, himel@gmail.com, lazim@gmail.com) with password "dummy123" are authorized.'
+      );
+    }
+
+    // 1. Attempt optional Firebase login if configured
     if (auth) {
       try {
         await signInWithEmailAndPassword(auth, cleanEmail, pass);
       } catch (fbErr) {
-        console.warn('Firebase Auth notice (falling back to database):', fbErr);
+        console.warn('Firebase Auth notice (falling back to local database):', fbErr);
       }
     }
 
@@ -82,35 +98,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let existingUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
 
     if (!existingUser) {
-      // Auto-register account if using valid demo emails
-      const name = cleanEmail.split('@')[0];
-      const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
       existingUser = {
-        uid: `user-${Date.now()}`,
-        displayName: capitalized,
+        uid: `user-${demo.id}-001`,
+        displayName: demo.displayName,
         email: cleanEmail,
         houseId: 'house-demo-001',
-        role: 'member',
+        role: demo.id === 'raiyan' ? 'leader' : 'member',
         createdAt: new Date().toISOString(),
       };
-      const updated = [...users, existingUser];
-      saveUsersDB(updated);
+      saveUsersDB([...users, existingUser]);
     }
 
-    // Map housemate ID if matches raiyan, himel, or lazim
-    if (cleanEmail.includes('raiyan')) switchProfile('raiyan');
-    else if (cleanEmail.includes('himel')) switchProfile('himel');
-    else if (cleanEmail.includes('lazim')) switchProfile('lazim');
-
+    switchProfile(demo.id);
     setActiveSession(existingUser);
     setDbUserProfile(existingUser);
     setLoading(false);
   };
 
-  // Sign Up Handler
+  // Sign Up Handler (Strict Demo Account Enforcement)
   const signUpWithEmail = async (email: string, pass: string, displayName: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
+    const demo = AUTHORIZED_DEMO_ACCOUNTS[cleanEmail];
+
+    if (!demo || pass !== demo.pass) {
+      setLoading(false);
+      throw new Error(
+        'Access Denied: Registration is restricted to pre-approved housemate credentials (raiyan@gmail.com, himel@gmail.com, lazim@gmail.com) with password "dummy123".'
+      );
+    }
 
     if (auth) {
       try {
@@ -125,19 +141,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!existing) {
       existing = {
-        uid: `user-${Date.now()}`,
-        displayName: displayName.trim(),
+        uid: `user-${demo.id}-001`,
+        displayName: displayName.trim() || demo.displayName,
         email: cleanEmail,
-        houseId: null,
-        role: null,
+        houseId: 'house-demo-001',
+        role: demo.id === 'raiyan' ? 'leader' : 'member',
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existing]);
     } else {
-      existing.displayName = displayName.trim();
+      existing.displayName = displayName.trim() || existing.displayName;
       saveUsersDB(users);
     }
 
+    switchProfile(demo.id);
     setActiveSession(existing);
     setDbUserProfile(existing);
     setLoading(false);
