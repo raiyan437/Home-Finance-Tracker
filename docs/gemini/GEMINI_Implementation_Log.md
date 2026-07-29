@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Complete UI/UX Polish & Modern Minimal Design System Refinement Complete  
+**Current Status**: House Name Editing Capability for House Leaders Implemented  
 
 ---
 
@@ -190,3 +190,10 @@
 * **CSS Design System Rules (`src/index.css`)**:
   * Built pixel-perfect `.user-profile-card`, `.user-profile-info`, `.user-name-row`, `.user-name`, and `.user-role-badge` rules.
   * Aligned all grid gaps, card padding, button heights, border radii, and font weights across the app.
+
+### 2026-07-29: House Name Editing Capability for House Leaders
+* **Leader Power Engine (`src/context/AuthContext.tsx`)**:
+  * Implemented `updateHouseName(newName)` method restricted to users with `role: 'leader'` or `currentHouse.leaderUid === user.uid`.
+* **Inline House Name Editing (`src/components/SettingsView.tsx`)**:
+  * Added an **"Edit Name ✏️"** action button inside the House Code Banner for Leaders.
+  * Features inline edit form, text validation, and instant realtime updates across the sidebar title and settings header.

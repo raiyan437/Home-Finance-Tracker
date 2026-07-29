@@ -101,6 +101,14 @@
   2. Locate Himel in member roster. Click red **"Kick Member"** button.
 - **Expected Result**: Himel is removed from house roster, Himel's `houseId` is reset to `null` in realtime.
 
+### TC-3.5: Leader House Name Editing Power
+- **Objective**: Verify that House Leaders can edit and rename the household name.
+- **Steps**:
+  1. Log in as Raiyan (Leader). Go to **Settings ⚙️**.
+  2. Click **"Edit Name ✏️"** button inside the House Banner.
+  3. Change house name to `"Sunset Penthouse 5A"`. Click **Save**.
+- **Expected Result**: House name updates instantly across the Settings page, top header, and left sidebar.
+
 ---
 
 ## Test Suite 4: Financial Balance Engine & Debt Settlement
