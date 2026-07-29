@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Render Loop & ErrorBoundary Resolution Complete  
+**Current Status**: Leader-Based Multi-User Household Management System Complete  
 
 ---
 
@@ -140,7 +140,19 @@
 * Confirmed documentation alignment across `/docs/gemini/GEMINI_Architecture.md` and `/docs/gemini/GEMINI_Implementation_Log.md`.
 
 ### 2026-07-29: Created Project Flow Architecture & UI Wireframes Documentation
-* Created `docs/gemini/GEMINI_Project_Flow.md` containing Mermaid system diagrams, ASCII screen wireframes (App Shell, Add Expense Modal, Debt Settlement, Personal Wallet), data lifecycle workflows, module mappings, and design rationale.
+* Created `docs/gemini/GEMINI_Project_Flow.md` containing Mermaid system diagrams, ASCII screen wireframes, data lifecycle workflows, module mappings, and design rationale.
 
-
-
+### 2026-07-29: Leader-Based Multi-User Household Management System with House Codes
+* **Data Models (`src/types/index.ts`)**: Added `UserProfile`, `HouseMember`, `HouseRole`, and `House` interfaces.
+* **Auth Engine & House Controls (`src/context/AuthContext.tsx`)**:
+  * Added `displayName` to Sign Up flow.
+  * Added `createHouse(houseName)` generating 6-character codes (e.g. `HM-8823`) and setting user as 👑 `leader`.
+  * Added `joinHouse(houseCode)` adding user as 👤 `member`.
+  * Added `kickMember(targetUid)` for Leaders to remove members and reset their house state in realtime.
+  * Added `leaveHouse()` for non-leader members.
+* **Settings View (`src/components/SettingsView.tsx`)**:
+  * Created NEW Settings view featuring House Code Banner with 1-click **"📋 Copy House Code"** button, member roster table, role badges, and kick/leave actions.
+* **Navigation (`src/components/Navbar.tsx` & `src/App.tsx`)**:
+  * Added Settings ⚙️ tab to sidebar and mobile bottom nav, displaying live House Name and House Code.
+* **Realtime Firestore Scoping (`src/utils/firebaseSync.ts`)**:
+  * Scoped realtime listeners (`expenses`, `settlements`, `cards`) by `houseId`.
