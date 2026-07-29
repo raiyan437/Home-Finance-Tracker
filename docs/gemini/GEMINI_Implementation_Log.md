@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Dynamic House Member Scoping for Dashboard, Settlement Engine, Splits, and Analytics Implemented  
+**Current Status**: Complete Realtime House Member Synchronization & Roster Alignment  
 
 ---
 
@@ -206,3 +206,11 @@
   * Dashboard net balances, housemate cards, and average per member (`totalSpent / memberCount`) are dynamically rendered ONLY for the active members currently in the house.
 * **Add Expense Modal & Analytics Scoping (`src/components/AddExpenseModal.tsx` & `src/components/CategoryChart.tsx`)**:
   * Expense split checkboxes, equal share calculations, payer pickers, and out-of-pocket ratio charts dynamically scope exclusively to active members of the current house!
+
+### 2026-07-29: Complete Realtime House Member Synchronization & Roster Alignment
+* **Default Seed Roster Alignment (`src/utils/mockAuthDatabase.ts`)**:
+  * Aligned seed house roster `house-demo-001` to contain **Raiyan** (Leader) and **Lazim** (Member) only.
+  * Unassigned Himel initially (`houseId: null`), so Himel can test joining via House Code `HM-8823`.
+* **Synchronized Session & House State Loading (`src/context/AuthContext.tsx`)**:
+  * Added explicit `syncHouseForUser(userProfile)` handler on login, sign up, profile switch, and member kick/leave actions.
+  * Ensured `useEffect` re-reads fresh house objects from `localStorage` whenever `dbUserProfile` updates.
