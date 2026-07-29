@@ -1,4 +1,34 @@
-export type UserId = 'raiyan' | 'himel' | 'lazim';
+export type UserId = 'raiyan' | 'himel' | 'lazim' | string;
+
+export type HouseRole = 'leader' | 'member';
+
+export interface UserProfile {
+  uid: string;
+  displayName: string;
+  email: string;
+  avatar?: string;
+  houseId?: string | null;
+  role?: HouseRole | null;
+  createdAt: string;
+}
+
+export interface HouseMember {
+  uid: string;
+  displayName: string;
+  email: string;
+  avatar?: string;
+  role: HouseRole;
+  joinedAt: string;
+}
+
+export interface House {
+  id: string; // House Document ID
+  code: string; // 6-character Code (e.g. 'HM-8823')
+  name: string;
+  leaderUid: string;
+  members: HouseMember[];
+  createdAt: string;
+}
 
 export interface User {
   id: UserId;
@@ -25,6 +55,7 @@ export interface PaymentCard {
   cardType?: 'debit' | 'credit'; // 'debit' vs 'credit'
   color: string; // Gradient or CSS color token
   ownerId?: UserId;
+  houseId?: string;
   createdAt: string;
 }
 
@@ -57,6 +88,7 @@ export interface Expense {
   shares: Share[];
   scope?: ExpenseScope; // 'household' (shared) vs 'personal' (private wallet)
   ownerId?: UserId;     // Owner ID for personal private expenses
+  houseId?: string;     // House ID for scoping household expenses
   paymentMethod?: PaymentMethodInfo; // Cash vs specific Card
   isRecurring?: boolean;
   recurringFrequency?: RecurringFrequency;
@@ -73,6 +105,7 @@ export interface Settlement {
   toUserId: UserId;   // Recipient of debt
   amountCents: number;
   status: 'completed';
+  houseId?: string;
   createdAt: string;
   settledAt: string;
   notes?: string;

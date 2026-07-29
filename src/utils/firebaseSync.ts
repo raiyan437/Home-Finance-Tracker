@@ -1,17 +1,19 @@
-import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../config/firebase';
 import type { Expense, Settlement, PaymentCard } from '../types';
 
 /**
- * Listens for realtime changes to the Firestore `expenses` collection.
+ * Listens for realtime changes to the Firestore `expenses` collection (optionally house-scoped).
  */
-export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void) => {
+export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'expenses');
+    const q = houseId ? query(colRef, where('houseId', '==', houseId)) : colRef;
+
     return onSnapshot(
-      colRef,
+      q,
       (snapshot) => {
         const list: Expense[] = [];
         snapshot.forEach((doc) => {
@@ -32,11 +34,12 @@ export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void) => {
 /**
  * Saves or updates an expense in Firestore.
  */
-export const syncSaveExpense = async (expense: Expense) => {
+export const syncSaveExpense = async (expense: Expense, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return;
   try {
     const docRef = doc(db, 'expenses', expense.id);
-    await setDoc(docRef, expense, { merge: true });
+    const dataToSave = houseId ? { ...expense, houseId } : expense;
+    await setDoc(docRef, dataToSave, { merge: true });
   } catch (err) {
     console.warn('Firestore save expense fallback:', err);
   }
@@ -55,15 +58,17 @@ export const syncDeleteExpense = async (expenseId: string) => {
 };
 
 /**
- * Listens for realtime changes to the Firestore `settlements` collection.
+ * Listens for realtime changes to the Firestore `settlements` collection (optionally house-scoped).
  */
-export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => void) => {
+export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => void, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'settlements');
+    const q = houseId ? query(colRef, where('houseId', '==', houseId)) : colRef;
+
     return onSnapshot(
-      colRef,
+      q,
       (snapshot) => {
         const list: Settlement[] = [];
         snapshot.forEach((doc) => {
@@ -83,26 +88,29 @@ export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => vo
 /**
  * Saves a settlement in Firestore.
  */
-export const syncSaveSettlement = async (settlement: Settlement) => {
+export const syncSaveSettlement = async (settlement: Settlement, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return;
   try {
     const docRef = doc(db, 'settlements', settlement.id);
-    await setDoc(docRef, settlement, { merge: true });
+    const dataToSave = houseId ? { ...settlement, houseId } : settlement;
+    await setDoc(docRef, dataToSave, { merge: true });
   } catch (err) {
     console.warn('Firestore save settlement fallback:', err);
   }
 };
 
 /**
- * Listens for realtime changes to the Firestore `cards` collection.
+ * Listens for realtime changes to the Firestore `cards` collection (optionally house-scoped).
  */
-export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void) => {
+export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'cards');
+    const q = houseId ? query(colRef, where('houseId', '==', houseId)) : colRef;
+
     return onSnapshot(
-      colRef,
+      q,
       (snapshot) => {
         const list: PaymentCard[] = [];
         snapshot.forEach((doc) => {
@@ -122,11 +130,12 @@ export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void) => {
 /**
  * Saves a card in Firestore.
  */
-export const syncSaveCard = async (card: PaymentCard) => {
+export const syncSaveCard = async (card: PaymentCard, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return;
   try {
     const docRef = doc(db, 'cards', card.id);
-    await setDoc(docRef, card, { merge: true });
+    const dataToSave = houseId ? { ...card, houseId } : card;
+    await setDoc(docRef, dataToSave, { merge: true });
   } catch (err) {
     console.warn('Firestore save card fallback:', err);
   }

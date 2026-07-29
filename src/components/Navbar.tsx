@@ -3,9 +3,25 @@ import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import { getTranslation } from '../utils/i18n';
 import type { Language } from '../utils/i18n';
-import { LayoutDashboard, Receipt, ArrowLeftRight, Calendar, Plus, Sun, Moon, Home, Sparkles, Wallet, UserCheck, CreditCard, Languages } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Receipt,
+  ArrowLeftRight,
+  Calendar,
+  Plus,
+  Sun,
+  Moon,
+  Home,
+  Sparkles,
+  Wallet,
+  UserCheck,
+  CreditCard,
+  Languages,
+  Settings,
+  Crown,
+} from 'lucide-react';
 
-export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards';
+export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'settings';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -36,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   personalCount,
   cardsCount,
 }) => {
-  const { userProfile } = useAuth();
+  const { userProfile, dbUserProfile, currentHouse } = useAuth();
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
 
   return (
@@ -48,42 +64,47 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Home size={22} />
           </div>
           <div className="brand-title-box">
-            <div className="brand-title">{t('appTitle')}</div>
+            <div className="brand-title">{currentHouse?.name || t('appTitle')}</div>
             <div className="brand-subtitle">
               <span className="status-dot" />
-              <span>{t('housematesCount')}</span>
+              <span>{currentHouse ? `Code: ${currentHouse.code}` : t('housematesCount')}</span>
             </div>
           </div>
         </div>
 
         {/* User Account / Profile Box */}
         <div
+          className="user-profile-card"
           onClick={onOpenAuthModal}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 14px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--bg-input)',
-            border: '1px solid var(--border-subtle)',
-            marginBottom: '20px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          title="Click to switch profile or manage Firebase auth"
+          title="Click to switch account profile or manage Firebase auth"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <UserAvatar user={userProfile} size={32} />
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{userProfile.name}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 700 }}>{t('activeProfile')}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <UserAvatar
+              user={{
+                id: userProfile.id,
+                name: dbUserProfile?.displayName || userProfile.name,
+                avatar: userProfile.avatar,
+                color: userProfile.color,
+              }}
+              size={40}
+            />
+            <div className="user-profile-info">
+              <div className="user-name-row">
+                <span className="user-name">{dbUserProfile?.displayName || userProfile.name}</span>
+                {dbUserProfile?.role === 'leader' && (
+                  <Crown size={14} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
+                )}
+              </div>
+              <span className="user-role-badge">
+                <UserCheck size={12} />
+                <span>{dbUserProfile?.role === 'leader' ? 'Leader' : 'Active Account'}</span>
+              </span>
             </div>
           </div>
-          <UserCheck size={16} style={{ color: 'var(--text-muted)' }} />
         </div>
 
-        <nav className="nav-links">
+        {/* Navigation Section */}
+        <nav className="nav-list">
           <button
             className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('dashboard')}
@@ -102,7 +123,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Receipt size={19} />
               <span>{t('householdExpenses')}</span>
             </div>
-            {expenseCount !== undefined && <span className="nav-badge">{expenseCount}</span>}
+            {expenseCount !== undefined && expenseCount > 0 && (
+              <span className="nav-badge">{expenseCount}</span>
+            )}
           </button>
 
           <button
@@ -114,7 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{t('settlements')}</span>
             </div>
             {settlementCount !== undefined && settlementCount > 0 && (
-              <span className="nav-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)' }}>
+              <span className="nav-badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'var(--accent-emerald)' }}>
                 {settlementCount}
               </span>
             )}
@@ -125,11 +148,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setActiveTab('personal')}
           >
             <div className="nav-item-left">
-              <Wallet size={19} style={{ color: 'var(--accent-purple)' }} />
+              <Wallet size={19} style={{ color: 'var(--accent-amber)' }} />
               <span>{t('personalWallet')}</span>
             </div>
             {personalCount !== undefined && personalCount > 0 && (
-              <span className="nav-badge" style={{ backgroundColor: 'rgba(139, 92, 246, 0.2)', color: 'var(--accent-purple)' }}>
+              <span className="nav-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)' }}>
                 {personalCount}
               </span>
             )}
@@ -157,6 +180,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="nav-item-left">
               <Calendar size={19} />
               <span>{t('monthlyReport')}</span>
+            </div>
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <div className="nav-item-left">
+              <Settings size={19} style={{ color: 'var(--accent-purple)' }} />
+              <span>Settings ⚙️</span>
             </div>
           </button>
         </nav>
@@ -222,11 +255,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
-          className={`mobile-nav-item ${activeTab === 'personal' ? 'active' : ''}`}
-          onClick={() => setActiveTab('personal')}
+          className={`mobile-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
         >
-          <Wallet size={20} />
-          <span>{t('personalWallet')}</span>
+          <Settings size={20} />
+          <span>Settings</span>
         </button>
       </nav>
     </>

@@ -133,3 +133,14 @@
   * Fixed `useEffect` dependency array `[isOpen, initialExpense]` with `if (!isOpen) return;` guard to eliminate re-render loops caused by array prop reference changes.
 * **React Error Boundary (`src/components/ErrorBoundary.tsx` & `src/App.tsx`)**:
   * Wrapped entire application in `ErrorBoundary` class component to catch any uncaught UI exceptions and render a recovery screen instead of letting the DOM turn blank.
+
+### 2026-07-29: Comprehensive Project Audit & Analysis
+* Verified project compilation (`tsc --noEmit`) - **0 errors**.
+* Audited linter rules (`oxlint`) - **0 errors**, 6 minor warnings.
+* Confirmed documentation alignment across `/docs/gemini/GEMINI_Architecture.md` and `/docs/gemini/GEMINI_Implementation_Log.md`.
+
+### 2026-07-29: Created Project Flow Architecture & UI Wireframes Documentation
+* Created `docs/gemini/GEMINI_Project_Flow.md` containing Mermaid system diagrams, ASCII screen wireframes (App Shell, Add Expense Modal, Debt Settlement, Personal Wallet), data lifecycle workflows, module mappings, and design rationale.
+
+
+

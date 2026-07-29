@@ -11,10 +11,11 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { activeUserId, switchProfile, firebaseUser, loginWithEmail, signUpWithEmail, logout } = useAuth();
+  const { activeUserId, switchProfile, firebaseUser, dbUserProfile, loginWithEmail, signUpWithEmail, logout } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'profile' | 'firebase'>('profile');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedHousemate, setSelectedHousemate] = useState<UserId>('raiyan');
@@ -35,7 +36,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (isSignUp) {
-        await signUpWithEmail(email, password, selectedHousemate);
+        if (!displayName.trim()) {
+          setErrorMsg('Please enter a display name.');
+          setIsSubmitting(false);
+          return;
+        }
+        await signUpWithEmail(email, password, displayName);
+        switchProfile(selectedHousemate);
       } else {
         await loginWithEmail(email, password);
       }
@@ -131,7 +138,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ShieldCheck size={24} style={{ color: 'var(--accent-emerald)' }} />
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Authenticated via Firebase</div>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{dbUserProfile?.displayName || firebaseUser.displayName || 'Authenticated User'}</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{firebaseUser.email}</div>
                   </div>
                 </div>
@@ -146,6 +153,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--status-negative-text)', background: 'var(--status-negative-bg)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}>
                     <AlertCircle size={16} />
                     <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                {isSignUp && (
+                  <div className="form-group">
+                    <label className="form-label">Display Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Raiyan, Himel, Lazim"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      required={isSignUp}
+                    />
                   </div>
                 )}
 

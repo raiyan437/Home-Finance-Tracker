@@ -43,9 +43,12 @@ const PersonalWallet = lazy(() =>
 const CardsManager = lazy(() =>
   import('./components/CardsManager').then((m) => ({ default: m.CardsManager }))
 );
+const SettingsView = lazy(() =>
+  import('./components/SettingsView').then((m) => ({ default: m.SettingsView }))
+);
 
 const AppContent: React.FC = () => {
-  const { activeUserId } = useAuth();
+  const { activeUserId, currentHouse } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -72,28 +75,30 @@ const AppContent: React.FC = () => {
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
 
+    const houseId = currentHouse?.id;
+
     // Subscribe to Firestore Realtime Updates when available
     const unsubExp = subscribeExpenses((fbExpenses) => {
       setExpenses(fbExpenses);
       saveExpenses(fbExpenses);
-    });
+    }, houseId);
 
     const unsubSt = subscribeSettlements((fbSettlements) => {
       setSettlements(fbSettlements);
       saveSettlements(fbSettlements);
-    });
+    }, houseId);
 
     const unsubCards = subscribeCards((fbCards) => {
       setCards(fbCards);
       saveCards(fbCards);
-    });
+    }, houseId);
 
     return () => {
       unsubExp();
       unsubSt();
       unsubCards();
     };
-  }, []);
+  }, [currentHouse?.id]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -106,64 +111,63 @@ const AppContent: React.FC = () => {
     setLang((prev) => (prev === 'en' ? 'bn' : 'en'));
   };
 
-  // Separate shared household expenses vs personal private wallet expenses
+  // Filter household expenses (shared scope) vs personal expenses (private scope)
   const householdExpenses = useMemo(() => {
     return expenses.filter((e) => !e.scope || e.scope === 'household');
   }, [expenses]);
 
   const personalExpenses = useMemo(() => {
-    return expenses.filter((e) => e.scope === 'personal' && e.ownerId === activeUserId);
+    return expenses.filter((e) => e.scope === 'personal' && (e.ownerId === activeUserId || e.paidBy === activeUserId));
   }, [expenses, activeUserId]);
 
   const userCards = useMemo(() => {
     return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
   }, [cards, activeUserId]);
 
-  // Derived financial balances & optimal debt transfers
-  const userBalances = useMemo(() => {
-    return calculateNetBalances(householdExpenses, settlements);
-  }, [householdExpenses, settlements]);
+  // Derived financial computations
+  const netBalances = useMemo(
+    () => calculateNetBalances(householdExpenses, settlements),
+    [householdExpenses, settlements]
+  );
 
-  const simplifiedSettlements = useMemo(() => {
-    return calculateSimplifiedSettlements(userBalances);
-  }, [userBalances]);
+  const simplifiedSettlements = useMemo(
+    () => calculateSimplifiedSettlements(netBalances),
+    [netBalances]
+  );
 
-  // Expense Handlers
+  // Add / Edit expense handler
   const handleSaveExpense = (
     expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>,
     editingId?: string
   ) => {
     const now = new Date().toISOString();
+    let updatedExpenses: Expense[];
+    let targetExpense: Expense = {
+      ...expenseData,
+      id: editingId || `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      houseId: currentHouse?.id,
+      createdAt: now,
+      updatedAt: now,
+    };
 
     if (editingId) {
-      const target = expenses.find((e) => e.id === editingId);
-      const updatedExpense: Expense = {
-        ...(target || {}),
-        ...expenseData,
-        id: editingId,
-        createdAt: target?.createdAt || now,
-        updatedAt: now,
-      };
-      const updatedList = expenses.map((e) => (e.id === editingId ? updatedExpense : e));
-      setExpenses(updatedList);
-      saveExpenses(updatedList);
-      syncSaveExpense(updatedExpense);
+      updatedExpenses = expenses.map((e) => {
+        if (e.id === editingId) {
+          return targetExpense;
+        }
+        return e;
+      });
     } else {
-      const newExpense: Expense = {
-        ...expenseData,
-        id: `exp-${Date.now()}`,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const updatedList = [newExpense, ...expenses];
-      setExpenses(updatedList);
-      saveExpenses(updatedList);
-      syncSaveExpense(newExpense);
+      updatedExpenses = [targetExpense, ...expenses];
     }
+
+    setExpenses(updatedExpenses);
+    saveExpenses(updatedExpenses);
+    syncSaveExpense(targetExpense, currentHouse?.id);
   };
 
-  // Delete Expense handler
-  const handleDeleteExpenseConfirm = () => {
+  // Delete expense handler
+  const handleConfirmDeleteExpense = () => {
     if (!deletingExpenseId) return;
     const updated = expenses.filter((e) => e.id !== deletingExpenseId);
     setExpenses(updated);
@@ -172,65 +176,64 @@ const AppContent: React.FC = () => {
     setDeletingExpenseId(null);
   };
 
-  // Comment Handler
-  const handleAddComment = (expenseId: string, commentText: string) => {
+  // Add Comment Handler
+  const handleAddComment = (expenseId: string, text: string) => {
     const now = new Date().toISOString();
     const newComment = {
-      id: `cmt-${Date.now()}`,
+      id: `comment-${Date.now()}`,
       userId: activeUserId,
-      text: commentText,
+      text: text.trim(),
       createdAt: now,
     };
 
-    const updatedList = expenses.map((e) => {
+    let updatedExp: Expense | undefined;
+    const updated = expenses.map((e) => {
       if (e.id === expenseId) {
-        const existingComments = e.comments || [];
-        const updatedExp = {
+        updatedExp = {
           ...e,
-          comments: [...existingComments, newComment],
+          comments: [...(e.comments || []), newComment],
           updatedAt: now,
         };
-        syncSaveExpense(updatedExp);
         return updatedExp;
       }
       return e;
     });
 
-    setExpenses(updatedList);
-    saveExpenses(updatedList);
-  };
-
-  // Card Management handlers
-  const handleAddCard = (
-    cardData: Omit<PaymentCard, 'id' | 'createdAt'>,
-    editingId?: string
-  ) => {
-    const now = new Date().toISOString();
-    if (editingId) {
-      const target = cards.find((c) => c.id === editingId);
-      const updatedCard: PaymentCard = {
-        ...(target || {}),
-        ...cardData,
-        id: editingId,
-        createdAt: target?.createdAt || now,
-      };
-      const updatedList = cards.map((c) => (c.id === editingId ? updatedCard : c));
-      setCards(updatedList);
-      saveCards(updatedList);
-      syncSaveCard(updatedCard);
-    } else {
-      const newCard: PaymentCard = {
-        ...cardData,
-        id: `card-${Date.now()}`,
-        createdAt: now,
-      };
-      const updatedList = [...cards, newCard];
-      setCards(updatedList);
-      saveCards(updatedList);
-      syncSaveCard(newCard);
+    setExpenses(updated);
+    saveExpenses(updated);
+    if (updatedExp) {
+      syncSaveExpense(updatedExp, currentHouse?.id);
     }
   };
 
+  // Save Card Handler
+  const handleSaveCard = (cardData: Omit<PaymentCard, 'id' | 'createdAt'>, editingId?: string) => {
+    const now = new Date().toISOString();
+    let targetCard: PaymentCard = {
+      ...cardData,
+      id: editingId || `card-${Date.now()}`,
+      houseId: currentHouse?.id,
+      createdAt: now,
+    };
+
+    let updatedCards: PaymentCard[];
+    if (editingId) {
+      updatedCards = cards.map((c) => {
+        if (c.id === editingId) {
+          return targetCard;
+        }
+        return c;
+      });
+    } else {
+      updatedCards = [targetCard, ...cards];
+    }
+
+    setCards(updatedCards);
+    saveCards(updatedCards);
+    syncSaveCard(targetCard, currentHouse?.id);
+  };
+
+  // Delete Card Handler
   const handleDeleteCard = (cardId: string) => {
     const updated = cards.filter((c) => c.id !== cardId);
     setCards(updated);
@@ -238,17 +241,18 @@ const AppContent: React.FC = () => {
     syncDeleteCard(cardId);
   };
 
-  // Mark Settlement Paid handler
+  // Mark Settlement as Paid handler
   const handleMarkSettledConfirm = () => {
     if (!pendingSettlementTx) return;
 
     const now = new Date().toISOString();
     const newSettlement: Settlement = {
-      id: `st-${Date.now()}`,
+      id: `set-${Date.now()}`,
       fromUserId: pendingSettlementTx.fromUser.id,
       toUserId: pendingSettlementTx.toUser.id,
       amountCents: pendingSettlementTx.amountCents,
       status: 'completed',
+      houseId: currentHouse?.id,
       createdAt: now,
       settledAt: now,
       notes: `Direct settlement between ${pendingSettlementTx.fromUser.name} and ${pendingSettlementTx.toUser.name}`,
@@ -257,7 +261,7 @@ const AppContent: React.FC = () => {
     const updatedSettlements = [newSettlement, ...settlements];
     setSettlements(updatedSettlements);
     saveSettlements(updatedSettlements);
-    syncSaveSettlement(newSettlement);
+    syncSaveSettlement(newSettlement, currentHouse?.id);
     setPendingSettlementTx(null);
   };
 
@@ -348,7 +352,7 @@ const AppContent: React.FC = () => {
             <CardsManager
               cards={cards}
               expenses={expenses}
-              onAddCard={handleAddCard}
+              onAddCard={handleSaveCard}
               onDeleteCard={handleDeleteCard}
             />
           )}
@@ -356,10 +360,12 @@ const AppContent: React.FC = () => {
           {activeTab === 'monthly' && (
             <MonthlySummary expenses={householdExpenses} settlements={settlements} />
           )}
+
+          {activeTab === 'settings' && <SettingsView />}
         </Suspense>
       </main>
 
-      {/* Add / Edit Expense Modal */}
+      {/* Modals & Overlays */}
       <AddExpenseModal
         isOpen={isAddExpenseOpen}
         onClose={() => {
@@ -371,20 +377,16 @@ const AppContent: React.FC = () => {
         cards={cards}
       />
 
-      {/* Auth & Switch Profile Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-      />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
-      {/* Delete Confirm Modal */}
+      {/* Delete Expense Confirm Modal */}
       <ConfirmModal
         isOpen={!!deletingExpenseId}
-        title="Delete Expense"
-        message="Are you sure you want to delete this expense record?"
-        confirmText="Delete"
+        title="Delete Expense Record"
+        message="Are you sure you want to delete this expense? This will permanently recalculate housemate net balances."
+        confirmText="Delete Expense"
         variant="danger"
-        onConfirm={handleDeleteExpenseConfirm}
+        onConfirm={handleConfirmDeleteExpense}
         onClose={() => setDeletingExpenseId(null)}
       />
 
