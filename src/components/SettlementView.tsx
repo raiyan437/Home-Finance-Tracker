@@ -17,8 +17,8 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
   settlements,
   onMarkSettled,
 }) => {
-  const { currentHouse } = useAuth();
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+  const { currentHouse, dbUserProfile } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
 

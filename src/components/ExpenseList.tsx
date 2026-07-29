@@ -26,8 +26,8 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   onDeleteExpense,
   onAddComment,
 }) => {
-  const { currentHouse } = useAuth();
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+  const { currentHouse, dbUserProfile } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');

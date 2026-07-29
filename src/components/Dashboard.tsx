@@ -20,8 +20,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToSettlement,
   onNavigateToExpenses,
 }) => {
-  const { currentHouse } = useAuth();
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+  const { currentHouse, dbUserProfile } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const userBalances = useMemo(
     () => calculateNetBalances(expenses, settlements, houseUsers),

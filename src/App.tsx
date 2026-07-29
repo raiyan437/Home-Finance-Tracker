@@ -49,7 +49,7 @@ const SettingsView = lazy(() =>
 );
 
 const AppContent: React.FC = () => {
-  const { activeUserId, currentHouse, isAuthenticated } = useAuth();
+  const { activeUserId, currentHouse, isAuthenticated, dbUserProfile } = useAuth();
 
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -141,7 +141,7 @@ const AppContent: React.FC = () => {
     return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
   }, [cards, activeUserId]);
 
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   // Derived financial computations
   const netBalances = useMemo(

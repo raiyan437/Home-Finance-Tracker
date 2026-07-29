@@ -30,8 +30,8 @@ const CATEGORIES: CategoryItem[] = [
 ];
 
 export const CategoryChart: React.FC<CategoryChartProps> = ({ expenses }) => {
-  const { currentHouse } = useAuth();
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+  const { currentHouse, dbUserProfile } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   // Aggregate total expenses by category
   const categoryTotals: Record<Category, number> = {

@@ -29,9 +29,12 @@ export const ALL_USERS: User[] = Object.values(USERS);
 
 /**
  * Returns the list of User objects for members in the active house.
- * Defaults to ALL_USERS if no house or empty roster.
+ * If user is not in any house, returns only that logged-in user.
  */
-export const getHouseUsers = (house?: House | null): User[] => {
+export const getHouseUsers = (
+  house?: House | null,
+  currentUser?: any
+): User[] => {
   if (house && house.members && house.members.length > 0) {
     return house.members.map((m) => {
       const staticUser = Object.values(USERS).find(
@@ -48,6 +51,25 @@ export const getHouseUsers = (house?: House | null): User[] => {
       };
     });
   }
+
+  // If user is logged in but not in any house, return ONLY that user
+  if (currentUser) {
+    const nameStr = currentUser.displayName || currentUser.name || 'User';
+    const cleanName = nameStr.toLowerCase().trim();
+    const staticUser = USERS[cleanName] || Object.values(USERS).find((u) => u.name.toLowerCase() === cleanName);
+    const userId = currentUser.uid || currentUser.id || staticUser?.id || cleanName || 'user';
+    return [
+      {
+        id: userId,
+        name: nameStr,
+        avatar: staticUser?.avatar || currentUser.avatar || nameStr.slice(0, 5),
+        color: staticUser?.color || '#3b82f6',
+        email: currentUser.email,
+        uid: currentUser.uid,
+      },
+    ];
+  }
+
   return ALL_USERS;
 };
 

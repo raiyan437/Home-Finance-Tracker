@@ -14,8 +14,8 @@ interface MonthlySummaryProps {
 }
 
 export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settlements }) => {
-  const { currentHouse } = useAuth();
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+  const { currentHouse, dbUserProfile } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthKey);

@@ -36,8 +36,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   initialExpense,
   cards = [],
 }) => {
-  const { currentHouse, activeUserId } = useAuth();
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse), [currentHouse]);
+  const { currentHouse, activeUserId, dbUserProfile } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
