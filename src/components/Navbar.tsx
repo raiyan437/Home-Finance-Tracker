@@ -19,6 +19,7 @@ import {
   Languages,
   Settings,
   Crown,
+  LogOut,
 } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'settings';
@@ -52,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   personalCount,
   cardsCount,
 }) => {
-  const { userProfile, dbUserProfile, currentHouse } = useAuth();
+  const { userProfile, dbUserProfile, currentHouse, firebaseUser, logout } = useAuth();
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
 
   return (
@@ -199,7 +200,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>{t('newExpense')}</span>
         </button>
 
-        {/* Footer Toggles (Language & Theme) */}
+        {/* Footer Toggles (Language, Theme & Logout) */}
         <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -221,6 +222,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{theme === 'dark' ? t('light') : t('dark')}</span>
             </button>
           </div>
+
+          {firebaseUser && (
+            <button
+              className="btn btn-danger btn-sm"
+              style={{ width: '100%', marginTop: '4px', justifyContent: 'center' }}
+              onClick={() => logout()}
+            >
+              <LogOut size={15} />
+              <span>Log Out</span>
+            </button>
+          )}
         </div>
       </aside>
 

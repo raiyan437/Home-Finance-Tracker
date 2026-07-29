@@ -22,6 +22,7 @@ interface AuthContextType {
   switchProfile: (userId: UserId) => void;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
+  loginOrSignUpDemoAccount: (email: string, pass: string, displayName: string, housemateId: UserId) => Promise<void>;
   logout: () => Promise<void>;
   createHouse: (houseName: string) => Promise<void>;
   joinHouse: (houseCode: string) => Promise<void>;
@@ -157,6 +158,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setFirebaseUser(cred.user);
     setDbUserProfile(newProfile);
+  };
+
+  const loginOrSignUpDemoAccount = async (email: string, pass: string, displayName: string, housemateId: UserId) => {
+    switchProfile(housemateId);
+    if (!auth) return;
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err: any) {
+      try {
+        await signUpWithEmail(email, pass, displayName);
+      } catch (signUpErr) {
+        console.warn('Demo account sign up fallback error:', signUpErr);
+      }
+    }
   };
 
   const logout = async () => {
@@ -315,6 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchProfile,
         loginWithEmail,
         signUpWithEmail,
+        loginOrSignUpDemoAccount,
         logout,
         createHouse,
         joinHouse,

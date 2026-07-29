@@ -3,15 +3,30 @@ import { useAuth } from '../context/AuthContext';
 import { ALL_USERS } from '../utils/settlementEngine';
 import type { UserId } from '../types';
 import { UserAvatar } from './UserAvatar';
-import { X, Lock, User, KeyRound, ShieldCheck, Check, AlertCircle } from 'lucide-react';
+import { X, Lock, User, KeyRound, ShieldCheck, Check, AlertCircle, LogOut, Sparkles } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const DEMO_ACCOUNTS = [
+  { id: 'raiyan' as UserId, name: 'Raiyan', email: 'raiyan@gmail.com', password: 'dummy123' },
+  { id: 'himel' as UserId, name: 'Himel', email: 'himel@gmail.com', password: 'dummy123' },
+  { id: 'lazim' as UserId, name: 'Lazim', email: 'lazim@gmail.com', password: 'dummy123' },
+];
+
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { activeUserId, switchProfile, firebaseUser, dbUserProfile, loginWithEmail, signUpWithEmail, logout } = useAuth();
+  const {
+    activeUserId,
+    switchProfile,
+    firebaseUser,
+    dbUserProfile,
+    loginWithEmail,
+    signUpWithEmail,
+    loginOrSignUpDemoAccount,
+    logout,
+  } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'profile' | 'firebase'>('profile');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -27,6 +42,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleSelectProfile = (userId: UserId) => {
     switchProfile(userId);
     onClose();
+  };
+
+  const handleDemoAccountClick = async (demo: typeof DEMO_ACCOUNTS[0]) => {
+    setErrorMsg(null);
+    setIsSubmitting(true);
+    try {
+      await loginOrSignUpDemoAccount(demo.email, demo.password, demo.name, demo.id);
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to authenticate demo account.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFirebaseSubmit = async (e: React.FormEvent) => {
@@ -60,7 +88,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <div className="modal-header">
           <div className="modal-title-group">
             <Lock size={22} style={{ color: 'var(--accent-primary)' }} />
-            <h2 className="modal-title">Account & Profile</h2>
+            <h2 className="modal-title">Account & Authentication</h2>
           </div>
           <button className="close-btn" onClick={onClose}>
             <X size={18} />
@@ -83,14 +111,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             onClick={() => setActiveTab('firebase')}
           >
             <KeyRound size={15} />
-            <span>Firebase Auth</span>
+            <span>Firebase Login / Sign Up</span>
           </button>
+        </div>
+
+        {/* Quick Demo Accounts Banner */}
+        <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '8px' }}>
+            <Sparkles size={14} />
+            <span>1-CLICK DEMO ACCOUNTS (Raiyan, Himel, Lazim)</span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {DEMO_ACCOUNTS.map((demo) => (
+              <button
+                key={demo.id}
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ justifyContent: 'space-between', padding: '8px 12px' }}
+                onClick={() => handleDemoAccountClick(demo)}
+                disabled={isSubmitting}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserAvatar user={ALL_USERS.find((u) => u.id === demo.id)!} size={24} />
+                  <span style={{ fontWeight: 700 }}>{demo.name}</span>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {demo.email} • {demo.password}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {activeTab === 'profile' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-              Select your housemate profile. Personal money tracker records and out-of-pocket expenses will be attributed to this active account.
+              Select your active housemate profile for local tracking and expense attribution:
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -143,8 +200,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
-                <button className="btn btn-danger btn-sm" onClick={() => logout()}>
-                  Sign Out
+                <button className="btn btn-danger" onClick={() => logout()}>
+                  <LogOut size={16} />
+                  <span>Logout / Sign Out</span>
                 </button>
               </div>
             ) : (
@@ -175,7 +233,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <input
                     type="email"
                     className="form-input"
-                    placeholder="user@example.com"
+                    placeholder="raiyan@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -187,7 +245,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <input
                     type="password"
                     className="form-input"
-                    placeholder="••••••••"
+                    placeholder="dummy123"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

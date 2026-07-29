@@ -26,6 +26,7 @@ export const SettingsView: React.FC = () => {
     joinHouse,
     kickMember,
     leaveHouse,
+    logout,
   } = useAuth();
 
   const [createHouseName, setCreateHouseName] = useState('');
@@ -397,6 +398,36 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Account Info & Logout Card */}
+      <div className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <UserAvatar
+            user={{
+              id: dbUserProfile?.uid || 'user',
+              name: dbUserProfile?.displayName || 'User',
+              avatar: dbUserProfile?.avatar || 'U',
+              color: '#3b82f6',
+            }}
+            size={42}
+          />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>
+              {dbUserProfile?.displayName || firebaseUser?.displayName || 'Active Account'}
+            </div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              {firebaseUser?.email || 'Logged in locally'}
+            </div>
+          </div>
+        </div>
+
+        {firebaseUser && (
+          <button className="btn btn-danger" onClick={() => logout()}>
+            <LogOut size={16} />
+            <span>Log Out</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };
