@@ -20,8 +20,9 @@ import {
   saveSettlements,
   loadCards,
   saveCards,
-  resetToSeedData,
+  clearAllFinancialData,
 } from './utils/storage';
+import { resetMockDBToDefault } from './utils/mockAuthDatabase';
 import {
   subscribeExpenses,
   subscribeSettlements,
@@ -411,16 +412,15 @@ const AppContent: React.FC = () => {
   // Reset Demo Data handler with Cloud Firestore clearing & re-seeding
   const handleResetDataConfirm = () => {
     expenses.forEach((e) => syncDeleteExpense(e.id));
+    settlements.forEach((s) => syncDeleteSettlement(s.id));
     cards.forEach((c) => syncDeleteCard(c.id));
 
-    const seed = resetToSeedData();
-    setExpenses(seed.expenses);
-    setSettlements(seed.settlements);
-    setCards(seed.cards || []);
+    clearAllFinancialData();
+    resetMockDBToDefault();
 
-    seed.expenses.forEach((e) => syncSaveExpense(e, currentHouse?.id));
-    seed.settlements.forEach((s) => syncSaveSettlement(s, currentHouse?.id));
-    (seed.cards || []).forEach((c) => syncSaveCard(c, currentHouse?.id));
+    setExpenses([]);
+    setSettlements([]);
+    setCards([]);
 
     setIsResetConfirmOpen(false);
   };

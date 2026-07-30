@@ -70,9 +70,15 @@ export const saveCards = (cards: PaymentCard[]): void => {
   }
 };
 
+export const clearAllFinancialData = (): void => {
+  localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify([]));
+  localStorage.setItem(SETTLEMENTS_STORAGE_KEY, JSON.stringify([]));
+  localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify([]));
+  localStorage.removeItem('home_finance_personal_budget_v1');
+  localStorage.removeItem('home_finance_category_budgets_v1');
+};
+
 export const resetToSeedData = (): { expenses: Expense[]; settlements: Settlement[]; cards: PaymentCard[] } => {
-  saveExpenses([]);
-  saveSettlements([]);
-  saveCards([]);
+  clearAllFinancialData();
   return { expenses: [], settlements: [], cards: [] };
 };

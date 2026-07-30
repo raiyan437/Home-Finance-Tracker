@@ -122,3 +122,10 @@ export const setActiveSession = (user: UserProfile | null) => {
     localStorage.removeItem(ACTIVE_SESSION_KEY);
   }
 };
+
+// Helper: Reset Mock DB to Default Seed Users & Houses
+export const resetMockDBToDefault = () => {
+  saveUsersDB(DEFAULT_USERS);
+  saveHousesDB([DEFAULT_HOUSE]);
+  setActiveSession(DEFAULT_USERS[0]);
+};
