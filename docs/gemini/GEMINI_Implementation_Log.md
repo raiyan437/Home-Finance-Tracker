@@ -268,10 +268,11 @@
 10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
     * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
 
-### 2026-07-30: Strict House-Less User Expense & Settlement Isolation
-* **Scoping Isolation (`src/App.tsx` & `src/utils/settlementEngine.ts`)**:
-  * Updated `householdExpenses` and `houseSettlements` to filter exclusively by `activeUserId` when `currentHouse` is `null` (unassigned user).
-  * Added guard `if (activeUsers.length < 2) return []` in `calculateSimplifiedSettlements` so single or unassigned users see 0 debt transfer cards.
+### 2026-07-30: Purged Active Recommendations & Settlement Audit Logs
+* **Audit Data Purge (`src/components/SettlementView.tsx`, `src/App.tsx`, `src/utils/firebaseSync.ts`)**:
+  * Added **"Clear Audit Data"** action button in `SettlementView.tsx` to wipe all active recommendations and completed settlement logs.
+  * Added `syncDeleteSettlement` in `firebaseSync.ts` to purge cloud records alongside `localStorage`.
+
 
 
 
