@@ -268,14 +268,11 @@
 10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
     * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
 
-### 2026-07-30: SQA Engineering & UI/UX Audit Resolution
-* **Strict Form Validation & Input Guards (`AddExpenseModal.tsx` & `PersonalWallet.tsx`)**:
-  * Enforced `amountCents <= 0` checks, 2-decimal input sanitization, negative share guards, and disabled submit buttons during `isSubmitting` processing.
-  * Added 3MB image size guard and `image/*` file format check with error banners for receipt photo uploads.
-* **Modal Background Scroll Locking (`AddExpenseModal.tsx`, `CardsManager.tsx`, `ConfirmModal.tsx`)**:
-  * Added `document.body.style.overflow = 'hidden'` lock while modals are active, restoring on close.
-* **Accessibility (WCAG 2.1 AA) & Touch Targets (`src/index.css`)**:
-  * Audited `--text-muted` to `#8e8e93` (4.5:1 contrast against surface layers). Added visible focus rings (`:focus-visible`) and enforced $44 \times 44\text{px}$ minimum touch target sizes on buttons and mobile navigation icons.
-  * Prevented horizontal scrolling on small displays (`overflow-x: hidden`).
+### 2026-07-30: Dual Light & Dark Mode Button & Element Color Harmony
+* **High-Contrast Button Palette (`src/index.css`)**:
+  * **Dark Mode**: Configured crisp platinum/zinc titanium primary buttons (`#e4e4e7` gradient with `#121214` dark text) to pop against charcoal anthracite cards.
+  * **Light Mode**: Configured deep obsidian zinc primary buttons (`#18181b` gradient with `#ffffff` text) on crisp light zinc surfaces (`#f4f4f6`).
+  * **Status Variants**: Standardized vibrant mint (`.btn-success`), coral rose (`.btn-danger`), and elevated zinc (`.btn-secondary`) buttons for WCAG 2.1 AA compliant readability in both modes.
+
 
 
