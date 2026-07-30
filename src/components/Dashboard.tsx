@@ -4,9 +4,9 @@ import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } f
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 import { CategoryChart } from './CategoryChart';
+import { CategoryPieChart } from './CategoryPieChart';
 import { UserAvatar } from './UserAvatar';
-import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity } from 'lucide-react';
-
+import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote } from 'lucide-react';
 import type { Language } from '../utils/i18n';
 
 interface DashboardProps {
@@ -44,15 +44,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const memberCount = Math.max(1, houseUsers.length);
   const averagePerMemberCents = Math.round(totalSpentCents / memberCount);
-
   const memberNamesText = houseUsers.map((u) => u.name).join(', ');
 
   const recentExpenses = [...expenses]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
+  // Payment Channel Analysis (Bank Cards vs Cash Outlay)
+  const paymentChannelStats = useMemo(() => {
+    let cardCents = 0;
+    let cashCents = 0;
+
+    expenses.forEach((e) => {
+      if (e.paymentMethod?.type === 'card') {
+        cardCents += e.amountCents;
+      } else {
+        cashCents += e.amountCents;
+      }
+    });
+
+    const grandTotal = cardCents + cashCents;
+    const cardPercentage = grandTotal > 0 ? (cardCents / grandTotal) * 100 : 0;
+    const cashPercentage = grandTotal > 0 ? (cashCents / grandTotal) * 100 : 0;
+
+    return { cardCents, cashCents, grandTotal, cardPercentage, cashPercentage };
+  }, [expenses]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       {/* Top Banner */}
       <div className="page-header">
         <div className="page-title-group">
@@ -68,7 +87,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="glass-card summary-card">
           <div className="summary-card-header">
             <span className="summary-title">Total Household Spend</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(228, 228, 231, 0.15)', color: 'var(--accent-primary)' }}>
               <TrendingUp size={20} />
             </div>
           </div>
@@ -114,7 +133,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="glass-card summary-card">
           <div className="summary-card-header">
             <span className="summary-title">Average Per Member</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)', color: 'var(--accent-purple)' }}>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}>
               <Activity size={20} />
             </div>
           </div>
@@ -127,205 +146,308 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Housemate Net Balances Grid */}
-      <div>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px', letterSpacing: '-0.02em' }}>
-          Housemate Net Balances ({houseUsers.length})
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-          {houseUsers.map((user) => {
-            const netCents = userBalances[user.id]?.netBalanceCents || 0;
-            const isCreditor = netCents > 0;
-            const isDebtor = netCents < 0;
-            const paidCents = expenses
-              .filter((e) => e.paidBy === user.id || e.paidBy.toLowerCase() === user.name.toLowerCase())
-              .reduce((sum, e) => sum + e.amountCents, 0);
-
-            return (
-              <div key={user.id} className="glass-card balance-card">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <UserAvatar user={user} size={44} />
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{user.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Paid {formatCurrency(paidCents, false, lang)} out-of-pocket
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
-                    Net Position
-                  </div>
-                  <div
-                    className="tabular-nums"
-                    style={{
-                      fontSize: '1.4rem',
-                      fontWeight: 900,
-                      color: isCreditor
-                        ? 'var(--accent-emerald)'
-                        : isDebtor
-                        ? 'var(--accent-rose)'
-                        : 'var(--text-muted)',
-                    }}
-                  >
-                    {isCreditor ? `+${formatCurrency(netCents, false, lang)}` : formatCurrency(netCents, false, lang)}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', marginTop: '4px', fontWeight: 600 }}>
-                    {isCreditor && <span style={{ color: 'var(--accent-emerald)' }}>Gets back overall</span>}
-                    {isDebtor && <span style={{ color: 'var(--accent-rose)' }}>Owes overall</span>}
-                    {!isCreditor && !isDebtor && <span style={{ color: 'var(--text-muted)' }}>Fully settled</span>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {userBalances['legacy-user'] && (userBalances['legacy-user'].totalPaidCents > 0 || userBalances['legacy-user'].totalShareCents > 0) && (
-            <div className="glass-card balance-card" style={{ opacity: 0.85, borderStyle: 'dashed' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <UserAvatar user={userBalances['legacy-user'].user} size={44} />
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>
-                    {userBalances['legacy-user'].user.name}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Isolated legacy member balance pool
-                  </div>
-                </div>
-              </div>
-              <div className="tabular-nums" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                {formatCurrency(userBalances['legacy-user'].netBalanceCents, false, lang)}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Middle Section: Direct Debt Settlement Action Cards */}
-      {simplifiedSettlements.length > 0 && (
-        <div className="glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-                Optimized Debt Settlement Payments ({simplifiedSettlements.length})
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Minimum cash flow algorithm solved to eliminate redundant transactions
-              </p>
-            </div>
-
-            <button className="btn btn-primary btn-sm" onClick={onNavigateToSettlement}>
-              <span>Settlement Hub</span>
-              <ArrowRight size={16} />
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
-            {simplifiedSettlements.map((tx) => (
-              <div
-                key={tx.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 20px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--bg-surface-elevated)',
-                  border: '1px solid var(--border-medium)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <UserAvatar user={tx.fromUser} size={36} />
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{tx.fromUser.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-rose)' }}>Owes debt</div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                  <ArrowRight size={18} style={{ color: 'var(--accent-amber)' }} />
-                  <span className="tabular-nums" style={{ fontWeight: 900, fontSize: '1.05rem', color: 'var(--accent-amber)' }}>
-                    {formatCurrency(tx.amountCents)}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.95rem', textAlign: 'right' }}>{tx.toUser.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', textAlign: 'right' }}>Receives payment</div>
-                  </div>
-                  <UserAvatar user={tx.toUser} size={36} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Analytics & Recent Transactions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px' }}>
-        <CategoryChart expenses={expenses} />
-
-        <div className="glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-              Recent Shared Expenses
+      {/* Main Dashboard Layout: Left Primary Ledger & Right Visual Analytics Panel */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '28px' }}>
+        
+        {/* Left Column: Housemate Net Balances, Debt Action Cards & Recent History */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          
+          {/* Housemate Net Balances Grid */}
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em' }}>
+              Housemate Net Balances ({houseUsers.length})
             </h2>
-            <button className="btn btn-secondary btn-sm" onClick={onNavigateToExpenses}>
-              <span>View All</span>
-              <Receipt size={16} />
-            </button>
-          </div>
-
-          {recentExpenses.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
-              No expenses recorded yet.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {recentExpenses.map((exp) => {
-                const payer = houseUsers.find((u) => u.id === exp.paidBy || u.name.toLowerCase() === exp.paidBy.toLowerCase()) || {
-                  id: exp.paidBy,
-                  name: exp.paidBy,
-                  avatar: exp.paidBy,
-                  color: '#3b82f6',
-                };
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+              {houseUsers.map((user) => {
+                const netCents = userBalances[user.id]?.netBalanceCents || 0;
+                const isCreditor = netCents > 0;
+                const isDebtor = netCents < 0;
+                const paidCents = expenses
+                  .filter((e) => e.paidBy === user.id || e.paidBy.toLowerCase() === user.name.toLowerCase())
+                  .reduce((sum, e) => sum + e.amountCents, 0);
 
                 return (
-                  <div
-                    key={exp.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid var(--border-subtle)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <UserAvatar user={payer} size={36} />
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{exp.title}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          Paid by {payer.name} • {exp.date}
+                  <div key={user.id} className="glass-card balance-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <UserAvatar user={user} size={42} />
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '1rem' }}>{user.name}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            Paid {formatCurrency(paidCents, false, lang)} out-of-pocket
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '1.05rem' }}>
-                      {formatCurrency(exp.amountCents)}
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                        Net Position
+                      </div>
+                      <div
+                        className="tabular-nums"
+                        style={{
+                          fontSize: '1.35rem',
+                          fontWeight: 900,
+                          color: isCreditor
+                            ? 'var(--accent-emerald)'
+                            : isDebtor
+                            ? 'var(--accent-rose)'
+                            : 'var(--text-muted)',
+                        }}
+                      >
+                        {isCreditor ? `+${formatCurrency(netCents, false, lang)}` : formatCurrency(netCents, false, lang)}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', marginTop: '4px', fontWeight: 600 }}>
+                        {isCreditor && <span style={{ color: 'var(--accent-emerald)' }}>Gets back overall</span>}
+                        {isDebtor && <span style={{ color: 'var(--accent-rose)' }}>Owes overall</span>}
+                        {!isCreditor && !isDebtor && <span style={{ color: 'var(--text-muted)' }}>Fully settled</span>}
+                      </div>
                     </div>
                   </div>
                 );
               })}
+
+              {userBalances['legacy-user'] && (userBalances['legacy-user'].totalPaidCents > 0 || userBalances['legacy-user'].totalShareCents > 0) && (
+                <div className="glass-card balance-card" style={{ opacity: 0.85, borderStyle: 'dashed' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <UserAvatar user={userBalances['legacy-user'].user} size={42} />
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '1rem' }}>
+                        {userBalances['legacy-user'].user.name}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Isolated legacy member balance pool
+                      </div>
+                    </div>
+                  </div>
+                  <div className="tabular-nums" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+                    {formatCurrency(userBalances['legacy-user'].netBalanceCents, false, lang)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Direct Debt Settlement Action Cards */}
+          {simplifiedSettlements.length > 0 && (
+            <div className="glass-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                    Optimized Debt Settlement Payments ({simplifiedSettlements.length})
+                  </h2>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Minimum cash flow algorithm solved to eliminate redundant transactions
+                  </p>
+                </div>
+
+                <button className="btn btn-primary btn-sm" onClick={onNavigateToSettlement}>
+                  <span>Settlement Hub</span>
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {simplifiedSettlements.map((tx) => (
+                  <div
+                    key={tx.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 18px',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--bg-surface-elevated)',
+                      border: '1px solid var(--border-medium)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <UserAvatar user={tx.fromUser} size={34} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{tx.fromUser.name}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--accent-rose)' }}>Owes debt</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                      <ArrowRight size={16} style={{ color: 'var(--accent-amber)' }} />
+                      <span className="tabular-nums" style={{ fontWeight: 900, fontSize: '1rem', color: 'var(--accent-amber)' }}>
+                        {formatCurrency(tx.amountCents, false, lang)}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', textAlign: 'right' }}>{tx.toUser.name}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--accent-emerald)', textAlign: 'right' }}>Receives payment</div>
+                      </div>
+                      <UserAvatar user={tx.toUser} size={34} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Recent Expenses List */}
+          <div className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                Recent Shared Expenses
+              </h2>
+              <button className="btn btn-secondary btn-sm" onClick={onNavigateToExpenses}>
+                <span>View All</span>
+                <Receipt size={15} />
+              </button>
+            </div>
+
+            {recentExpenses.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No expenses recorded yet.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {recentExpenses.map((exp) => {
+                  const payer = houseUsers.find((u) => u.id === exp.paidBy || u.name.toLowerCase() === exp.paidBy.toLowerCase()) || {
+                    id: exp.paidBy,
+                    name: exp.paidBy,
+                    avatar: exp.paidBy,
+                    color: '#3b82f6',
+                  };
+
+                  return (
+                    <div
+                      key={exp.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 14px',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--bg-input)',
+                        border: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <UserAvatar user={payer} size={34} />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{exp.title}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Paid by {payer.name} • {exp.date}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '1rem' }}>
+                        {formatCurrency(exp.amountCents, false, lang)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
+
+        {/* Right Column: Visual Charts, Donut Pie Chart & Payment Channel Analytics */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          
+          {/* 1. Category Donut Pie Chart */}
+          <CategoryPieChart expenses={expenses} lang={lang} />
+
+          {/* 2. Category Progress Bars & Payer Out-of-Pocket Ratios */}
+          <CategoryChart expenses={expenses} />
+
+          {/* 3. Payment Method Channel Ratio Card (Bank Cards vs Cash) */}
+          <div className="glass-card">
+            <div style={{ marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CreditCard size={18} style={{ color: 'var(--accent-cyan)' }} />
+                <span>Payment Channel Distribution</span>
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Bank Credit/Debit Cards vs Cash outlays ratio
+              </p>
+            </div>
+
+            {/* Channel Progress Bar */}
+            <div
+              style={{
+                width: '100%',
+                height: '14px',
+                borderRadius: 'var(--radius-full)',
+                overflow: 'hidden',
+                display: 'flex',
+                backgroundColor: 'var(--bg-surface-elevated)',
+                marginBottom: '18px',
+              }}
+            >
+              <div
+                style={{
+                  width: `${paymentChannelStats.cardPercentage}%`,
+                  backgroundColor: 'var(--accent-cyan)',
+                  transition: 'width 0.6s ease',
+                }}
+                title={`Bank Cards: ${paymentChannelStats.cardPercentage.toFixed(1)}%`}
+              />
+              <div
+                style={{
+                  width: `${paymentChannelStats.cashPercentage}%`,
+                  backgroundColor: 'var(--accent-amber)',
+                  transition: 'width 0.6s ease',
+                }}
+                title={`Cash: ${paymentChannelStats.cashPercentage.toFixed(1)}%`}
+              />
+            </div>
+
+            {/* Payment Channel Stat Badges */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <CreditCard size={15} style={{ color: 'var(--accent-cyan)' }} />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Bank Cards</span>
+                </div>
+                <div className="tabular-nums" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+                  {formatCurrency(paymentChannelStats.cardCents, false, lang)}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {paymentChannelStats.cardPercentage.toFixed(1)}% of total
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <Banknote size={15} style={{ color: 'var(--accent-amber)' }} />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Cash Payments</span>
+                </div>
+                <div className="tabular-nums" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
+                  {formatCurrency(paymentChannelStats.cashCents, false, lang)}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {paymentChannelStats.cashPercentage.toFixed(1)}% of total
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
       </div>
     </div>
   );
