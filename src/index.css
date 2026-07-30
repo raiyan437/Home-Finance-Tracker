@@ -201,7 +201,7 @@ button, input, select, textarea {
 .main-content {
   flex: 1;
   padding: 16px;
-  max-width: 1280px;
+  max-width: 1540px;
   margin: 0 auto;
   padding-bottom: 100px; /* Mobile bottom nav offset */
   animation: fadeIn 0.3s ease-out;
@@ -211,7 +211,7 @@ button, input, select, textarea {
 @media (min-width: 768px) {
   .main-content {
     margin-left: var(--sidebar-width);
-    padding: 32px 40px;
+    padding: 28px 36px;
     padding-bottom: 48px;
     width: calc(100% - var(--sidebar-width));
   }
@@ -620,6 +620,24 @@ button, input, select, textarea {
 }
 
 /* Grids & Cards */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+}
+
+@media (min-width: 992px) {
+  .dashboard-main-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  }
+}
+
+@media (min-width: 1400px) {
+  .dashboard-main-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 460px);
+  }
+}
+
 .grid-summary {
   display: grid;
   grid-template-columns: repeat(1, 1fr);

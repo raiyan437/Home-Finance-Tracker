@@ -147,7 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Main Dashboard Layout: Left Primary Ledger & Right Visual Analytics Panel */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '28px' }}>
+      <div className="dashboard-main-grid">
         
         {/* Left Column: Housemate Net Balances, Debt Action Cards & Recent History */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
