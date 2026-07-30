@@ -63,10 +63,26 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [percentagesStr, setPercentagesStr] = useState<Record<UserId, string>>({});
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Background body scroll lock when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   // Initialize form when opening or editing
   useEffect(() => {
     if (!isOpen) return;
+
+    setErrorMessage(null);
+    setIsSubmitting(false);
 
     const allUserIds = houseUsers.map((u) => u.id);
 
@@ -157,7 +173,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) {
+        setErrorMessage('Invalid file format. Please upload an image file (JPEG, PNG, WebP).');
+        return;
+      }
+      if (file.size > 3 * 1024 * 1024) {
+        setErrorMessage('File size exceeds 3MB limit. Please select a smaller receipt image.');
+        return;
+      }
+
       setIsScanningOcr(true);
+      setErrorMessage(null);
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64 = event.target?.result as string;
@@ -187,11 +213,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       return;
     }
 
+    setIsSubmitting(true);
     let finalShares: Share[] = [];
 
     if (scope === 'personal') {
       if (paidBy !== activeUserId) {
-        // User B paid out-of-pocket for User A's personal item! Split between User A & B.
         const eqSplits = calculateEqualSplits(totalCents, [paidBy, activeUserId]);
         finalShares = [
           { userId: paidBy, amountCents: eqSplits[paidBy] || 0 },
@@ -203,6 +229,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     } else {
       if (selectedParticipants.length === 0) {
         setErrorMessage('Please select at least one participant.');
+        setIsSubmitting(false);
         return;
       }
 
@@ -214,9 +241,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         }));
       } else if (splitMethod === 'custom') {
         const customSharesCents: Record<string, number> = {};
+        let hasNegative = false;
+
         selectedParticipants.forEach((userId) => {
-          customSharesCents[userId] = dollarsToCents(customSharesStr[userId] || 0);
+          const valCents = dollarsToCents(customSharesStr[userId] || 0);
+          if (valCents < 0) hasNegative = true;
+          customSharesCents[userId] = valCents;
         });
+
+        if (hasNegative) {
+          setErrorMessage('Custom share amounts cannot be negative.');
+          setIsSubmitting(false);
+          return;
+        }
 
         const validation = validateCustomSplits(totalCents, customSharesCents);
         if (!validation.isValid) {
@@ -224,6 +261,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           setErrorMessage(
             `Custom split total does not match expense amount. Difference: ${diffDollars}.`
           );
+          setIsSubmitting(false);
           return;
         }
 
@@ -233,13 +271,24 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         }));
       } else if (splitMethod === 'percentage') {
         const percMap: Record<string, number> = {};
+        let hasNegativePerc = false;
+
         selectedParticipants.forEach((userId) => {
-          percMap[userId] = parseFloat(percentagesStr[userId] || '0');
+          const valPerc = parseFloat(percentagesStr[userId] || '0');
+          if (valPerc < 0) hasNegativePerc = true;
+          percMap[userId] = valPerc;
         });
+
+        if (hasNegativePerc) {
+          setErrorMessage('Percentage shares cannot be negative.');
+          setIsSubmitting(false);
+          return;
+        }
 
         const percResult = calculatePercentageSplits(totalCents, percMap);
         if (!percResult.is100Percent) {
           setErrorMessage('Percentages must total 100%.');
+          setIsSubmitting(false);
           return;
         }
 
@@ -645,9 +694,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
               <Check size={18} />
-              <span>{initialExpense ? 'Update Expense' : 'Save Expense'}</span>
+              <span>{isSubmitting ? 'Saving...' : initialExpense ? 'Update Expense' : 'Save Expense'}</span>
             </button>
           </div>
         </form>

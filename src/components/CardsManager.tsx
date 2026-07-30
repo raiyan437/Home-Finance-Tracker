@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { PaymentCard, Expense } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { USERS } from '../utils/settlementEngine';
@@ -44,6 +44,18 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
   const [bankName, setBankName] = useState('');
   const [cardType, setCardType] = useState<'credit' | 'debit'>('credit');
   const [selectedColor, setSelectedColor] = useState(CARD_COLOR_PRESETS[0].value);
+
+  // Background body scroll lock when modal is active
+  useEffect(() => {
+    if (isModalOpen || deletingCard) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isModalOpen, deletingCard]);
 
   // Filter cards by active user or show all household cards
   const userCards = useMemo(() => {

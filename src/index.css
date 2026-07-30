@@ -18,8 +18,8 @@
   /* Neutral Monochrome Typography */
   --text-primary: #f4f4f5;   /* Crisp off-white */
   --text-secondary: #a1a1aa; /* Cool slate secondary text */
-  --text-muted: #71717a;     /* Muted grey metadata */
-  --text-dim: #52525b;
+  --text-muted: #8e8e93;     /* WCAG 4.5:1 Contrast Muted Metadata */
+  --text-dim: #636366;
 
   /* Titanium & Monochromatic Accents */
   --accent-primary: #e4e4e7;         /* Platinum Titanium primary accent */
@@ -1420,4 +1420,28 @@ button, input, select, textarea {
     flex-wrap: wrap;
     gap: 10px;
   }
+}
+
+/* Accessibility Focus-Visible Rings & WCAG 2.1 AA Touch Targets */
+:focus-visible {
+  outline: 2px solid var(--accent-primary) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px var(--accent-primary-glow) !important;
+}
+
+.btn, .form-input, .form-select, .user-select-btn {
+  min-height: 44px;
+}
+
+.btn-icon-only {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html, body, #root, .app-container {
+  max-width: 100vw;
+  overflow-x: hidden;
 }
