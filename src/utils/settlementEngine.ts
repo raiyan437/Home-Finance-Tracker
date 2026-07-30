@@ -1,4 +1,4 @@
-import type { User, UserId, Expense, Settlement, UserBalance, SimplifiedTransaction, House } from '../types';
+import type { User, UserId, Expense, Settlement, UserBalance, SimplifiedTransaction, House, UserProfile } from '../types';
 
 import raiyanAvatar from '../assets/avatars/raiyan.png';
 import himelAvatar from '../assets/avatars/himel.png';
@@ -27,13 +27,20 @@ export const USERS: Record<UserId, User> = {
 
 export const ALL_USERS: User[] = Object.values(USERS);
 
+export const LEGACY_USER: User = {
+  id: 'legacy_departed',
+  name: 'Departed Member',
+  avatar: 'D',
+  color: '#6b7280', // Gray
+};
+
 /**
  * Returns the list of User objects for members in the active house.
  * If user is not in any house, returns only that logged-in user.
  */
 export const getHouseUsers = (
   house?: House | null,
-  currentUser?: any
+  currentUser?: UserProfile | User | null
 ): User[] => {
   if (house && house.members && house.members.length > 0) {
     return house.members.map((m) => {
@@ -54,18 +61,18 @@ export const getHouseUsers = (
 
   // If user is logged in but not in any house, return ONLY that user
   if (currentUser) {
-    const nameStr = currentUser.displayName || currentUser.name || 'User';
+    const nameStr = (currentUser as any).displayName || (currentUser as any).name || 'User';
     const cleanName = nameStr.toLowerCase().trim();
     const staticUser = USERS[cleanName] || Object.values(USERS).find((u) => u.name.toLowerCase() === cleanName);
-    const userId = currentUser.uid || currentUser.id || staticUser?.id || cleanName || 'user';
+    const userId = (currentUser as any).uid || (currentUser as any).id || staticUser?.id || cleanName || 'user';
     return [
       {
         id: userId,
         name: nameStr,
-        avatar: staticUser?.avatar || currentUser.avatar || nameStr.slice(0, 5),
+        avatar: staticUser?.avatar || (currentUser as any).avatar || nameStr.slice(0, 5),
         color: staticUser?.color || '#3b82f6',
-        email: currentUser.email,
-        uid: currentUser.uid,
+        email: (currentUser as any).email,
+        uid: (currentUser as any).uid,
       },
     ];
   }
@@ -75,6 +82,7 @@ export const getHouseUsers = (
 
 /**
  * Computes net balances for house members dynamically.
+ * Isolates departed / legacy members under LEGACY_USER so sum(Net) = 0.
  */
 export const calculateNetBalances = (
   expenses: Expense[],
@@ -90,12 +98,15 @@ export const calculateNetBalances = (
     totals[key] = { paid: 0, share: 0, settlementDelta: 0 };
   });
 
+  totals[LEGACY_USER.id] = { paid: 0, share: 0, settlementDelta: 0 };
+  usersMap[LEGACY_USER.id] = LEGACY_USER;
+
   // Helper for strict UID / ID lookup
-  const findUserKey = (targetIdStr: string) => {
-    if (!targetIdStr) return undefined;
+  const findUserKey = (targetIdStr: string): string => {
+    if (!targetIdStr) return LEGACY_USER.id;
     if (totals[targetIdStr]) return targetIdStr;
     const targetClean = targetIdStr.toLowerCase().trim();
-    return Object.keys(totals).find((k) => {
+    const found = Object.keys(totals).find((k) => {
       const u = usersMap[k];
       if (!u) return false;
       return (
@@ -105,31 +116,28 @@ export const calculateNetBalances = (
         u.name.toLowerCase().trim() === targetClean
       );
     });
+    return found || LEGACY_USER.id;
   };
 
   // 1. Process active expenses strictly by UID / ID
   expenses.forEach((exp) => {
     const payerKey = findUserKey(exp.paidBy);
-    if (payerKey) {
-      totals[payerKey].paid += exp.amountCents;
-    }
+    totals[payerKey].paid += exp.amountCents;
 
     exp.shares.forEach((share) => {
       const shareKey = findUserKey(share.userId);
-      if (shareKey) {
-        totals[shareKey].share += share.amountCents;
-      }
+      totals[shareKey].share += share.amountCents;
     });
   });
 
-  // 2. Process completed settlements strictly by UID / ID
+  // 2. Process completed settlements strictly by UID / ID (ignoring 'reversed' status)
   settlements.forEach((st) => {
     if (st.status === 'completed') {
       const fromKey = findUserKey(st.fromUserId);
       const toKey = findUserKey(st.toUserId);
 
-      if (fromKey) totals[fromKey].settlementDelta += st.amountCents;
-      if (toKey) totals[toKey].settlementDelta -= st.amountCents;
+      totals[fromKey].settlementDelta += st.amountCents;
+      totals[toKey].settlementDelta -= st.amountCents;
     }
   });
 
@@ -147,6 +155,18 @@ export const calculateNetBalances = (
       netBalanceCents: net,
     };
   });
+
+  // Include Legacy/Departed member pool if there are transactions attached to former members
+  const legacyTotals = totals[LEGACY_USER.id];
+  if (legacyTotals && (legacyTotals.paid > 0 || legacyTotals.share > 0 || legacyTotals.settlementDelta !== 0)) {
+    const net = legacyTotals.paid - legacyTotals.share + legacyTotals.settlementDelta;
+    result[LEGACY_USER.id] = {
+      user: LEGACY_USER,
+      totalPaidCents: legacyTotals.paid,
+      totalShareCents: legacyTotals.share,
+      netBalanceCents: net,
+    };
+  }
 
   return result;
 };

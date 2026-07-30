@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType, RecurringFrequency } from '../types';
-import { getHouseUsers, USERS } from '../utils/settlementEngine';
+import { getHouseUsers } from '../utils/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import {
   dollarsToCents,
   validateCustomSplits,
   formatCurrency,
+  calculateEqualSplits,
+  calculatePercentageSplits,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
 import { scanReceiptImage } from '../utils/ocrScanner';
+import type { Language } from '../utils/i18n';
+import { getTranslation } from '../utils/i18n';
 import { X, Check, AlertCircle, Sparkles, Users, Wallet, CreditCard, Banknote, Image as ImageIcon } from 'lucide-react';
 
 interface AddExpenseModalProps {
@@ -17,6 +21,7 @@ interface AddExpenseModalProps {
   onSaveExpense: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>, editingId?: string) => void;
   initialExpense?: Expense | null;
   cards?: PaymentCard[];
+  lang?: Language;
 }
 
 const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
@@ -35,6 +40,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onSaveExpense,
   initialExpense,
   cards = [],
+  lang = 'en',
 }) => {
   const { currentHouse, activeUserId, dbUserProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
@@ -100,10 +106,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           }
         });
       }
+
       setCustomSharesStr(customObj);
       setPercentagesStr(percObj);
     } else {
-      // Reset defaults dynamically based on active house users
       setTitle('');
       setAmountStr('');
       setPaidBy(activeUserId || allUserIds[0] || 'raiyan');
@@ -116,67 +122,50 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setIsRecurring(false);
       setRecurringFrequency('monthly');
       setReceiptUrl('');
+      setNotes('');
       setSelectedParticipants(allUserIds);
 
       const customObj: Record<UserId, string> = {};
       const percObj: Record<UserId, string> = {};
-      const equalPerc = (100 / Math.max(1, allUserIds.length)).toFixed(2);
+      const defaultPerc = (100 / Math.max(1, allUserIds.length)).toFixed(2);
 
       allUserIds.forEach((id) => {
         customObj[id] = '';
-        percObj[id] = equalPerc;
+        percObj[id] = defaultPerc;
       });
 
       setCustomSharesStr(customObj);
       setPercentagesStr(percObj);
-      setNotes('');
-      setErrorMessage(null);
     }
   }, [isOpen, initialExpense, houseUsers, activeUserId, cards]);
 
-  if (!isOpen) return null;
-
   const toggleParticipant = (userId: UserId) => {
     if (selectedParticipants.includes(userId)) {
-      if (selectedParticipants.length === 1) {
-        setErrorMessage('At least one participant must benefit from the expense.');
-        return;
-      }
+      if (selectedParticipants.length <= 1) return;
       setSelectedParticipants(selectedParticipants.filter((id) => id !== userId));
     } else {
       setSelectedParticipants([...selectedParticipants, userId]);
     }
   };
 
-  const handlePersonalShortcut = (beneficiaryId: UserId) => {
-    setCategory('Personal');
-    setSelectedParticipants([beneficiaryId]);
-    setSplitMethod('equal');
-  };
-
-  const applyPreset = (preset: typeof PRESETS[0]) => {
+  const applyPreset = (preset: (typeof PRESETS)[0]) => {
     setTitle(preset.name);
     setAmountStr(preset.amount);
     setCategory(preset.category);
   };
 
-  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        setErrorMessage('Receipt image size should be less than 3MB.');
-        return;
-      }
+      setIsScanningOcr(true);
       const reader = new FileReader();
-      reader.onloadend = async () => {
-        const b64 = reader.result as string;
-        setReceiptUrl(b64);
-        setIsScanningOcr(true);
-        const parsed = await scanReceiptImage(b64);
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        setReceiptUrl(base64);
+        const parsed = await scanReceiptImage(base64);
         setIsScanningOcr(false);
         if (parsed.success) {
-          if (parsed.title) setTitle(parsed.title);
-          if (parsed.amountCents) setAmountStr((parsed.amountCents / 100).toFixed(2));
+          if (parsed.title) setTitle((prev) => prev || parsed.title || '');
           if (parsed.date) setDate(parsed.date);
         }
       };
@@ -201,7 +190,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     let finalShares: Share[] = [];
 
     if (scope === 'personal') {
-      finalShares = [{ userId: paidBy, amountCents: totalCents }];
+      if (paidBy !== activeUserId) {
+        // User B paid out-of-pocket for User A's personal item! Split between User A & B.
+        const eqSplits = calculateEqualSplits(totalCents, [paidBy, activeUserId]);
+        finalShares = [
+          { userId: paidBy, amountCents: eqSplits[paidBy] || 0 },
+          { userId: activeUserId, amountCents: eqSplits[activeUserId] || 0 },
+        ];
+      } else {
+        finalShares = [{ userId: activeUserId, amountCents: totalCents }];
+      }
     } else {
       if (selectedParticipants.length === 0) {
         setErrorMessage('Please select at least one participant.');
@@ -209,14 +207,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
 
       if (splitMethod === 'equal') {
-        const count = selectedParticipants.length;
-        const baseShare = Math.floor(totalCents / count);
-        const remainder = totalCents % count;
-        const primaryPayerId = selectedParticipants.includes(paidBy) ? paidBy : selectedParticipants[0];
-
+        const eqSplits = calculateEqualSplits(totalCents, selectedParticipants);
         finalShares = selectedParticipants.map((userId) => ({
           userId,
-          amountCents: baseShare + (userId === primaryPayerId ? remainder : 0),
+          amountCents: eqSplits[userId] || 0,
         }));
       } else if (splitMethod === 'custom') {
         const customSharesCents: Record<string, number> = {};
@@ -226,11 +220,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
         const validation = validateCustomSplits(totalCents, customSharesCents);
         if (!validation.isValid) {
-          const diffDollars = formatCurrency(Math.abs(validation.differenceCents));
+          const diffDollars = formatCurrency(Math.abs(validation.differenceCents), false, lang);
           setErrorMessage(
-            `Custom split total does not match the expense amount. Difference: ${diffDollars} (${
-              validation.differenceCents > 0 ? 'under-allocated' : 'over-allocated'
-            }).`
+            `Custom split total does not match expense amount. Difference: ${diffDollars}.`
           );
           return;
         }
@@ -245,28 +237,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           percMap[userId] = parseFloat(percentagesStr[userId] || '0');
         });
 
-        const totalPercent = Object.values(percMap).reduce((a, b) => a + b, 0);
-        if (Math.abs(totalPercent - 100) > 0.01) {
-          setErrorMessage('Percentages must total exactly 100%.');
+        const percResult = calculatePercentageSplits(totalCents, percMap);
+        if (!percResult.is100Percent) {
+          setErrorMessage('Percentages must total 100%.');
           return;
         }
 
-        const primaryPayerId = selectedParticipants.includes(paidBy) ? paidBy : selectedParticipants[0];
-        let sumAssigned = 0;
-        const tempShares: Record<string, number> = {};
-
-        selectedParticipants.forEach((userId) => {
-          const cents = Math.floor((totalCents * (percMap[userId] || 0)) / 100);
-          tempShares[userId] = cents;
-          sumAssigned += cents;
-        });
-
-        const remainder = totalCents - sumAssigned;
-        tempShares[primaryPayerId] = (tempShares[primaryPayerId] || 0) + remainder;
-
         finalShares = selectedParticipants.map((userId) => ({
           userId,
-          amountCents: tempShares[userId] || 0,
+          amountCents: percResult.shares[userId] || 0,
           percentage: percMap[userId],
         }));
       }
@@ -285,46 +264,49 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         ownerId: activeUserId,
         paymentMethod: {
           type: paymentType,
-          cardId: paymentType === 'card' ? selectedCardId : undefined,
+          cardId: paymentType === 'card' ? (selectedCardId || cards[0]?.id) : undefined,
         },
         isRecurring,
         recurringFrequency: isRecurring ? recurringFrequency : undefined,
         receiptUrl: receiptUrl || undefined,
         notes: notes.trim() || undefined,
       },
-      initialExpense?.id
+      initialExpense ? initialExpense.id : undefined
     );
 
     onClose();
   };
 
-  const liveTotalCents = dollarsToCents(amountStr);
-  const liveEqualShareCents =
-    selectedParticipants.length > 0 ? Math.round(liveTotalCents / selectedParticipants.length) : 0;
+  if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop">
-      <div className="glass-card modal-card" style={{ maxWidth: '620px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>
-              {initialExpense ? 'Edit Expense' : 'Add New Expense'}
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Log shared household outlays or private personal purchases
-            </p>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <h2 className="modal-title">
+                {initialExpense ? 'Edit Expense Record' : getTranslation('newExpense', lang)}
+              </h2>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Log shared household purchases or private personal outlays
+              </p>
+            </div>
           </div>
-          <button className="btn btn-secondary btn-icon-only" onClick={onClose}>
-            <X size={18} />
+          <button className="close-btn" onClick={onClose}>
+            <X size={20} />
           </button>
         </div>
 
         {/* Scope Selector: Shared Household vs Private Personal */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', backgroundColor: 'var(--bg-input)', padding: '6px', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
           <button
             type="button"
             className={`btn ${scope === 'household' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1, padding: '10px', fontSize: '0.88rem' }}
+            style={{ justifyContent: 'center', padding: '10px', fontSize: '0.88rem' }}
             onClick={() => setScope('household')}
           >
             <Users size={18} />
@@ -334,8 +316,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           <button
             type="button"
             className={`btn ${scope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1, padding: '10px', fontSize: '0.88rem' }}
-            onClick={() => setScope('personal')}
+            style={{ justifyContent: 'center', padding: '10px', fontSize: '0.88rem' }}
+            onClick={() => {
+              setScope('personal');
+              setSelectedParticipants([paidBy || activeUserId]);
+              setSplitMethod('equal');
+            }}
           >
             <Wallet size={18} />
             <span>Private Personal Expense</span>
@@ -418,54 +404,44 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Method Selector (Cash vs Bank Card) */}
+          {/* Payment Method Selector: Cash vs Card */}
           <div className="form-group">
             <label className="form-label">Payment Channel</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button
                 type="button"
                 className={`btn ${paymentType === 'cash' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
+                style={{ justifyContent: 'center' }}
                 onClick={() => setPaymentType('cash')}
               >
                 <Banknote size={16} />
-                <span>Cash</span>
+                <span>{getTranslation('cash', lang)}</span>
               </button>
+
               <button
                 type="button"
                 className={`btn ${paymentType === 'card' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
-                onClick={() => {
-                  setPaymentType('card');
-                  if (!selectedCardId && cards.length > 0) {
-                    setSelectedCardId(cards[0].id);
-                  }
-                }}
+                style={{ justifyContent: 'center' }}
+                onClick={() => setPaymentType('card')}
               >
                 <CreditCard size={16} />
-                <span>Bank Card</span>
+                <span>{getTranslation('bankCard', lang)}</span>
               </button>
             </div>
 
-            {paymentType === 'card' && (
-              <div style={{ marginTop: '8px' }}>
-                {cards.length === 0 ? (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', background: 'var(--bg-input)', padding: '10px', borderRadius: 'var(--radius-sm)' }}>
-                    No cards created yet. Go to "Payment Cards" tab to add your bank cards!
-                  </div>
-                ) : (
-                  <select
-                    className="form-select"
-                    value={selectedCardId}
-                    onChange={(e) => setSelectedCardId(e.target.value)}
-                  >
-                    {cards.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit' : 'Credit'} Card • {USERS[c.ownerId || activeUserId]?.name || 'Card'})
-                      </option>
-                    ))}
-                  </select>
-                )}
+            {paymentType === 'card' && cards.length > 0 && (
+              <div style={{ marginTop: '10px' }}>
+                <select
+                  className="form-select"
+                  value={selectedCardId}
+                  onChange={(e) => setSelectedCardId(e.target.value)}
+                >
+                  {cards.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit' : 'Credit'})
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -479,7 +455,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>Receipt Attached</div>
                   <div style={{ fontSize: '0.75rem', color: isScanningOcr ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>
-                    {isScanningOcr ? 'Scanning receipt text via OCR...' : '✓ OCR scan completed'}
+                    {isScanningOcr ? getTranslation('scanReceipt', lang) : getTranslation('ocrSuccess', lang)}
                   </div>
                 </div>
                 <button type="button" className="btn btn-danger btn-sm" onClick={() => setReceiptUrl('')}>
@@ -538,68 +514,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           </div>
 
+          {/* Household Scope Split Options (Locked when Personal Scope) */}
           {scope === 'household' && (
             <>
-              {/* Quick Personal Purchase Shortcut */}
-              <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Personal Purchase Shortcut
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {houseUsers.filter((u) => u.id !== paidBy).map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handlePersonalShortcut(u.id)}
-                    >
-                      <span>Bought only for {u.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Participants Checklist */}
               <div className="form-group">
-                <label className="form-label">
-                  <span>Participants (Beneficiaries)</span>
-                  {splitMethod === 'equal' && liveTotalCents > 0 && (
-                    <span style={{ color: 'var(--accent-primary)' }}>~{formatCurrency(liveEqualShareCents)} / person</span>
-                  )}
-                </label>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {houseUsers.map((user) => {
-                    const isChecked = selectedParticipants.includes(user.id);
-                    return (
-                      <div key={user.id} className="participant-checkbox-item">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <UserAvatar user={user} size={28} />
-                          <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{user.name}</span>
-                        </div>
-
-                        <button
-                          type="button"
-                          className={`btn ${isChecked ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                          onClick={() => toggleParticipant(user.id)}
-                        >
-                          {isChecked ? <Check size={14} /> : null}
-                          <span>{isChecked ? 'Included' : 'Exclude'}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Split Method Selector */}
-              <div className="form-group">
-                <label className="form-label">Split Allocation Method</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <label className="form-label">Split Method</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                   <button
                     type="button"
                     className={`btn ${splitMethod === 'equal' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1 }}
                     onClick={() => setSplitMethod('equal')}
                   >
                     Equal Split
@@ -607,97 +530,124 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   <button
                     type="button"
                     className={`btn ${splitMethod === 'custom' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1 }}
                     onClick={() => setSplitMethod('custom')}
                   >
-                    Custom (৳)
+                    Custom Exact ৳
                   </button>
                   <button
                     type="button"
                     className={`btn ${splitMethod === 'percentage' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1 }}
                     onClick={() => setSplitMethod('percentage')}
                   >
-                    Percentage (%)
+                    Percentage %
                   </button>
                 </div>
               </div>
 
-              {/* Custom / Percentage Inputs */}
-              {splitMethod === 'custom' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Custom Taka Amounts</div>
-                  {selectedParticipants.map((userId) => {
-                    const uObj = houseUsers.find((u) => u.id === userId);
+              {/* Participant Selection */}
+              <div className="form-group">
+                <label className="form-label">Split Among Housemates</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {houseUsers.map((user) => {
+                    const isSelected = selectedParticipants.includes(user.id);
                     return (
-                      <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                        <span style={{ fontWeight: 700 }}>{uObj?.name || USERS[userId]?.name || userId}</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="form-input tabular-nums"
-                          style={{ width: '130px' }}
-                          placeholder="0.00"
-                          value={customSharesStr[userId] || ''}
-                          onChange={(e) =>
-                            setCustomSharesStr({ ...customSharesStr, [userId]: e.target.value })
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {splitMethod === 'percentage' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Percentage Share Allocations</div>
-                  {selectedParticipants.map((userId) => {
-                    const uObj = houseUsers.find((u) => u.id === userId);
-                    return (
-                      <div key={userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                        <span style={{ fontWeight: 700 }}>{uObj?.name || USERS[userId]?.name || userId}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div
+                        key={user.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--bg-input)',
+                          border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <input
-                            type="number"
-                            step="0.1"
-                            className="form-input tabular-nums"
-                            style={{ width: '100px' }}
-                            placeholder="0"
-                            value={percentagesStr[userId] || ''}
-                            onChange={(e) =>
-                              setPercentagesStr({ ...percentagesStr, [userId]: e.target.value })
-                            }
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleParticipant(user.id)}
                           />
-                          <span style={{ fontWeight: 800, color: 'var(--text-muted)' }}>%</span>
+                          <UserAvatar user={user} size={24} />
+                          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{user.name}</span>
                         </div>
+
+                        {isSelected && splitMethod === 'custom' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>৳</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              style={{ width: '80px', padding: '4px 6px', fontSize: '0.85rem' }}
+                              className="form-input tabular-nums"
+                              placeholder="0.00"
+                              value={customSharesStr[user.id] || ''}
+                              onChange={(e) =>
+                                setCustomSharesStr({ ...customSharesStr, [user.id]: e.target.value })
+                              }
+                            />
+                          </div>
+                        )}
+
+                        {isSelected && splitMethod === 'percentage' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              step="0.1"
+                              style={{ width: '70px', padding: '4px 6px', fontSize: '0.85rem' }}
+                              className="form-input tabular-nums"
+                              placeholder="0"
+                              value={percentagesStr[user.id] || ''}
+                              onChange={(e) =>
+                                setPercentagesStr({ ...percentagesStr, [user.id]: e.target.value })
+                              }
+                            />
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>%</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              )}
+              </div>
             </>
           )}
 
-          {/* Optional Notes */}
-          <div className="form-group">
-            <label className="form-label">Notes (Optional)</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. Bought from Shwapno Supermarket"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+          {/* Automated Recurring Bill Toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', backgroundColor: 'var(--bg-input)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>Automated Recurring Expense</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Automatically generate this bill every week or month</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {isRecurring && (
+                <select
+                  className="form-select"
+                  style={{ width: 'auto', padding: '4px 8px', fontSize: '0.8rem' }}
+                  value={recurringFrequency}
+                  onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              )}
+              <input
+                type="checkbox"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+            </div>
           </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              {initialExpense ? 'Save Changes' : 'Save Expense'}
+              <Check size={18} />
+              <span>{initialExpense ? 'Update Expense' : 'Save Expense'}</span>
             </button>
           </div>
         </form>

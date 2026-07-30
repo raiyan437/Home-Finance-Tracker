@@ -5,7 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { exportAuditReportCsv } from '../utils/exportCsv';
 import { UserAvatar } from './UserAvatar';
-import { Search, Edit, Trash2, Plus, Receipt, ChevronDown, ChevronUp, Filter, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
+import type { Language } from '../utils/i18n';
+import { getTranslation } from '../utils/i18n';
+import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -14,6 +16,8 @@ interface ExpenseListProps {
   onEditExpense: (expense: Expense) => void;
   onDeleteExpense: (expenseId: string) => void;
   onAddComment?: (expenseId: string, commentText: string) => void;
+  onDeleteComment?: (expenseId: string, commentId: string) => void;
+  lang?: Language;
 }
 
 const ALL_CATEGORIES: (Category | 'All')[] = ['All', 'Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
@@ -25,8 +29,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   onEditExpense,
   onDeleteExpense,
   onAddComment,
+  onDeleteComment,
+  lang = 'en',
 }) => {
-  const { currentHouse, dbUserProfile } = useAuth();
+  const { currentHouse, activeUserId, dbUserProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,7 +55,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   const filteredExpenses = useMemo(() => {
     return expenses
       .filter((exp) => {
-        // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchesTitle = exp.title.toLowerCase().includes(q);
@@ -61,19 +66,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           }
         }
 
-        // Category filter
         if (selectedCategory !== 'All' && exp.category !== selectedCategory) {
           return false;
         }
 
-        // Person filter (paid by OR participant)
         if (selectedUserFilter !== 'All') {
           const isPayer = exp.paidBy === selectedUserFilter;
           const isParticipant = exp.shares.some((s) => s.userId === selectedUserFilter);
           if (!isPayer && !isParticipant) return false;
         }
 
-        // Payment Channel filter
         if (selectedPaymentFilter !== 'All') {
           const type = exp.paymentMethod?.type || 'cash';
           if (type !== selectedPaymentFilter) return false;
@@ -98,74 +100,68 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      {/* Header */}
+      {/* Header Banner */}
       <div className="page-header">
         <div className="page-title-group">
-          <h1 className="page-title">Expense Log</h1>
+          <h1 className="page-title">{getTranslation('householdExpenses', lang)}</h1>
           <p className="page-description">
-            Complete audit trail of all shared household purchases, splits, payment channels, and custom allocations
+            Complete audit trail of shared household purchases with dynamic participant splits & receipts
           </p>
         </div>
 
-        <div className="header-actions">
-          <button
-            className="btn btn-secondary"
-            onClick={() => exportAuditReportCsv(filteredExpenses, [], 'expenses_audit_report.csv')}
-            title="Download formatted CSV report"
-          >
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button className="btn btn-secondary" onClick={() => exportAuditReportCsv(expenses)}>
             <Download size={16} />
-            <span>Export CSV</span>
+            <span>{getTranslation('exportCsv', lang)}</span>
           </button>
           <button className="btn btn-primary" onClick={onOpenAddExpense}>
             <Plus size={18} />
-            <span>Add Expense</span>
+            <span>{getTranslation('addExpense', lang)}</span>
           </button>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="glass-card" style={{ padding: '18px' }}>
-        <div className="filter-bar" style={{ marginBottom: 0 }}>
+      {/* Filter Toolbar & Search Bar */}
+      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           {/* Search Input */}
-          <div className="search-input-wrapper">
-            <Search size={18} />
+          <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              className="form-input search-input"
-              placeholder="Search expenses by title, note, payer..."
+              className="form-input"
+              style={{ paddingLeft: '36px' }}
+              placeholder={getTranslation('searchExpenses', lang)}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           {/* Category Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Filter size={16} style={{ color: 'var(--text-muted)' }} />
-            <select
-              className="form-select"
-              style={{ width: '160px' }}
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value as Category | 'All')}
-            >
-              {ALL_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat === 'All' ? 'All Categories' : cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Person Filter */}
           <select
             className="form-select"
-            style={{ width: '160px' }}
+            style={{ width: 'auto', minWidth: '140px' }}
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value as Category | 'All')}
+          >
+            {ALL_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === 'All' ? getTranslation('allCategories', lang) : cat}
+              </option>
+            ))}
+          </select>
+
+          {/* Housemate Filter */}
+          <select
+            className="form-select"
+            style={{ width: 'auto', minWidth: '140px' }}
             value={selectedUserFilter}
             onChange={(e) => setSelectedUserFilter(e.target.value as UserId | 'All')}
           >
-            <option value="All">All Housemates</option>
+            <option value="All">{getTranslation('allHousemates', lang)}</option>
             {houseUsers.map((u) => (
               <option key={u.id} value={u.id}>
-                Payer/Participant: {u.name}
+                {u.name}
               </option>
             ))}
           </select>
@@ -173,209 +169,145 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           {/* Payment Method Filter */}
           <select
             className="form-select"
-            style={{ width: '150px' }}
+            style={{ width: 'auto', minWidth: '140px' }}
             value={selectedPaymentFilter}
-            onChange={(e) => setSelectedPaymentFilter(e.target.value as 'All' | 'cash' | 'card')}
+            onChange={(e) => setSelectedPaymentFilter(e.target.value as any)}
           >
-            <option value="All">All Payments</option>
-            <option value="cash">💵 Cash</option>
-            <option value="card">💳 Bank Card</option>
+            <option value="All">{getTranslation('allPayments', lang)}</option>
+            <option value="cash">{getTranslation('cash', lang)}</option>
+            <option value="card">{getTranslation('bankCard', lang)}</option>
           </select>
-
-          {(searchQuery || selectedCategory !== 'All' || selectedUserFilter !== 'All' || selectedPaymentFilter !== 'All') && (
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedCategory('All');
-                setSelectedUserFilter('All');
-                setSelectedPaymentFilter('All');
-              }}
-            >
-              Reset Filters
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Expense Cards List */}
-      {filteredExpenses.length === 0 ? (
-        <div className="glass-card empty-state">
-          <Receipt className="empty-icon" />
-          <div className="empty-title">No matching expenses found</div>
-          <p style={{ fontSize: '0.85rem' }}>Try clearing your active search filters or add a new expense.</p>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedCategory('All');
-              setSelectedUserFilter('All');
-              setSelectedPaymentFilter('All');
-            }}
-          >
-            Clear Active Filters
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {filteredExpenses.map((exp) => {
-            const payer = houseUsers.find((u) => u.id === exp.paidBy || u.name.toLowerCase() === exp.paidBy.toLowerCase()) || USERS[exp.paidBy] || { id: exp.paidBy, name: exp.paidBy, avatar: exp.paidBy?.charAt(0) || 'U', color: '#3b82f6' };
+      {/* Expense Items List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {filteredExpenses.length === 0 ? (
+          <div className="glass-card empty-state">
+            <FileText className="empty-icon" />
+            <div className="empty-title">No expenses found</div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Try adjusting your search query or filter parameters above.
+            </p>
+          </div>
+        ) : (
+          filteredExpenses.map((exp) => {
             const isExpanded = expandedId === exp.id;
+            const payer = houseUsers.find((u) => u.id === exp.paidBy) || USERS[exp.paidBy] || { id: exp.paidBy, name: exp.paidBy, avatar: exp.paidBy?.charAt(0) || 'U', color: '#3b82f6' };
             const pm = exp.paymentMethod;
             const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
             const commentCount = exp.comments?.length || 0;
 
             return (
-              <div
-                key={exp.id}
-                className="expense-item-card"
-                style={{ flexDirection: 'column', alignItems: 'stretch', cursor: 'pointer' }}
-                onClick={() => toggleExpand(exp.id)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-                  {/* Left Metadata */}
-                  <div className="expense-left">
-                    <UserAvatar user={payer} size={44} />
-                    <div className="expense-info-group">
+              <div key={exp.id} className="expense-item-card" onClick={() => toggleExpand(exp.id)}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <UserAvatar user={payer} size={42} />
+
+                    <div>
                       <div className="expense-title-row">
                         <span className="expense-title">{exp.title}</span>
                         <span className={`cat-pill cat-${exp.category}`}>{exp.category}</span>
-                        
+
                         {/* Payment Channel Badge */}
                         <span className="share-mini-tag" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
                           {pm?.type === 'card' ? (
                             <>
                               <CreditCard size={12} style={{ color: 'var(--accent-primary)' }} />
-                              <span>{cardObj ? `${cardObj.bankName} (${cardObj.cardType === 'debit' ? 'Debit' : 'Credit'})` : 'Bank Card'}</span>
+                              <span>{cardObj ? `${cardObj.bankName} (${cardObj.cardType === 'debit' ? 'Debit' : 'Credit'})` : pm.cardId ? getTranslation('deletedCardBadge', lang) : getTranslation('bankCard', lang)}</span>
                             </>
                           ) : (
                             <>
                               <Banknote size={12} style={{ color: 'var(--accent-emerald)' }} />
-                              <span>Cash</span>
+                              <span>{getTranslation('cash', lang)}</span>
                             </>
                           )}
                         </span>
 
-                        {/* Recurring Bill Tag */}
-                        {exp.isRecurring && (
-                          <span className="share-mini-tag" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(59, 130, 246, 0.18)', color: 'var(--accent-primary)' }}>
-                            <RefreshCw size={11} />
-                            <span style={{ textTransform: 'capitalize' }}>{exp.recurringFrequency || 'Recurring'}</span>
-                          </span>
-                        )}
-
-                        {/* Receipt Tag */}
                         {exp.receiptUrl && (
-                          <button
-                            type="button"
+                          <span
                             className="share-mini-tag"
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.18)', color: 'var(--accent-emerald)', border: 'none', cursor: 'pointer' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}
                             onClick={(e) => {
                               e.stopPropagation();
                               setPreviewReceiptUrl(exp.receiptUrl || null);
                             }}
                           >
-                            <Paperclip size={11} />
-                            <span>Receipt Photo</span>
-                          </button>
+                            <Paperclip size={12} />
+                            <span>Receipt</span>
+                          </span>
+                        )}
+
+                        {exp.isRecurring && (
+                          <span className="share-mini-tag" style={{ background: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
+                            <RefreshCw size={11} />
+                            <span>Recurring ({exp.recurringFrequency || 'monthly'})</span>
+                          </span>
                         )}
                       </div>
-                      <div className="expense-meta-row">
+
+                      <div className="expense-sub-row">
                         <span>Paid by <strong>{payer.name}</strong></span>
                         <span>•</span>
                         <span>{exp.date}</span>
                         <span>•</span>
-                        <span style={{ textTransform: 'capitalize' }}>{exp.splitMethod} Split</span>
+                        <span>Split: {exp.splitMethod}</span>
                         {commentCount > 0 && (
                           <>
                             <span>•</span>
-                            <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>💬 {commentCount} comments</span>
+                            <span style={{ color: 'var(--accent-primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <MessageSquare size={12} />
+                              {commentCount}
+                            </span>
                           </>
                         )}
-                      </div>
-                      
-                      {/* Mini Participant Share Pills */}
-                      <div className="expense-shares-list">
-                        {exp.shares.map((s) => (
-                          <span key={s.userId} className="share-mini-tag">
-                            {USERS[s.userId]?.name || s.userId}: {formatCurrency(s.amountCents)}
-                          </span>
-                        ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Actions & Amount */}
-                  <div className="expense-right">
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="expense-amount-display tabular-nums">{formatCurrency(exp.amountCents)}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {exp.shares.length} participant{exp.shares.length === 1 ? '' : 's'}
-                      </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {formatCurrency(exp.amountCents, false, lang)}
                     </div>
 
-                    <div className="expense-actions-group" onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <button
                         className="btn btn-secondary btn-icon-only"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditExpense(exp);
+                        }}
                         title="Edit expense"
-                        onClick={() => onEditExpense(exp)}
                       >
-                        <Edit size={16} />
+                        <Edit size={15} />
                       </button>
                       <button
                         className="btn btn-danger btn-icon-only"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteExpense(exp.id);
+                        }}
                         title="Delete expense"
-                        onClick={() => onDeleteExpense(exp.id)}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                       </button>
-                      <button
-                        className="btn btn-secondary btn-icon-only"
-                        onClick={() => toggleExpand(exp.id)}
-                      >
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </button>
+                      <div style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Expanded Shares Breakdown & Comment Thread */}
+                {/* Expanded Details Pane */}
                 {isExpanded && (
-                  <div
-                    style={{
-                      marginTop: '16px',
-                      paddingTop: '16px',
-                      borderTop: '1px solid var(--border-subtle)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px',
-                    }}
-                  >
-                    {exp.notes && (
-                      <div
-                        style={{
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)',
-                          backgroundColor: 'var(--bg-input)',
-                          padding: '10px 14px',
-                          borderRadius: 'var(--radius-sm)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                        }}
-                      >
-                        <FileText size={16} style={{ color: 'var(--text-muted)' }} />
-                        <span><strong>Notes:</strong> {exp.notes}</span>
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Detailed Share Allocation
+                  <div className="expense-expand-pane" onClick={(e) => e.stopPropagation()}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                      Participant Split Breakdown ({exp.shares.length} Members)
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '14px' }}>
                       {exp.shares.map((share) => {
-                        const user = USERS[share.userId] || { id: share.userId, name: share.userId, avatar: share.userId?.charAt(0) || 'U', color: '#3b82f6' };
+                        const user = houseUsers.find((u) => u.id === share.userId) || USERS[share.userId] || { id: share.userId, name: share.userId, avatar: share.userId?.charAt(0) || 'U', color: '#3b82f6' };
                         return (
                           <div
                             key={share.userId}
@@ -394,7 +326,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                               <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{user.name}</span>
                             </div>
                             <span className="tabular-nums" style={{ fontSize: '0.95rem', fontWeight: 800 }}>
-                              {formatCurrency(share.amountCents)}
+                              {formatCurrency(share.amountCents, false, lang)}
                             </span>
                           </div>
                         );
@@ -413,13 +345,30 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                           {exp.comments.map((c) => {
                             const commenter = houseUsers.find((u) => u.id === c.userId || u.name.toLowerCase() === c.userId.toLowerCase()) || USERS[c.userId] || { id: c.userId, name: c.userId, avatar: c.userId?.charAt(0) || 'U', color: '#3b82f6' };
+                            const isMyComment = c.userId === activeUserId || c.userId === dbUserProfile?.uid;
+
                             return (
                               <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
                                 <UserAvatar user={commenter} size={22} />
                                 <div style={{ flex: 1, fontSize: '0.82rem' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
                                     <strong style={{ color: 'var(--text-primary)' }}>{commenter.name}</strong>
-                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{c.createdAt ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{c.createdAt ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                      {isMyComment && onDeleteComment && (
+                                        <button
+                                          type="button"
+                                          style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', padding: '2px' }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDeleteComment(exp.id, c.id);
+                                          }}
+                                          title={getTranslation('deleteComment', lang)}
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <div style={{ color: 'var(--text-secondary)' }}>{c.text}</div>
                                 </div>
@@ -439,7 +388,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                           type="text"
                           className="form-input"
                           style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                          placeholder="Type a comment or question..."
+                          placeholder={getTranslation('addComment', lang)}
                           value={newCommentText[exp.id] || ''}
                           onChange={(e) => setNewCommentText({ ...newCommentText, [exp.id]: e.target.value })}
                           onKeyDown={(e) => {
@@ -452,7 +401,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                           onClick={() => handleSendComment(exp.id)}
                         >
                           <Send size={14} />
-                          <span>Post</span>
+                          <span>{getTranslation('postComment', lang)}</span>
                         </button>
                       </div>
                     </div>
@@ -460,23 +409,21 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                 )}
               </div>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
 
-      {/* Receipt Image Preview Modal */}
+      {/* Receipt Photo Modal Preview */}
       {previewReceiptUrl && (
         <div className="modal-overlay" onClick={() => setPreviewReceiptUrl(null)}>
-          <div className="modal-card" style={{ maxWidth: '520px', padding: '20px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title" style={{ fontSize: '1.1rem' }}>Attached Receipt Photo</h2>
+          <div className="modal-card" style={{ maxWidth: '560px', padding: '16px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ marginBottom: '12px' }}>
+              <h3 className="modal-title">Receipt Photo Preview</h3>
               <button className="close-btn" onClick={() => setPreviewReceiptUrl(null)}>
                 <X size={18} />
               </button>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0' }}>
-              <img src={previewReceiptUrl} alt="Receipt Full View" style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 'var(--radius-md)', objectFit: 'contain' }} />
-            </div>
+            <img src={previewReceiptUrl} alt="Receipt" style={{ width: '100%', maxHeight: '480px', objectFit: 'contain', borderRadius: '8px' }} />
           </div>
         </div>
       )}

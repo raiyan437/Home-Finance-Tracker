@@ -18,7 +18,13 @@ import {
   Edit3,
 } from 'lucide-react';
 
-export const SettingsView: React.FC = () => {
+import type { Language } from '../utils/i18n';
+
+interface SettingsViewProps {
+  lang?: Language;
+}
+
+export const SettingsView: React.FC<SettingsViewProps> = () => {
   const {
     firebaseUser,
     dbUserProfile,

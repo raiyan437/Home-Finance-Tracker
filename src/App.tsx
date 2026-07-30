@@ -101,6 +101,51 @@ const AppContent: React.FC = () => {
     };
   }, [currentHouse?.id]);
 
+  // Automated Recurring Expense Generator Engine
+  useEffect(() => {
+    if (expenses.length === 0) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newGeneratedExpenses: Expense[] = [];
+
+    expenses.forEach((exp) => {
+      if (!exp.isRecurring) return;
+      const lastGen = exp.lastGeneratedDate || exp.date;
+      const freq = exp.recurringFrequency || 'monthly';
+
+      const lastDateObj = new Date(lastGen);
+      if (isNaN(lastDateObj.getTime())) return;
+
+      const nextDateObj = new Date(lastDateObj);
+      if (freq === 'weekly') {
+        nextDateObj.setDate(nextDateObj.getDate() + 7);
+      } else {
+        nextDateObj.setMonth(nextDateObj.getMonth() + 1);
+      }
+
+      const nextDateStr = nextDateObj.toISOString().split('T')[0];
+      if (nextDateStr <= todayStr && lastGen !== todayStr) {
+        const now = new Date().toISOString();
+        const cloned: Expense = {
+          ...exp,
+          id: `exp-recur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          date: nextDateStr,
+          lastGeneratedDate: nextDateStr,
+          createdAt: now,
+          updatedAt: now,
+        };
+        exp.lastGeneratedDate = nextDateStr;
+        newGeneratedExpenses.push(cloned);
+      }
+    });
+
+    if (newGeneratedExpenses.length > 0) {
+      const updated = [...newGeneratedExpenses, ...expenses];
+      setExpenses(updated);
+      saveExpenses(updated);
+      newGeneratedExpenses.forEach((e) => syncSaveExpense(e, currentHouse?.id));
+    }
+  }, [expenses.length]);
+
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
@@ -225,6 +270,29 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // Delete Comment Handler
+  const handleDeleteComment = (expenseId: string, commentId: string) => {
+    const now = new Date().toISOString();
+    let updatedExp: Expense | undefined;
+    const updated = expenses.map((e) => {
+      if (e.id === expenseId && e.comments) {
+        updatedExp = {
+          ...e,
+          comments: e.comments.filter((c) => c.id !== commentId),
+          updatedAt: now,
+        };
+        return updatedExp;
+      }
+      return e;
+    });
+
+    setExpenses(updated);
+    saveExpenses(updated);
+    if (updatedExp) {
+      syncSaveExpense(updatedExp, currentHouse?.id);
+    }
+  };
+
   // Save Card Handler
   const handleSaveCard = (cardData: Omit<PaymentCard, 'id' | 'createdAt'>, editingId?: string) => {
     const now = new Date().toISOString();
@@ -252,16 +320,33 @@ const AppContent: React.FC = () => {
     syncSaveCard(targetCard, currentHouse?.id);
   };
 
-  // Delete Card Handler
+  // Delete Card Handler with expense cascade handling
   const handleDeleteCard = (cardId: string) => {
-    const updated = cards.filter((c) => c.id !== cardId);
-    setCards(updated);
-    saveCards(updated);
+    const updatedCards = cards.filter((c) => c.id !== cardId);
+    setCards(updatedCards);
+    saveCards(updatedCards);
     syncDeleteCard(cardId);
+
+    // Scrub or switch linked expenses to cash
+    const updatedExpenses = expenses.map((e) => {
+      if (e.paymentMethod?.type === 'card' && e.paymentMethod.cardId === cardId) {
+        const updatedExp = {
+          ...e,
+          paymentMethod: { type: 'cash' as const },
+          updatedAt: new Date().toISOString(),
+        };
+        syncSaveExpense(updatedExp, currentHouse?.id);
+        return updatedExp;
+      }
+      return e;
+    });
+
+    setExpenses(updatedExpenses);
+    saveExpenses(updatedExpenses);
   };
 
   // Mark Settlement as Paid handler
-  const handleMarkSettledConfirm = () => {
+  const handleMarkSettledConfirm = (proofUrl?: string) => {
     if (!pendingSettlementTx) return;
 
     const now = new Date().toISOString();
@@ -271,6 +356,7 @@ const AppContent: React.FC = () => {
       toUserId: pendingSettlementTx.toUser.id,
       amountCents: pendingSettlementTx.amountCents,
       status: 'completed',
+      proofUrl,
       houseId: currentHouse?.id,
       createdAt: now,
       settledAt: now,
@@ -284,11 +370,44 @@ const AppContent: React.FC = () => {
     setPendingSettlementTx(null);
   };
 
-  // Reset Demo Data handler
+  // Reverse Settlement Handler
+  const handleReverseSettlement = (settlementId: string) => {
+    let targetSt: Settlement | undefined;
+    const now = new Date().toISOString();
+    const updated = settlements.map((st) => {
+      if (st.id === settlementId) {
+        targetSt = {
+          ...st,
+          status: 'reversed' as const,
+          reversedAt: now,
+          reversedBy: activeUserId,
+        };
+        return targetSt;
+      }
+      return st;
+    });
+
+    setSettlements(updated);
+    saveSettlements(updated);
+    if (targetSt) {
+      syncSaveSettlement(targetSt, currentHouse?.id);
+    }
+  };
+
+  // Reset Demo Data handler with Cloud Firestore clearing & re-seeding
   const handleResetDataConfirm = () => {
+    expenses.forEach((e) => syncDeleteExpense(e.id));
+    cards.forEach((c) => syncDeleteCard(c.id));
+
     const seed = resetToSeedData();
     setExpenses(seed.expenses);
     setSettlements(seed.settlements);
+    setCards(seed.cards || []);
+
+    seed.expenses.forEach((e) => syncSaveExpense(e, currentHouse?.id));
+    seed.settlements.forEach((s) => syncSaveSettlement(s, currentHouse?.id));
+    (seed.cards || []).forEach((c) => syncSaveCard(c, currentHouse?.id));
+
     setIsResetConfirmOpen(false);
   };
 
@@ -335,6 +454,7 @@ const AppContent: React.FC = () => {
               settlements={houseSettlements}
               onNavigateToExpenses={() => setActiveTab('expenses')}
               onNavigateToSettlement={() => setActiveTab('settlement')}
+              lang={lang}
             />
           )}
 
@@ -352,6 +472,8 @@ const AppContent: React.FC = () => {
               }}
               onDeleteExpense={(id) => setDeletingExpenseId(id)}
               onAddComment={handleAddComment}
+              onDeleteComment={handleDeleteComment}
+              lang={lang}
             />
           )}
 
@@ -360,6 +482,8 @@ const AppContent: React.FC = () => {
               expenses={householdExpenses}
               settlements={houseSettlements}
               onMarkSettled={(tx: SimplifiedTransaction) => setPendingSettlementTx(tx)}
+              onReverseSettlement={handleReverseSettlement}
+              lang={lang}
             />
           )}
 
@@ -369,6 +493,7 @@ const AppContent: React.FC = () => {
               cards={cards}
               onSaveExpense={handleSaveExpense}
               onDeleteExpense={(id) => setDeletingExpenseId(id)}
+              lang={lang}
             />
           )}
 
@@ -378,14 +503,15 @@ const AppContent: React.FC = () => {
               expenses={expenses}
               onAddCard={handleSaveCard}
               onDeleteCard={handleDeleteCard}
+              lang={lang}
             />
           )}
 
           {activeTab === 'monthly' && (
-            <MonthlySummary expenses={householdExpenses} settlements={houseSettlements} />
+            <MonthlySummary expenses={householdExpenses} settlements={houseSettlements} lang={lang} />
           )}
 
-          {activeTab === 'settings' && <SettingsView />}
+          {activeTab === 'settings' && <SettingsView lang={lang} />}
         </Suspense>
       </main>
 
@@ -399,6 +525,7 @@ const AppContent: React.FC = () => {
         onSaveExpense={handleSaveExpense}
         initialExpense={editingExpense}
         cards={cards}
+        lang={lang}
       />
 
       {/* Delete Expense Confirm Modal */}
@@ -435,7 +562,7 @@ const AppContent: React.FC = () => {
             : ''
         }
         confirmText="Confirm Payment"
-        onConfirm={handleMarkSettledConfirm}
+        onConfirm={() => handleMarkSettledConfirm()}
         onClose={() => setPendingSettlementTx(null)}
       />
     </div>

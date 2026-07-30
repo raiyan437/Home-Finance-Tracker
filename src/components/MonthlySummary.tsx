@@ -8,12 +8,15 @@ import { CategoryChart } from './CategoryChart';
 import { UserAvatar } from './UserAvatar';
 import { Calendar, Users, Download } from 'lucide-react';
 
+import type { Language } from '../utils/i18n';
+
 interface MonthlySummaryProps {
   expenses: Expense[];
   settlements: Settlement[];
+  lang?: Language;
 }
 
-export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settlements }) => {
+export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settlements, lang = 'en' }) => {
   const { currentHouse, dbUserProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
@@ -104,7 +107,7 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settle
           Total Spending — {formattedMonthLabel}
         </div>
         <div className="tabular-nums" style={{ fontSize: '2.6rem', fontWeight: 800, marginTop: '8px' }}>
-          {formatCurrency(totalMonthSpentCents)}
+          {formatCurrency(totalMonthSpentCents, false, lang)}
         </div>
         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
           Across {monthExpenses.length} transactions logged in this billing period

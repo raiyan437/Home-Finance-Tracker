@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { USERS } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
+import { ConfirmModal } from './ConfirmModal';
+import type { Language } from '../utils/i18n';
+import { getTranslation } from '../utils/i18n';
 import { CreditCard, Plus, Trash2, Edit, X, ShieldCheck, Wallet, Landmark } from 'lucide-react';
 
 interface CardsManagerProps {
@@ -11,6 +14,7 @@ interface CardsManagerProps {
   expenses: Expense[];
   onAddCard: (card: Omit<PaymentCard, 'id' | 'createdAt'>, editingId?: string) => void;
   onDeleteCard: (cardId: string) => void;
+  lang?: Language;
 }
 
 export const CARD_COLOR_PRESETS = [
@@ -30,11 +34,13 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
   expenses,
   onAddCard,
   onDeleteCard,
+  lang = 'en',
 }) => {
   const { userProfile, activeUserId } = useAuth();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<PaymentCard | null>(null);
+  const [deletingCard, setDeletingCard] = useState<PaymentCard | null>(null);
   const [bankName, setBankName] = useState('');
   const [cardType, setCardType] = useState<'credit' | 'debit'>('credit');
   const [selectedColor, setSelectedColor] = useState(CARD_COLOR_PRESETS[0].value);
@@ -71,6 +77,18 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
     setIsModalOpen(true);
   };
 
+  const handleDeleteClick = (card: PaymentCard) => {
+    const linkedCount = expenses.filter(
+      (e) => e.paymentMethod?.type === 'card' && e.paymentMethod.cardId === card.id
+    ).length;
+
+    if (linkedCount > 0) {
+      setDeletingCard(card);
+    } else {
+      onDeleteCard(card.id);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!bankName.trim()) return;
@@ -96,7 +114,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <CreditCard size={28} style={{ color: 'var(--accent-primary)' }} />
             <div>
-              <h1 className="page-title">Payment Cards & Wallets</h1>
+              <h1 className="page-title">{getTranslation('paymentCards', lang)}</h1>
               <p className="page-description">
                 Manage bank credit/debit cards to track payment channels for household & personal outlays
               </p>
@@ -179,7 +197,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
                       <button
                         className="btn btn-secondary btn-icon-only"
                         style={{ background: 'rgba(244, 63, 94, 0.3)', border: 'none', color: 'white' }}
-                        onClick={() => onDeleteCard(card.id)}
+                        onClick={() => handleDeleteClick(card)}
                         title="Delete card"
                       >
                         <Trash2 size={15} />
@@ -205,7 +223,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
                         Total Tracked Outlay
                       </div>
                       <div className="tabular-nums" style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                        {formatCurrency(spentCents)}
+                        {formatCurrency(spentCents, false, lang)}
                       </div>
                     </div>
 
@@ -217,6 +235,28 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
           </div>
         )}
       </div>
+
+      {/* Delete Card Confirmation Notice Modal */}
+      <ConfirmModal
+        isOpen={!!deletingCard}
+        title={getTranslation('confirmDeleteCard', lang)}
+        message={
+          deletingCard
+            ? `Card "${deletingCard.bankName}" is linked to ${
+                expenses.filter((e) => e.paymentMethod?.type === 'card' && e.paymentMethod.cardId === deletingCard.id).length
+              } expense record(s). Deleting it will mark historical transaction badges as (Deleted Card). Proceed?`
+            : ''
+        }
+        confirmText="Delete Card"
+        variant="danger"
+        onConfirm={() => {
+          if (deletingCard) {
+            onDeleteCard(deletingCard.id);
+            setDeletingCard(null);
+          }
+        }}
+        onClose={() => setDeletingCard(null)}
+      />
 
       {/* Add / Edit Card Modal */}
       {isModalOpen && (

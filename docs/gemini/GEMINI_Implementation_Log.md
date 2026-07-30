@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-29  
-**Current Status**: Single User Fallback Resolution & Roster Dynamic Scoping Complete  
+**Current Status**: Business Logic Audit & Feature Specifications Complete  
 
 ---
 
@@ -244,3 +244,11 @@
   * Refactored `getHouseUsers(currentHouse, dbUserProfile)` so that when a user is not in any house (`currentHouse` is `null`), `getHouseUsers` returns **ONLY that user** (e.g. `[Himel]`), instead of defaulting to all users.
 * **Component Integration Across All Views**:
   * Updated `App.tsx`, `Dashboard.tsx`, `SettlementView.tsx`, `ExpenseList.tsx`, `MonthlySummary.tsx`, `CategoryChart.tsx`, and `AddExpenseModal.tsx` to pass `dbUserProfile` to `getHouseUsers`.
+
+### 2026-07-30: Comprehensive Business Logic Audit & Specification
+* **Project Analysis & Audit**:
+  * Audited codebase for broken business logic, data desynchronization bugs, algorithmic edge cases, and missing features.
+* **Created Documentation (`docs/gemini/GEMINI_Business_Logic_Analysis.md`)**:
+  * Detailed 10 critical broken business logics (ID mismatch, desynced resets, percentage rounding, irreversible settlements, personal scope leakage, un-generated recurring bills, kicked member balance distortion, unpersisted budgets, deleted card references, incomplete i18n).
+  * Formulated 8 proposed new business logic modules (Settlement Reversals, Automated Recurring Generators, Legacy Member Debt Ledgers, Card Credit Limit Trackers, Proof of Payment Attachments, etc.).
+

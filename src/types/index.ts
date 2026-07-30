@@ -92,6 +92,7 @@ export interface Expense {
   paymentMethod?: PaymentMethodInfo; // Cash vs specific Card
   isRecurring?: boolean;
   recurringFrequency?: RecurringFrequency;
+  lastGeneratedDate?: string; // YYYY-MM-DD format of last generated recurring instance
   receiptUrl?: string; // Base64 data URL or photo link
   comments?: ExpenseComment[];
   notes?: string;
@@ -104,7 +105,10 @@ export interface Settlement {
   fromUserId: UserId; // Payer of debt
   toUserId: UserId;   // Recipient of debt
   amountCents: number;
-  status: 'completed';
+  status: 'completed' | 'reversed';
+  reversedAt?: string;
+  reversedBy?: string;
+  proofUrl?: string;  // Image URL/base64 of payment receipt (bKash/Nagad/bank slip)
   houseId?: string;
   createdAt: string;
   settledAt: string;
@@ -136,4 +140,9 @@ export interface MonthlyStats {
 export interface PersonalBudget {
   userId: UserId;
   monthlyLimitCents: number;
+}
+
+export interface CategoryBudget {
+  category: Category;
+  limitCents: number;
 }

@@ -14,14 +14,37 @@ export const centsToDollars = (cents: number): number => {
   return cents / 100;
 };
 
-export const formatCurrency = (cents: number, includeSign = false): string => {
+export const toBengaliDigits = (str: string): string => {
+  const bnDigits: Record<string, string> = {
+    '0': '০',
+    '1': '১',
+    '2': '২',
+    '3': '৩',
+    '4': '৪',
+    '5': '৫',
+    '6': '৬',
+    '7': '৭',
+    '8': '৮',
+    '9': '৯',
+  };
+  return str.replace(/[0-9]/g, (digit) => bnDigits[digit] || digit);
+};
+
+export const formatCurrency = (
+  cents: number,
+  includeSign = false,
+  language: 'en' | 'bn' = 'en'
+): string => {
   const amount = cents / 100;
   const absValue = Math.abs(amount).toLocaleString('en-BD', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
-  const formattedStr = `৳${absValue}`;
+  let formattedStr = `৳${absValue}`;
+  if (language === 'bn') {
+    formattedStr = `৳${toBengaliDigits(absValue)}`;
+  }
 
   if (includeSign && cents > 0) {
     return `+${formattedStr}`;
@@ -33,7 +56,7 @@ export const formatCurrency = (cents: number, includeSign = false): string => {
 
 /**
  * Calculates equal splits for a total amount in cents among N participants.
- * Handles remainder cents deterministically.
+ * Handles remainder cents deterministically by allocating 1 extra cent to first R participants.
  */
 export const calculateEqualSplits = (
   totalCents: number,
@@ -47,7 +70,6 @@ export const calculateEqualSplits = (
 
   const result: Record<string, number> = {};
   participantUserIds.forEach((userId) => {
-    // Distribute remainder cents 1 by 1
     const extra = remainder > 0 ? 1 : 0;
     if (remainder > 0) remainder -= 1;
     result[userId] = baseShare + extra;
@@ -73,27 +95,45 @@ export const validateCustomSplits = (
 
 /**
  * Calculates percentage splits into integer cents.
+ * Automatically normalizes floating percentage inputs (e.g. 33.3% + 33.3% + 33.3% = 99.9%)
+ * within a 0.5% tolerance and uses deterministic remainder distribution.
  */
 export const calculatePercentageSplits = (
   totalCents: number,
   percentages: Record<string, number>
 ): { shares: Record<string, number>; is100Percent: boolean } => {
-  const totalPercent = Object.values(percentages).reduce((a, b) => a + b, 0);
-  const is100Percent = Math.abs(totalPercent - 100) < 0.01;
+  let totalPercent = Object.values(percentages).reduce((a, b) => a + b, 0);
+  const is100Percent = Math.abs(totalPercent - 100) <= 0.5;
 
-  let assignedCents = 0;
+  const normalized: Record<string, number> = {};
+  const userIds = Object.keys(percentages);
+
+  if (is100Percent && totalPercent !== 100 && totalPercent > 0) {
+    userIds.forEach((u) => {
+      normalized[u] = (percentages[u] / totalPercent) * 100;
+    });
+  } else {
+    userIds.forEach((u) => {
+      normalized[u] = percentages[u];
+    });
+  }
+
+  const rawShares: Record<string, number> = {};
+  let totalAssigned = 0;
+
+  userIds.forEach((u) => {
+    const cents = Math.floor((totalCents * (normalized[u] || 0)) / 100);
+    rawShares[u] = cents;
+    totalAssigned += cents;
+  });
+
+  let remainder = totalCents - totalAssigned;
   const shares: Record<string, number> = {};
-  const entries = Object.entries(percentages);
 
-  entries.forEach(([userId, percent], index) => {
-    if (index === entries.length - 1) {
-      // Last participant receives exact remainder to match totalCents
-      shares[userId] = Math.max(0, totalCents - assignedCents);
-    } else {
-      const shareCents = Math.round((totalCents * percent) / 100);
-      shares[userId] = shareCents;
-      assignedCents += shareCents;
-    }
+  userIds.forEach((u) => {
+    const extra = remainder > 0 ? 1 : 0;
+    if (remainder > 0) remainder -= 1;
+    shares[u] = rawShares[u] + extra;
   });
 
   return { shares, is100Percent };

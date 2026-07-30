@@ -1,27 +1,31 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Expense, Category, PaymentCard, PaymentMethodType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency, dollarsToCents } from '../utils/currency';
-import { USERS } from '../utils/settlementEngine';
-import { UserAvatar } from './UserAvatar';
-import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, PieChart, CreditCard, Banknote, Calendar } from 'lucide-react';
+import type { Language } from '../utils/i18n';
+import { getTranslation } from '../utils/i18n';
+import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, CreditCard, Banknote, Calendar, AlertTriangle } from 'lucide-react';
 
 interface PersonalWalletProps {
   expenses: Expense[];
   cards?: PaymentCard[];
   onSaveExpense: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>, editingId?: string) => void;
   onDeleteExpense: (expenseId: string) => void;
+  lang?: Language;
 }
 
 const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
+const BUDGET_STORAGE_KEY = 'home_finance_personal_budget_v1';
+const CAT_BUDGET_STORAGE_KEY = 'home_finance_category_budgets_v1';
 
 export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   expenses,
   cards = [],
   onSaveExpense,
   onDeleteExpense,
+  lang = 'en',
 }) => {
-  const { userProfile, activeUserId } = useAuth();
+  const { activeUserId } = useAuth();
 
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -36,6 +40,40 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   const [paymentType, setPaymentType] = useState<PaymentMethodType>('cash');
   const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [notes, setNotes] = useState('');
+
+  // Persistent budget target (৳15,000.00 default)
+  const [monthlyBudgetTaka, setMonthlyBudgetTaka] = useState<string>(() => {
+    return localStorage.getItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`) || '15000.00';
+  });
+
+  // Persistent category monthly budget limits (in Taka strings)
+  const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${activeUserId}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (err) {
+        // Fallback
+      }
+    }
+    return {
+      Groceries: '8000',
+      Household: '5000',
+      Utilities: '4000',
+      Food: '6000',
+      Personal: '5000',
+      Other: '3000',
+    };
+  });
+
+  // Save budget targets to localStorage
+  useEffect(() => {
+    localStorage.setItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`, monthlyBudgetTaka);
+  }, [monthlyBudgetTaka, activeUserId]);
+
+  useEffect(() => {
+    localStorage.setItem(`${CAT_BUDGET_STORAGE_KEY}_${activeUserId}`, JSON.stringify(categoryBudgets));
+  }, [categoryBudgets, activeUserId]);
 
   const userCards = useMemo(() => {
     return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
@@ -52,7 +90,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   // Filter personal expenses belonging strictly to the active user
   const personalExpenses = useMemo(() => {
     return expenses
-      .filter((e) => e.scope === 'personal' && e.ownerId === activeUserId)
+      .filter((e) => e.scope === 'personal' && (e.ownerId === activeUserId || e.paidBy === activeUserId))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [expenses, activeUserId]);
 
@@ -76,9 +114,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   // Totals
   const totalPersonalSpentCents = monthPersonalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
-  // Default personal monthly budget target ($500.00)
-  const [monthlyBudgetDollars, setMonthlyBudgetDollars] = useState('500.00');
-  const monthlyBudgetCents = dollarsToCents(monthlyBudgetDollars);
+  const monthlyBudgetCents = dollarsToCents(monthlyBudgetTaka);
   const budgetRatioPercent = monthlyBudgetCents > 0 ? Math.min(100, (totalPersonalSpentCents / monthlyBudgetCents) * 100) : 0;
 
   // Category breakdown
@@ -143,15 +179,15 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      {/* Header */}
+      {/* Header Banner */}
       <div className="page-header">
         <div className="page-title-group">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <UserAvatar user={userProfile} size={40} />
+            <Wallet size={28} style={{ color: 'var(--accent-purple)' }} />
             <div>
-              <h1 className="page-title">{userProfile.name}'s Personal Wallet</h1>
+              <h1 className="page-title">{getTranslation('personalWallet', lang)}</h1>
               <p className="page-description">
-                Private money tracker — expenses logged here do not affect household debt settlements
+                Private individual budget tracker for personal purchases (not shared with housemates)
               </p>
             </div>
           </div>
@@ -159,28 +195,8 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
         <button className="btn btn-primary" onClick={() => handleOpenAdd()}>
           <Plus size={18} />
-          <span>Add Personal Expense</span>
+          <span>Log Personal Expense</span>
         </button>
-      </div>
-
-      {/* Privacy Notice Banner */}
-      <div
-        className="glass-card"
-        style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 182, 212, 0.12))',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '14px',
-        }}
-      >
-        <ShieldCheck size={28} style={{ color: 'var(--accent-emerald)', flexShrink: 0 }} />
-        <div>
-          <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>Strict Personal Privacy Active</h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            These records are stored exclusively under <strong>{userProfile.name}'s account</strong>. Other housemates cannot view or balance against your personal wallet.
-          </p>
-        </div>
       </div>
 
       {/* Hero Stats & Budget Grid */}
@@ -190,7 +206,6 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
           <div className="summary-card-header" style={{ alignItems: 'flex-start' }}>
             <div>
               <span className="summary-title">Monthly Personal Outlay</span>
-              {/* Calendar Icon + Month/Year Selector */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
                 <Calendar size={15} style={{ color: 'var(--accent-purple)' }} />
                 <select
@@ -226,7 +241,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
           </div>
 
           <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-purple)', marginTop: '12px' }}>
-            {formatCurrency(totalPersonalSpentCents)}
+            {formatCurrency(totalPersonalSpentCents, false, lang)}
           </div>
           <div className="summary-footer">
             <span>{monthPersonalExpenses.length} personal purchases logged for this month</span>
@@ -236,7 +251,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
         {/* Monthly Budget Target */}
         <div className="glass-card summary-card">
           <div className="summary-card-header">
-            <span className="summary-title">Monthly Budget Target</span>
+            <span className="summary-title">{getTranslation('monthlyBudgetTarget', lang)}</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
               <ShieldCheck size={20} />
             </div>
@@ -245,136 +260,171 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
             <span className="tabular-nums" style={{ fontSize: '1.85rem', fontWeight: 800 }}>৳</span>
             <input
               type="number"
-              step="10"
+              step="100"
               className="form-input tabular-nums"
-              style={{ fontSize: '1.5rem', fontWeight: 800, padding: '4px 8px', width: '130px' }}
-              value={monthlyBudgetDollars}
-              onChange={(e) => setMonthlyBudgetDollars(e.target.value)}
+              style={{ fontSize: '1.5rem', fontWeight: 800, padding: '4px 8px', width: '150px' }}
+              value={monthlyBudgetTaka}
+              onChange={(e) => setMonthlyBudgetTaka(e.target.value)}
             />
           </div>
 
           <div style={{ marginTop: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              <span>Budget Used</span>
+              <span>{getTranslation('budgetUsed', lang)}</span>
               <span>{budgetRatioPercent.toFixed(0)}%</span>
             </div>
-            <div className="progress-bar-container">
+
+            <div className="progress-bar-bg" style={{ height: '8px' }}>
               <div
                 className="progress-bar-fill"
                 style={{
                   width: `${budgetRatioPercent}%`,
-                  backgroundColor: budgetRatioPercent > 90 ? 'var(--accent-rose)' : 'var(--accent-primary)',
+                  backgroundColor:
+                    budgetRatioPercent >= 100
+                      ? 'var(--accent-rose)'
+                      : budgetRatioPercent >= 80
+                      ? 'var(--accent-amber)'
+                      : 'var(--accent-emerald)',
                 }}
               />
             </div>
+
+            {budgetRatioPercent >= 80 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.75rem', color: budgetRatioPercent >= 100 ? 'var(--accent-rose)' : 'var(--accent-amber)', fontWeight: 700 }}>
+                <AlertTriangle size={14} />
+                <span>{budgetRatioPercent >= 100 ? getTranslation('overBudgetWarning', lang) : getTranslation('nearBudgetWarning', lang)}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Category Breakdown */}
+      {/* Per-Category Monthly Budget Threshold Limits Grid */}
       <div className="glass-card">
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <PieChart size={18} style={{ color: 'var(--accent-primary)' }} />
-          <span>Personal Spend Distribution</span>
-        </h2>
+        <h3 className="section-title" style={{ marginBottom: '14px' }}>
+          {getTranslation('categoryBudgets', lang)}
+        </h3>
 
-        {Object.keys(categoryTotals).length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '24px' }}>
-            No personal expenses recorded for the selected month.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {Object.entries(categoryTotals).map(([cat, amount]) => {
-              const pct = totalPersonalSpentCents > 0 ? (amount / totalPersonalSpentCents) * 100 : 0;
-              return (
-                <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', fontWeight: 700 }}>
-                    <span>{cat}</span>
-                    <span className="tabular-nums">{formatCurrency(amount)} ({pct.toFixed(1)}%)</span>
-                  </div>
-                  <div className="chart-bar-track">
-                    <div
-                      className="chart-bar-fill"
-                      style={{
-                        width: `${pct}%`,
-                        backgroundColor: 'var(--accent-purple)',
-                      }}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+          {CATEGORIES.map((cat) => {
+            const spentCents = categoryTotals[cat] || 0;
+            const limitStr = categoryBudgets[cat] || '5000';
+            const limitCents = dollarsToCents(limitStr);
+            const ratio = limitCents > 0 ? Math.min(100, (spentCents / limitCents) * 100) : 0;
+
+            return (
+              <div
+                key={cat}
+                style={{
+                  backgroundColor: 'var(--bg-input)',
+                  padding: '14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: ratio >= 100 ? '1px solid var(--accent-rose)' : ratio >= 80 ? '1px solid var(--accent-amber)' : '1px solid var(--border-subtle)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{cat}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Limit: ৳</span>
+                    <input
+                      type="number"
+                      step="100"
+                      className="form-input tabular-nums"
+                      style={{ width: '80px', padding: '2px 6px', fontSize: '0.8rem' }}
+                      value={limitStr}
+                      onChange={(e) => setCategoryBudgets({ ...categoryBudgets, [cat]: e.target.value })}
                     />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
+                  <span>Spent: <strong>{formatCurrency(spentCents, false, lang)}</strong></span>
+                  <span style={{ fontWeight: 700, color: ratio >= 100 ? 'var(--accent-rose)' : ratio >= 80 ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>
+                    {ratio.toFixed(0)}%
+                  </span>
+                </div>
+
+                <div className="progress-bar-bg" style={{ height: '6px' }}>
+                  <div
+                    className="progress-bar-fill"
+                    style={{
+                      width: `${ratio}%`,
+                      backgroundColor:
+                        ratio >= 100
+                          ? 'var(--accent-rose)'
+                          : ratio >= 80
+                          ? 'var(--accent-amber)'
+                          : 'var(--accent-primary)',
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Personal Expense Ledger */}
-      <div>
-        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '16px' }}>Personal Purchases</h2>
+      {/* History List */}
+      <div className="glass-card">
+        <h3 className="section-title" style={{ marginBottom: '16px' }}>
+          Personal Purchase Audit History
+        </h3>
 
         {monthPersonalExpenses.length === 0 ? (
-          <div className="glass-card empty-state">
-            <Wallet className="empty-icon" />
-            <div className="empty-title">No Personal Expenses For Selected Month</div>
-            <p style={{ fontSize: '0.85rem' }}>Log your private expenses here to manage personal budgets independently.</p>
-            <button className="btn btn-primary" onClick={() => handleOpenAdd()}>
-              <Plus size={16} /> Add Personal Expense
-            </button>
+          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+            No personal purchases logged for {selectedMonth}. Click "Log Personal Expense" above to add one.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {monthPersonalExpenses.map((exp) => {
-              const pm = exp.paymentMethod;
-              const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
+              const cardObj = exp.paymentMethod?.cardId ? cardsMap[exp.paymentMethod.cardId] : null;
 
               return (
-                <div key={exp.id} className="expense-item-card">
-                  <div className="expense-left">
-                    <UserAvatar user={userProfile} size={42} />
-                    <div className="expense-info-group">
-                      <div className="expense-title-row">
-                        <span className="expense-title">{exp.title}</span>
-                        <span className={`cat-pill cat-${exp.category}`}>{exp.category}</span>
-
-                        {/* Payment Channel Badge */}
-                        <span className="share-mini-tag" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
-                          {pm?.type === 'card' ? (
-                            <>
-                              <CreditCard size={12} style={{ color: 'var(--accent-primary)' }} />
-                              <span>{cardObj ? `${cardObj.bankName} (${cardObj.cardType === 'debit' ? 'Debit' : 'Credit'})` : 'Bank Card'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Banknote size={12} style={{ color: 'var(--accent-emerald)' }} />
-                              <span>Cash</span>
-                            </>
-                          )}
-                        </span>
-                      </div>
-                      <div className="expense-meta-row">
+                <div
+                  key={exp.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '14px 18px',
+                    backgroundColor: 'var(--bg-input)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div className={`cat-pill cat-${exp.category}`} style={{ fontSize: '0.75rem' }}>
+                      {exp.category}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.98rem' }}>{exp.title}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{exp.date}</span>
-                        {exp.notes && (
-                          <>
-                            <span>•</span>
-                            <span>{exp.notes}</span>
-                          </>
+                        {exp.paymentMethod?.type === 'card' ? (
+                          <span style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <CreditCard size={12} />
+                            {cardObj ? cardObj.bankName : getTranslation('deletedCardBadge', lang)}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Banknote size={12} />
+                            Cash
+                          </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="expense-right">
-                    <div className="expense-amount-display tabular-nums" style={{ color: 'var(--accent-purple)' }}>
-                      {formatCurrency(exp.amountCents)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-purple)' }}>
+                      {formatCurrency(exp.amountCents, false, lang)}
                     </div>
-                    <div className="expense-actions-group">
-                      <button className="btn btn-secondary btn-icon-only" onClick={() => handleOpenAdd(exp)}>
-                        <Edit size={16} />
-                      </button>
-                      <button className="btn btn-danger btn-icon-only" onClick={() => onDeleteExpense(exp.id)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                    <button className="btn btn-secondary btn-icon-only" onClick={() => handleOpenAdd(exp)} title="Edit">
+                      <Edit size={14} />
+                    </button>
+                    <button className="btn btn-danger btn-icon-only" onClick={() => onDeleteExpense(exp.id)} title="Delete">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               );
@@ -386,9 +436,9 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
       {/* Add / Edit Personal Expense Modal */}
       {isAddModalOpen && (
         <div className="modal-overlay" onClick={() => setIsAddModalOpen(false)}>
-          <div className="modal-card" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">{editingExp ? 'Edit Personal Expense' : 'Log Personal Expense'}</h2>
+              <h3 className="modal-title">{editingExp ? 'Edit Personal Expense' : 'Log Personal Purchase'}</h3>
               <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>
                 <X size={18} />
               </button>
@@ -396,15 +446,13 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
             <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="form-group">
-                <label className="form-label">Expense Title</label>
+                <label className="form-label">Item / Description</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Personal Coffee, Shopping"
+                  placeholder="e.g. Coffee, Book, Gym Membership"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  autoFocus
-                  required
                 />
               </div>
 
@@ -413,75 +461,17 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
                   className="form-input tabular-nums"
                   placeholder="0.00"
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
-                  required
                 />
-              </div>
-
-              {/* Payment Channel Selector (Cash vs Bank Card) */}
-              <div className="form-group">
-                <label className="form-label">Payment Channel</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="button"
-                    className={`btn ${paymentType === 'cash' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
-                    onClick={() => setPaymentType('cash')}
-                  >
-                    <Banknote size={16} />
-                    <span>Cash</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn ${paymentType === 'card' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1, padding: '8px', fontSize: '0.85rem' }}
-                    onClick={() => {
-                      setPaymentType('card');
-                      if (!selectedCardId && userCards.length > 0) {
-                        setSelectedCardId(userCards[0].id);
-                      }
-                    }}
-                  >
-                    <CreditCard size={16} />
-                    <span>Bank Card</span>
-                  </button>
-                </div>
-
-                {paymentType === 'card' && (
-                  <div style={{ marginTop: '8px' }}>
-                    {userCards.length === 0 ? (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', background: 'var(--bg-input)', padding: '10px', borderRadius: 'var(--radius-sm)' }}>
-                        No payment cards created yet. Add a card in the "Payment Cards" tab!
-                      </div>
-                    ) : (
-                      <select
-                        className="form-select"
-                        value={selectedCardId}
-                        onChange={(e) => setSelectedCardId(e.target.value)}
-                      >
-                        {userCards.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit' : 'Credit'} Card • {USERS[c.ownerId || activeUserId]?.name || 'Card'})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
                   <label className="form-label">Category</label>
-                  <select
-                    className="form-select"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as Category)}
-                  >
+                  <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value as Category)}>
                     {CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
@@ -492,24 +482,43 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
                 <div className="form-group">
                   <label className="form-label">Date</label>
-                  <input
-                    type="date"
-                    className="form-input"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
+                  <input type="date" className="form-input" value={date} onChange={(e) => setDate(e.target.value)} />
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Notes (Optional)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Private details..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
+                <label className="form-label">Payment Channel</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className={`btn ${paymentType === 'cash' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setPaymentType('cash')}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${paymentType === 'card' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setPaymentType('card')}
+                  >
+                    Bank Card
+                  </button>
+                </div>
+
+                {paymentType === 'card' && userCards.length > 0 && (
+                  <select
+                    className="form-select"
+                    style={{ marginTop: '10px' }}
+                    value={selectedCardId}
+                    onChange={(e) => setSelectedCardId(e.target.value)}
+                  >
+                    {userCards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        💳 {c.bankName}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
@@ -517,7 +526,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  {editingExp ? 'Save Changes' : 'Save Personal Expense'}
+                  Save Personal Expense
                 </button>
               </div>
             </form>

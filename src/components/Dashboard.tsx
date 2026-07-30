@@ -5,13 +5,16 @@ import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 import { CategoryChart } from './CategoryChart';
 import { UserAvatar } from './UserAvatar';
-import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Wallet, Activity } from 'lucide-react';
+import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity } from 'lucide-react';
+
+import type { Language } from '../utils/i18n';
 
 interface DashboardProps {
   expenses: Expense[];
   settlements: Settlement[];
   onNavigateToSettlement: () => void;
   onNavigateToExpenses: () => void;
+  lang?: Language;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -19,6 +22,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   settlements,
   onNavigateToSettlement,
   onNavigateToExpenses,
+  lang = 'en',
 }) => {
   const { currentHouse, dbUserProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
@@ -68,10 +72,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <TrendingUp size={20} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums">{formatCurrency(totalSpentCents)}</div>
+          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+            {formatCurrency(totalSpentCents, false, lang)}
+          </div>
           <div className="summary-footer">
             <Activity size={14} style={{ color: 'var(--accent-primary)' }} />
-            <span>{expenses.length} active transactions</span>
+            <span>{expenses.length} expense record{expenses.length === 1 ? '' : 's'}</span>
           </div>
         </div>
 
@@ -79,11 +85,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="summary-card-header">
             <span className="summary-title">Outstanding Debt</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
-              <Wallet size={20} />
+              <Receipt size={20} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums" style={{ color: totalPendingDebtCents > 0 ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>
-            {formatCurrency(totalPendingDebtCents)}
+          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-amber)' }}>
+            {formatCurrency(totalPendingDebtCents, false, lang)}
           </div>
           <div className="summary-footer">
             <span>{simplifiedSettlements.length} transfer{simplifiedSettlements.length === 1 ? '' : 's'} required</span>
@@ -98,7 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-emerald)' }}>
-            {formatCurrency(settlements.reduce((sum, st) => sum + st.amountCents, 0))}
+            {formatCurrency(settlements.reduce((sum, st) => sum + st.amountCents, 0), false, lang)}
           </div>
           <div className="summary-footer">
             <span>{settlements.length} settlement records</span>
@@ -113,7 +119,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="summary-amount tabular-nums">
-            {formatCurrency(averagePerMemberCents)}
+            {formatCurrency(averagePerMemberCents, false, lang)}
           </div>
           <div className="summary-footer">
             <span>Split evenly across {memberCount} member{memberCount === 1 ? '' : 's'}</span>
@@ -143,7 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{user.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Paid {formatCurrency(paidCents)} out-of-pocket
+                        Paid {formatCurrency(paidCents, false, lang)} out-of-pocket
                       </div>
                     </div>
                   </div>
@@ -165,7 +171,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         : 'var(--text-muted)',
                     }}
                   >
-                    {isCreditor ? `+${formatCurrency(netCents)}` : formatCurrency(netCents)}
+                    {isCreditor ? `+${formatCurrency(netCents, false, lang)}` : formatCurrency(netCents, false, lang)}
                   </div>
                   <div style={{ fontSize: '0.8rem', marginTop: '4px', fontWeight: 600 }}>
                     {isCreditor && <span style={{ color: 'var(--accent-emerald)' }}>Gets back overall</span>}
