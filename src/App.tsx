@@ -29,6 +29,7 @@ import {
   syncSaveExpense,
   syncDeleteExpense,
   syncSaveSettlement,
+  syncDeleteSettlement,
   syncSaveCard,
   syncDeleteCard,
 } from './utils/firebaseSync';
@@ -400,6 +401,13 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // Clear All Settlements & Audit Log Handler
+  const handleClearSettlements = () => {
+    settlements.forEach((s) => syncDeleteSettlement(s.id));
+    setSettlements([]);
+    saveSettlements([]);
+  };
+
   // Reset Demo Data handler with Cloud Firestore clearing & re-seeding
   const handleResetDataConfirm = () => {
     expenses.forEach((e) => syncDeleteExpense(e.id));
@@ -489,6 +497,7 @@ const AppContent: React.FC = () => {
               settlements={houseSettlements}
               onMarkSettled={(tx: SimplifiedTransaction) => setPendingSettlementTx(tx)}
               onReverseSettlement={handleReverseSettlement}
+              onClearSettlements={handleClearSettlements}
               lang={lang}
             />
           )}

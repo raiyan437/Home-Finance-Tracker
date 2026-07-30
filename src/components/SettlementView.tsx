@@ -6,13 +6,14 @@ import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
-import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Image as ImageIcon, X } from 'lucide-react';
+import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Image as ImageIcon, X, Trash2 } from 'lucide-react';
 
 interface SettlementViewProps {
   expenses: Expense[];
   settlements: Settlement[];
   onMarkSettled: (transaction: SimplifiedTransaction) => void;
   onReverseSettlement?: (settlementId: string) => void;
+  onClearSettlements?: () => void;
   lang?: Language;
 }
 
@@ -21,6 +22,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
   settlements,
   onMarkSettled,
   onReverseSettlement,
+  onClearSettlements,
   lang = 'en',
 }) => {
   const { currentHouse, dbUserProfile } = useAuth();
@@ -74,22 +76,36 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
       </div>
 
       {/* Tabs Switcher */}
-      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
-        <button
-          className={`btn ${activeTab === 'pending' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('pending')}
-        >
-          <ArrowLeftRight size={16} />
-          <span>Active Recommendations ({simplifiedTransactions.length})</span>
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            className={`btn ${activeTab === 'pending' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('pending')}
+          >
+            <ArrowLeftRight size={16} />
+            <span>Active Recommendations ({simplifiedTransactions.length})</span>
+          </button>
 
-        <button
-          className={`btn ${activeTab === 'history' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('history')}
-        >
-          <History size={16} />
-          <span>Settlement Audit Log ({allSettlements.length})</span>
-        </button>
+          <button
+            className={`btn ${activeTab === 'history' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('history')}
+          >
+            <History size={16} />
+            <span>Settlement Audit Log ({allSettlements.length})</span>
+          </button>
+        </div>
+
+        {onClearSettlements && (allSettlements.length > 0 || simplifiedTransactions.length > 0) && (
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ color: 'var(--accent-rose)', borderColor: 'rgba(244, 63, 94, 0.3)' }}
+            onClick={onClearSettlements}
+            title="Clear all recommendations and audit logs"
+          >
+            <Trash2 size={14} />
+            <span>Clear Audit Data</span>
+          </button>
+        )}
       </div>
 
       {/* TAB 1: PENDING MIN-CASH-FLOW RECOMMENDATIONS */}

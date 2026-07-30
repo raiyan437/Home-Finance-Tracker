@@ -99,6 +99,18 @@ export const syncSaveSettlement = async (settlement: Settlement, houseId?: strin
 };
 
 /**
+ * Deletes a settlement from Firestore.
+ */
+export const syncDeleteSettlement = async (settlementId: string) => {
+  if (!isFirebaseConfigured || !db) return;
+  try {
+    await deleteDoc(doc(db, 'settlements', settlementId));
+  } catch (err) {
+    console.warn('Firestore delete settlement fallback:', err);
+  }
+};
+
+/**
  * Listens for realtime changes to the Firestore `cards` collection (optionally house-scoped).
  */
 export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void, houseId?: string | null) => {
