@@ -1,40 +1,43 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* Ultra-Modern Color Tokens - Slate Midnight Glass Dark Default */
-  --bg-base: #090d16;
-  --bg-surface: #111827;
-  --bg-surface-elevated: #1e293b;
-  --bg-surface-glass: rgba(17, 24, 39, 0.75);
-  --bg-card: rgba(26, 36, 56, 0.65);
-  --bg-card-hover: rgba(36, 49, 74, 0.85);
-  --bg-input: rgba(15, 23, 42, 0.8);
+  /* Dark Grey & Charcoal Surfaces */
+  --bg-base: #121214;                /* Deep Charcoal Anthracite background */
+  --bg-surface: #18181b;             /* Dark Zinc surface layer */
+  --bg-surface-elevated: #27272a;    /* Elevated card layer */
+  --bg-surface-glass: rgba(24, 24, 27, 0.82); /* Glassmorphism background */
+  --bg-card: rgba(39, 39, 42, 0.65); /* Translucent card glass */
+  --bg-card-hover: rgba(52, 52, 56, 0.85);
+  --bg-input: rgba(24, 24, 27, 0.9);
 
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-medium: rgba(255, 255, 255, 0.12);
-  --border-glow: rgba(59, 130, 246, 0.35);
+  /* Borders & Glows */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.14);
+  --border-glow: rgba(228, 228, 231, 0.3); /* Subtle titanium border highlight */
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-dim: #475569;
+  /* Neutral Monochrome Typography */
+  --text-primary: #f4f4f5;   /* Crisp off-white */
+  --text-secondary: #a1a1aa; /* Cool slate secondary text */
+  --text-muted: #71717a;     /* Muted grey metadata */
+  --text-dim: #52525b;
 
-  /* Accent Neon & Pastel Palette */
-  --accent-primary: #3b82f6;
-  --accent-primary-hover: #2563eb;
-  --accent-primary-glow: rgba(59, 130, 246, 0.25);
+  /* Titanium & Monochromatic Accents */
+  --accent-primary: #e4e4e7;         /* Platinum Titanium primary accent */
+  --accent-primary-hover: #ffffff;
+  --accent-primary-glow: rgba(228, 228, 231, 0.2);
 
-  --accent-emerald: #10b981;
-  --accent-emerald-glow: rgba(16, 185, 129, 0.2);
+  /* Modern Muted Accents */
+  --accent-emerald: #10b981;        /* Vibrant Mint for positive balances */
+  --accent-emerald-glow: rgba(16, 185, 129, 0.18);
 
-  --accent-purple: #8b5cf6;
-  --accent-purple-glow: rgba(139, 92, 246, 0.2);
+  --accent-purple: #a855f7;         /* Refined Slate Violet */
+  --accent-purple-glow: rgba(168, 85, 247, 0.18);
 
-  --accent-amber: #f59e0b;
-  --accent-amber-glow: rgba(245, 158, 11, 0.2);
+  --accent-amber: #f59e0b;          /* Warm Amber for warnings/debts */
+  --accent-amber-glow: rgba(245, 158, 11, 0.18);
 
-  --accent-rose: #f43f5e;
-  --accent-rose-glow: rgba(244, 63, 94, 0.2);
+  --accent-rose: #f43f5e;           /* Coral Rose for negative balances */
+  --accent-rose-glow: rgba(244, 63, 94, 0.18);
 
   --accent-cyan: #06b6d4;
 
@@ -47,25 +50,25 @@
   --status-negative-text: #fb7185;
   --status-negative-border: rgba(244, 63, 94, 0.35);
 
-  --status-settled-bg: rgba(148, 163, 184, 0.1);
-  --status-settled-text: #cbd5e1;
-  --status-settled-border: rgba(148, 163, 184, 0.25);
+  --status-settled-bg: rgba(161, 161, 170, 0.1);
+  --status-settled-text: #d4d4d8;
+  --status-settled-border: rgba(161, 161, 170, 0.25);
 
   /* User Accent Colors & Gradients */
-  --user-raiyan-gradient: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  --user-himel-gradient: linear-gradient(135deg, #10b981, #047857);
-  --user-lazim-gradient: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  --user-raiyan-gradient: linear-gradient(135deg, #52525b, #27272a);
+  --user-himel-gradient: linear-gradient(135deg, #059669, #047857);
+  --user-lazim-gradient: linear-gradient(135deg, #9333ea, #6b21a8);
 
   /* Category Specific Badges */
-  --cat-groceries: rgba(59, 130, 246, 0.15);
-  --cat-groceries-text: #60a5fa;
+  --cat-groceries: rgba(228, 228, 231, 0.12);
+  --cat-groceries-text: #e4e4e7;
   --cat-household: rgba(16, 185, 129, 0.15);
   --cat-household-text: #34d399;
   --cat-utilities: rgba(245, 158, 11, 0.15);
   --cat-utilities-text: #fbbf24;
   --cat-food: rgba(244, 63, 94, 0.15);
   --cat-food-text: #f87171;
-  --cat-personal: rgba(139, 92, 246, 0.15);
+  --cat-personal: rgba(168, 85, 247, 0.15);
   --cat-personal-text: #c084fc;
   --cat-other: rgba(6, 182, 212, 0.15);
   --cat-other-text: #22d3ee;
@@ -78,10 +81,11 @@
   --radius-xl: 28px;
   --radius-full: 9999px;
 
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.55);
-  --shadow-glow: 0 0 25px rgba(59, 130, 246, 0.2);
+  /* Shadows & Glow Highlights */
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.65);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.85);
+  --shadow-glow: 0 0 25px rgba(255, 255, 255, 0.08);
 
   --sidebar-width: 270px;
 }
