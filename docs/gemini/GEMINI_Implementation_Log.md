@@ -268,10 +268,11 @@
 10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
     * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
 
-### 2026-07-30: Purged Active Recommendations & Settlement Audit Logs
-* **Audit Data Purge (`src/components/SettlementView.tsx`, `src/App.tsx`, `src/utils/firebaseSync.ts`)**:
-  * Added **"Clear Audit Data"** action button in `SettlementView.tsx` to wipe all active recommendations and completed settlement logs.
-  * Added `syncDeleteSettlement` in `firebaseSync.ts` to purge cloud records alongside `localStorage`.
+### 2026-07-30: Complete Project Reset Preserving Demo Accounts
+* **Master Reset (`src/utils/storage.ts`, `src/utils/mockAuthDatabase.ts`, `src/App.tsx`)**:
+  * Purged all expenses, cards, settlements, and category budget data across `localStorage` and Cloud Firestore.
+  * Preserved intact demo user IDs (`raiyan`, `himel`, `lazim`) and standard house structure (`house-demo-001`).
+
 
 
 
