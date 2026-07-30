@@ -268,13 +268,11 @@
 10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
     * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
 
-### 2026-07-30: Multi-Column Analytics Dashboard & Interactive SVG Donut Pie Chart
-* **Category Donut Pie Chart (`src/components/CategoryPieChart.tsx`)**:
-  * Built an interactive SVG Donut Pie Chart with category slice hover states, center total household spending display, and grid legend.
-* **Payment Channel Analytics Card (`src/components/Dashboard.tsx`)**:
-  * Added 💳 Bank Cards vs 💵 Cash spending distribution card with visual ratio progress bar.
-* **Multi-Column Layout (`src/components/Dashboard.tsx`)**:
-  * Re-architected Dashboard into a 2-column layout (Left: Primary Ledger & Settlements; Right: Visual Donut Pie Chart, Category Progress Bars, and Payment Method Ratios).
+### 2026-07-30: Enforced Explicit 2-Column Dashboard Grid Layout
+* **Layout Fix (`src/index.css` & `Dashboard.tsx`)**:
+  * Created `.dashboard-main-grid` rule enforcing an explicit 2-column layout (`grid-template-columns: minmax(0, 1fr) minmax(0, 420px)`) on desktop displays ($\ge 992\text{px}$).
+  * Expanded `.main-content` max-width to `1540px` to ensure the Right Visual Analytics Panel always renders directly adjacent to the primary ledger without wrapping to the bottom.
+
 
 
 
