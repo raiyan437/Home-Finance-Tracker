@@ -1,8 +1,8 @@
 # GEMINI Implementation Log
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
-**Last Updated**: 2026-07-29  
-**Current Status**: Business Logic Audit & Feature Specifications Complete  
+**Last Updated**: 2026-07-30  
+**Current Status**: 10 Broken Business Logics Fixed & Features 1, 4, 6, 8 Complete  
 
 ---
 
@@ -245,10 +245,25 @@
 * **Component Integration Across All Views**:
   * Updated `App.tsx`, `Dashboard.tsx`, `SettlementView.tsx`, `ExpenseList.tsx`, `MonthlySummary.tsx`, `CategoryChart.tsx`, and `AddExpenseModal.tsx` to pass `dbUserProfile` to `getHouseUsers`.
 
-### 2026-07-30: Comprehensive Business Logic Audit & Specification
-* **Project Analysis & Audit**:
-  * Audited codebase for broken business logic, data desynchronization bugs, algorithmic edge cases, and missing features.
-* **Created Documentation (`docs/gemini/GEMINI_Business_Logic_Analysis.md`)**:
-  * Detailed 10 critical broken business logics (ID mismatch, desynced resets, percentage rounding, irreversible settlements, personal scope leakage, un-generated recurring bills, kicked member balance distortion, unpersisted budgets, deleted card references, incomplete i18n).
-  * Formulated 8 proposed new business logic modules (Settlement Reversals, Automated Recurring Generators, Legacy Member Debt Ledgers, Card Credit Limit Trackers, Proof of Payment Attachments, etc.).
-
+### 2026-07-30: Fix 10 Broken Business Logics & Implementation of Features 1, 4, 6, 8
+1. **User ID Identity Standardization (`AuthContext.tsx`, `settlementEngine.ts`, `AddExpenseModal.tsx`)**:
+   * Ensured `activeUserId` matches `dbUserProfile.uid` or static fallback IDs consistently.
+2. **Cloud Firestore Sync on Reset (`App.tsx`)**:
+   * Called `syncDeleteExpense`, `syncSaveSettlement`, `syncDeleteCard` during demo data reset so old cloud items are cleared and re-seeded cleanly.
+3. **Percentage & Custom Split Remainder Calculations (`AddExpenseModal.tsx`, `currency.ts`)**:
+   * Implemented deterministic remainder distribution and normalized floating percentage inputs to 100% within a 0.5% tolerance.
+4. **Settlement Reversals & Audit History (`types/index.ts`, `settlementEngine.ts`, `SettlementView.tsx`, `App.tsx`)**:
+   * Added `status: 'completed' | 'reversed'`, `reversedAt`, `reversedBy` to `Settlement`.
+   * Ignore reversed settlements in net balances and display a `[Reversed]` badge with an "Undo Settlement" action button.
+5. **Personal Expense Scope & Out-of-Pocket Accounting (`AddExpenseModal.tsx`, `PersonalWallet.tsx`)**:
+   * Automatically assigned `ownerId: activeUserId`. Converted out-of-pocket payments by User B for User A's personal purchase to shared household expenses split between User A and User B.
+6. **Automated Recurring Expense Generator Engine (`App.tsx`)**:
+   * Built `useEffect` engine checking `isRecurring === true` expenses and automatically cloning/generating new period instances upon app launch.
+7. **Isolated Departed / Kicked Member Debts (`settlementEngine.ts`)**:
+   * Accumulated historical paid and share amounts of former house members into a "Departed Member" balance pool so active housemates' net sum remains balanced ($\sum \text{Net} = 0$).
+8. **Persistent Personal & Category Monthly Budgets (`PersonalWallet.tsx`)**:
+   * Persisted `monthlyBudgetTaka` and category budget limits in `localStorage` under `home_finance_personal_budget_v1`. Displayed real-time progress bars with 80% (amber) and 100% (rose) warning badges.
+9. **Cascade Handling for Deleted Payment Cards (`CardsManager.tsx`, `ExpenseList.tsx`, `App.tsx`)**:
+   * Prompted user with confirmation notice when deleting a card linked to expenses. Scrubbed linked card IDs to cash or rendered `(Deleted Card)` badge.
+10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
+    * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
