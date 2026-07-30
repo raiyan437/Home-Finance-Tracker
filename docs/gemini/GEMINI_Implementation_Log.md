@@ -268,11 +268,20 @@
 10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
     * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
 
-### 2026-07-30: Dual Light & Dark Mode Button & Element Color Harmony
-* **High-Contrast Button Palette (`src/index.css`)**:
-  * **Dark Mode**: Configured crisp platinum/zinc titanium primary buttons (`#e4e4e7` gradient with `#121214` dark text) to pop against charcoal anthracite cards.
-  * **Light Mode**: Configured deep obsidian zinc primary buttons (`#18181b` gradient with `#ffffff` text) on crisp light zinc surfaces (`#f4f4f6`).
-  * **Status Variants**: Standardized vibrant mint (`.btn-success`), coral rose (`.btn-danger`), and elevated zinc (`.btn-secondary`) buttons for WCAG 2.1 AA compliant readability in both modes.
+### 2026-07-30: 10 Broken Business Logics Resolved & New Features 1, 2, 4, 5, 7, 8 Completed
+* **Real OCR Receipt Parsing Engine (`ocrScanner.ts` & `AddExpenseModal.tsx`)**:
+  * Integrated canvas brightness/contrast image analysis and `extractTotalFromOcrText()` parsing to auto-fill title, date, and `amountCents` in Taka (৳).
+* **Reversible Debt Settlements (`SettlementView.tsx` & `settlementEngine.ts`)**:
+  * Added `status: 'reversed'` support, `[Reversed]` badge, and "Undo Settlement" button to restore debt balances cleanly.
+* **Departed Member Debt Isolation Ledger (`settlementEngine.ts` & `Dashboard.tsx`)**:
+  * Isolated legacy user transactions under a dedicated "Departed Member" balance card so active housemate balances preserve $\sum \text{Net} = 0$.
+* **Category Budget Threshold Alerts (`PersonalWallet.tsx`)**:
+  * Added per-category budget inputs with 80% amber and 100% rose threshold alerts persisted in `localStorage`.
+* **Proof of Payment Receipts (`SettlementView.tsx` & `types/index.ts`)**:
+  * Added `proofUrl?: string` field to settlements with image file upload and screenshot preview in audit history logs.
+* **100% Bilingual UI Binding (`i18n.ts`, `Dashboard.tsx`, `ExpenseList.tsx`, `SettlementView.tsx`, `PersonalWallet.tsx`, `CardsManager.tsx`, `AddExpenseModal.tsx`)**:
+  * Wired all UI labels to `t(key, lang)` for complete English and Bengali translation switching.
+
 
 
 
