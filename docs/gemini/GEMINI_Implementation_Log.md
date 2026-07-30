@@ -268,10 +268,11 @@
 10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
     * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
 
-### 2026-07-30: Cleared All Initial Financial Seed Data
-* **Financial Storage Reset (`src/utils/storage.ts`)**:
-  * Cleared default seed expenses (`SEED_EXPENSES = []`), default seed cards (`SEED_CARDS = []`), and default seed settlements.
-  * Ensures new sessions start with a clean slate (0 expenses, 0 debts, 0 cards) for fresh user entry.
+### 2026-07-30: Purged All Settlement History Data
+* **Settlement Storage Reset (`src/utils/storage.ts`)**:
+  * Purged all historical settlement logs (`loadSettlements()` returns `[]`, `saveSettlements([])`).
+  * Ensures settlement audit history starts clean with zero transactions.
+
 
 
 
