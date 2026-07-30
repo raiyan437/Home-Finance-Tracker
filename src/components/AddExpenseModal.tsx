@@ -193,6 +193,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         if (parsed.success) {
           if (parsed.title) setTitle((prev) => prev || parsed.title || '');
           if (parsed.date) setDate(parsed.date);
+          if (parsed.amountCents) setAmountStr((parsed.amountCents / 100).toFixed(2));
         }
       };
       reader.readAsDataURL(file);
