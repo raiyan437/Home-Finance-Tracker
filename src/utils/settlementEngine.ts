@@ -178,6 +178,10 @@ export const calculateSimplifiedSettlements = (
   userBalances: Record<UserId, UserBalance>,
   activeUsers: User[] = ALL_USERS
 ): SimplifiedTransaction[] => {
+  if (!activeUsers || activeUsers.length < 2) {
+    return [];
+  }
+
   const balances: { userId: UserId; user: User; net: number }[] = activeUsers.map((u) => ({
     userId: u.id,
     user: u,

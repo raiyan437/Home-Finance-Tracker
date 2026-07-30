@@ -162,21 +162,27 @@ const AppContent: React.FC = () => {
     return expenses.filter((e) => {
       const isHousehold = !e.scope || e.scope === 'household';
       if (!isHousehold) return false;
+
       if (currentHouse) {
-        return !e.houseId || e.houseId === currentHouse.id;
+        return e.houseId === currentHouse.id || !e.houseId;
       }
-      return true;
+
+      // If user is not in any house, only show expenses created by or involving this user
+      return (
+        e.paidBy === activeUserId ||
+        (e.shares && e.shares.some((s) => s.userId === activeUserId))
+      );
     });
-  }, [expenses, currentHouse]);
+  }, [expenses, currentHouse, activeUserId]);
 
   const houseSettlements = useMemo(() => {
     return settlements.filter((s) => {
       if (currentHouse) {
-        return !(s as any).houseId || (s as any).houseId === currentHouse.id;
+        return (s as any).houseId === currentHouse.id || !(s as any).houseId;
       }
-      return true;
+      return s.fromUserId === activeUserId || s.toUserId === activeUserId;
     });
-  }, [settlements, currentHouse]);
+  }, [settlements, currentHouse, activeUserId]);
 
   const personalExpenses = useMemo(() => {
     return expenses.filter((e) => e.scope === 'personal' && (e.ownerId === activeUserId || e.paidBy === activeUserId));
