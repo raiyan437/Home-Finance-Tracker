@@ -267,3 +267,9 @@
    * Prompted user with confirmation notice when deleting a card linked to expenses. Scrubbed linked card IDs to cash or rendered `(Deleted Card)` badge.
 10. **100% Bilingual UI Binding (EN / BN) (`i18n.ts`, `currency.ts`, `ocrScanner.ts`, all components)**:
     * Added complete translation keys for English and Bengali. Added Bengali digit conversion (`০-৯`) in `currency.ts` and filtered Bangladeshi phone numbers & dates in `ocrScanner.ts`.
+
+### 2026-07-30: Charcoal & Dark Grey Titanium Theme Redesign
+* **CSS Design System Overhaul (`src/index.css`)**:
+  * Replaced midnight-blue/navy dark mode with a modern, ultra-sleek **Charcoal & Dark Grey** palette.
+  * Applied deep anthracite background (`#121214`), dark zinc surface layers (`#18181b`, `#27272a`), translucent glassmorphism cards (`rgba(39, 39, 42, 0.65)`), crisp off-white typography (`#f4f4f5`), and platinum titanium primary accents (`#e4e4e7`).
+
