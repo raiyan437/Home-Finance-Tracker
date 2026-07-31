@@ -7,6 +7,7 @@ export interface UserProfile {
   displayName: string;
   email: string;
   avatar?: string;
+  password?: string;
   houseId?: string | null;
   role?: HouseRole | null;
   createdAt: string;

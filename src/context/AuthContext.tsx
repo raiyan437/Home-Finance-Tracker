@@ -11,7 +11,16 @@ import {
 } from '../utils/mockAuthDatabase';
 import { auth } from '../config/firebase';
 import { syncSaveUser, syncSaveHouse } from '../utils/firebaseSync';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  type User as FirebaseUser,
+} from 'firebase/auth';
 
 interface AuthContextType {
   activeUserId: UserId;
@@ -24,6 +33,8 @@ interface AuthContextType {
   switchProfile: (userId: UserId) => void;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
+  updateUserProfilePhoto: (avatarUrl: string) => Promise<void>;
+  changeUserPassword: (currentPass: string, newPass: string) => Promise<void>;
   logout: () => Promise<void>;
   createHouse: (houseName: string, customHouseCode?: string) => Promise<void>;
   joinHouse: (houseCode: string) => Promise<void>;
@@ -102,11 +113,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: firebaseUid || `user-${Date.now()}`,
         displayName: cleanEmail.split('@')[0],
         email: cleanEmail,
+        password: pass,
         houseId: null,
         role: null,
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existingUser]);
+    } else if (pass) {
+      existingUser.password = pass;
+      saveUsersDB(users);
     }
 
     setActiveSession(existingUser);
@@ -158,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: firebaseUid || `user-${Date.now()}`,
       displayName: displayName.trim() || cleanEmail.split('@')[0],
       email: cleanEmail,
+      password: pass,
       houseId: null,
       role: null,
       createdAt: new Date().toISOString(),
@@ -169,6 +185,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncHouseForUser(newUser);
     syncSaveUser(newUser);
     setLoading(false);
+  };
+
+  // Update User Profile Photo Handler
+  const updateUserProfilePhoto = async (avatarUrl: string) => {
+    if (!dbUserProfile) throw new Error('You must be logged in to update profile photo.');
+
+    const users = loadUsersDB();
+    const updatedUsers = users.map((u) => {
+      if (u.uid === dbUserProfile.uid) {
+        return { ...u, avatar: avatarUrl };
+      }
+      return u;
+    });
+    saveUsersDB(updatedUsers);
+
+    const updatedProfile = { ...dbUserProfile, avatar: avatarUrl };
+    setActiveSession(updatedProfile);
+    setDbUserProfile(updatedProfile);
+    syncSaveUser(updatedProfile);
+
+    if (auth?.currentUser) {
+      try {
+        await updateProfile(auth.currentUser, { photoURL: avatarUrl });
+      } catch (e) {
+        console.warn('Firebase profile photo update notice:', e);
+      }
+    }
+  };
+
+  // Change User Password Handler
+  const changeUserPassword = async (currentPass: string, newPass: string) => {
+    if (!dbUserProfile) throw new Error('You must be logged in to change password.');
+    if (!newPass || newPass.length < 6) {
+      throw new Error('New password must be at least 6 characters long.');
+    }
+
+    const users = loadUsersDB();
+    const targetUser = users.find((u) => u.uid === dbUserProfile.uid);
+
+    if (targetUser?.password && targetUser.password !== currentPass) {
+      throw new Error('Current password is incorrect.');
+    }
+
+    if (auth?.currentUser && auth.currentUser.email) {
+      try {
+        const cred = EmailAuthProvider.credential(auth.currentUser.email, currentPass);
+        await reauthenticateWithCredential(auth.currentUser, cred);
+        await updatePassword(auth.currentUser, newPass);
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/wrong-password' || fbErr.code === 'auth/invalid-credential') {
+          throw new Error('Current password is incorrect.');
+        }
+        console.warn('Firebase reauth notice:', fbErr);
+      }
+    }
+
+    // Save updated password in local DB
+    const updatedUsers = users.map((u) => {
+      if (u.uid === dbUserProfile.uid) {
+        return { ...u, password: newPass };
+      }
+      return u;
+    });
+    saveUsersDB(updatedUsers);
+
+    const updatedProfile = { ...dbUserProfile, password: newPass };
+    setActiveSession(updatedProfile);
+    setDbUserProfile(updatedProfile);
   };
 
   // Logout Handler
@@ -207,6 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: dbUserProfile.uid,
       displayName: dbUserProfile.displayName,
       email: dbUserProfile.email,
+      avatar: dbUserProfile.avatar,
       role: 'leader',
       joinedAt: now,
     };
@@ -259,6 +344,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: dbUserProfile.uid,
         displayName: dbUserProfile.displayName,
         email: dbUserProfile.email,
+        avatar: dbUserProfile.avatar,
         role: 'member',
         joinedAt: now,
       };
@@ -373,6 +459,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchProfile,
         loginWithEmail,
         signUpWithEmail,
+        updateUserProfilePhoto,
+        changeUserPassword,
         logout,
         createHouse,
         joinHouse,
