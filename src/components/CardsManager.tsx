@@ -157,7 +157,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
             </button>
           </div>
         ) : (
-          <div className="grid-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 360px))', gap: '20px' }}>
             {userCards.map((card) => {
               const spentCents = cardSpentTotals[card.id] || 0;
               const owner = USERS[card.ownerId || activeUserId];
@@ -176,6 +176,8 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     minHeight: '190px',
+                    maxWidth: '360px',
+                    width: '100%',
                     position: 'relative',
                     overflow: 'hidden',
                   }}
