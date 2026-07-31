@@ -273,8 +273,13 @@
   * Purged all expenses, cards, settlements, and category budget data across `localStorage` and Cloud Firestore.
   * Preserved intact demo user IDs (`raiyan`, `himel`, `lazim`) and standard house structure (`house-demo-001`).
 
-### 2026-07-31: Successful Vercel Production Deployment
-* **Live Production Web Application**:
-  * Successfully built and deployed the Home Finance Tracker application to **Vercel** connected directly via GitHub continuous integration.
-  * **Live Production URL**: [https://home-finance-tracker-kappa.vercel.app/](https://home-finance-tracker-kappa.vercel.app/)
-  * Configured instant build pipeline (`npm run build` -> `dist/`) with zero-config Vite edge delivery and automated deployment triggers on every `git push`.
+### 2026-07-31: 8 Post-Deployment Features Built & Deployed
+* **1.1 Live Firebase Environment Sync Badge (`src/config/firebase.ts`, `SettingsView.tsx`)**: Added `isFirebaseConfigured` environment validator and live connection badge (🟢 *Cloud Sync Active* / 🟡 *Offline Local Storage Mode*).
+* **1.2 PWA Manifest & Mobile Installability (`public/manifest.json`, `index.html`)**: Added standalone Web App Manifest with SVG maskable icon and iOS/Android "Add to Home Screen" meta tags.
+* **1.3 1-Click JSON Data Backup & Restore (`src/utils/storage.ts`, `SettingsView.tsx`)**: Added 📥 Export Backup JSON and 📤 Import Backup JSON file tools with timestamped JSON structure validation.
+* **2.2 Proof of Payment Uploads (`SettlementView.tsx`)**: Added bKash/Nagad/bank screenshot upload picker on debt settlements and `[Attached Proof 📎]` button opening full photo preview modal on audit history records.
+* **2.3 Push Notifications & Reminders Helper (`src/utils/notifications.ts`, `App.tsx`, `SettingsView.tsx`)**: Created Web Notification helper with browser permission toggle for instant alerts on new expenses and pending debt transfers.
+* **3.1 Printable PDF Financial Statement Generator (`MonthlySummary.tsx`, `index.css`)**: Added **"📄 Download Statement PDF"** button triggering browser print dialog (`window.print()`) with clean background print styles.
+* **4.1 Native Web Share API Integration (`src/utils/share.ts`, `SettingsView.tsx`, `SettlementView.tsx`)**: Created Web Share API helper wrapping `navigator.share()` with clipboard fallback for sharing House Join Codes (`HM-8823`) and settlement transfer instructions via WhatsApp/SMS.
+* **4.2 Custom Theme Accent Picker (`index.css`, `Navbar.tsx`, `SettingsView.tsx`)**: Added CSS attributes and UI color pickers for `charcoal`, `midnight`, `emerald`, and `amber` accents persisted in `localStorage`.
+
