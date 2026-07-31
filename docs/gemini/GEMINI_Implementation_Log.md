@@ -312,10 +312,16 @@
 * **Left Column Card Restructuring (`Dashboard.tsx`, `CategoryChart.tsx`)**:
   * Extracted `PayerContributionCard` from `CategoryChart.tsx`.
   * Positioned **Payer Out-of-Pocket Contribution Ratio** card and **Payment Channel Distribution** card directly beneath `Recent Shared Expenses` in the Left Column of the dashboard grid, eliminating empty whitespace beneath the recent expenses card.
-### 2026-08-01: Fixed Payment Card Width & Auto-Fill Grid Layout
-* **Payment Card Sizing (`CardsManager.tsx`)**:
-  * Updated cards deck grid to `grid-template-columns: repeat(auto-fill, minmax(300px, 360px))` and set `max-width: 360px` on card elements.
-  * Single cards maintain standard credit card proportions instead of stretching 100% full width; new cards render side-by-side cleanly.
+### 2026-08-01: Card Persistence, Cross-Device House Joining & Live Date Defaults
+* **Cross-Device House Joining (`AuthContext.tsx`)**:
+  * Enhanced `joinHouse(houseCode)` to search local browser `loadHousesDB()` first, and query Firestore `houses` collection (`where('code', '==', cleanCode)`) if not found locally, enabling User B on a different phone/laptop to join User A's house seamlessly.
+* **Card Persistence & Selection Dropdown (`CardsManager.tsx`, `App.tsx`, `AddExpenseModal.tsx`)**:
+  * Saved `ownerId: activeUserId` and `houseId: currentHouse?.id` for payment cards across `localStorage` and Firestore `cards` collection (`syncSaveCard`).
+  * Updated `userCards` filter and passed `cards={userCards}` to `AddExpenseModal.tsx`.
+  * Auto-selected `cards[0]?.id` when `paymentType === 'card'` in `AddExpenseModal.tsx`.
+* **Live Current Date Initialization (`AddExpenseModal.tsx`)**:
+  * Defaulted `date` state to today's local date (`new Date().toISOString().split('T')[0]`) for new expenses.
+
 
 
 
