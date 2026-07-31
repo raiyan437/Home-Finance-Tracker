@@ -312,7 +312,9 @@
 * **Left Column Card Restructuring (`Dashboard.tsx`, `CategoryChart.tsx`)**:
   * Extracted `PayerContributionCard` from `CategoryChart.tsx`.
   * Positioned **Payer Out-of-Pocket Contribution Ratio** card and **Payment Channel Distribution** card directly beneath `Recent Shared Expenses` in the Left Column of the dashboard grid, eliminating empty whitespace beneath the recent expenses card.
-  * Maintained `CategoryPieChart` and `CategoryChart` in the Right Column dedicated to category analytics.
+* **Restored Metrics Cards Styling (`Dashboard.tsx`)**:
+  * Restored `.grid-summary` and `.summary-card` layout structure for **Total Household Spend**, **Outstanding Debt**, and **Average Per Member** top cards.
+
 
 
 
