@@ -300,8 +300,10 @@
 * **Dedicated House Navigation Tab (`HouseView.tsx`, `Navbar.tsx`, `App.tsx`)**:
   * Created `HouseView.tsx` and added `House` (🏠) tab to desktop sidebar & mobile nav.
   * Moved House Creation, House Join, House Join Code 1-click copy/share, inline House Name edit, and Member Roster Table into `HouseView.tsx`.
-* **Focused Settings View (`SettingsView.tsx`)**:
-  * Removed custom theme accent color picker. Kept SettingsView focused strictly on account details, cloud sync status, 1-click JSON backup export/import, push alerts, and logout.
+* **Dynamic Sidebar Member Count (`Navbar.tsx`, `i18n.ts`)**:
+  * Fixed sidebar header subtitle to dynamically calculate and display `${members.length} Members • Code: ${code}` when inside an active household.
+  * Displays `"No Active Household"` when `currentHouse === null` instead of the legacy demo count.
+
 
 
 
