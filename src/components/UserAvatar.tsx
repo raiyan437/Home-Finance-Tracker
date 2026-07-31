@@ -14,6 +14,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, classNa
     typeof safeUser.avatar === 'string' &&
     (safeUser.avatar.includes('/') || safeUser.avatar.includes('.') || safeUser.avatar.startsWith('data:'));
 
+  const initial = (safeUser.name?.charAt(0) || safeUser.avatar?.charAt(0) || 'U').toUpperCase();
+
   return (
     <div
       className={`avatar-badge-large ${className}`}
@@ -42,7 +44,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, classNa
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       ) : (
-        safeUser.avatar || safeUser.name?.charAt(0) || 'U'
+        initial
       )}
     </div>
   );

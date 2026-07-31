@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
-import type { TabType, AccentColor } from './components/Navbar';
+import type { TabType } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { ExpenseList } from './components/ExpenseList';
 import { SettlementView } from './components/SettlementView';
@@ -51,6 +51,9 @@ const CardsManager = lazy(() =>
 const SettingsView = lazy(() =>
   import('./components/SettingsView').then((m) => ({ default: m.SettingsView }))
 );
+const HouseView = lazy(() =>
+  import('./components/HouseView').then((m) => ({ default: m.HouseView }))
+);
 
 const AppContent: React.FC = () => {
   const { activeUserId, currentHouse, isAuthenticated, dbUserProfile } = useAuth();
@@ -61,9 +64,6 @@ const AppContent: React.FC = () => {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [accent, setAccent] = useState<AccentColor>(() => {
-    return (localStorage.getItem('home_finance_accent') as AccentColor) || 'charcoal';
-  });
   const [lang, setLang] = useState<Language>('en');
 
   // Modals state
@@ -82,10 +82,6 @@ const AppContent: React.FC = () => {
     const savedTheme = (localStorage.getItem('home_finance_theme') as 'dark' | 'light') || 'dark';
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
-
-    const savedAccent = (localStorage.getItem('home_finance_accent') as AccentColor) || 'charcoal';
-    setAccent(savedAccent);
-    document.documentElement.setAttribute('data-accent', savedAccent);
 
     const houseId = currentHouse?.id;
 
@@ -444,12 +440,6 @@ const AppContent: React.FC = () => {
     return <LoginPage onSwitchToSignUp={() => setAuthView('signup')} />;
   }
 
-  const handleSetAccent = (newAccent: AccentColor) => {
-    setAccent(newAccent);
-    localStorage.setItem('home_finance_accent', newAccent);
-    document.documentElement.setAttribute('data-accent', newAccent);
-  };
-
   return (
     <div className="app-container">
       {/* Navigation Sidebar / Mobile Nav */}
@@ -464,8 +454,6 @@ const AppContent: React.FC = () => {
         toggleTheme={toggleTheme}
         lang={lang}
         toggleLang={toggleLang}
-        accent={accent}
-        setAccent={handleSetAccent}
         expenseCount={householdExpenses.length}
         settlementCount={simplifiedSettlements.length}
         personalCount={personalExpenses.length}
@@ -500,10 +488,10 @@ const AppContent: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <button className="btn btn-primary" onClick={() => setActiveTab('settings')}>
+              <button className="btn btn-primary" onClick={() => setActiveTab('house')}>
                 <span>👑 Create a New House</span>
               </button>
-              <button className="btn btn-secondary" onClick={() => setActiveTab('settings')}>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('house')}>
                 <span>👤 Join Existing House</span>
               </button>
             </div>
@@ -557,6 +545,8 @@ const AppContent: React.FC = () => {
             />
           )}
 
+          {activeTab === 'house' && <HouseView lang={lang} />}
+
           {activeTab === 'personal' && (
             <PersonalWallet
               expenses={expenses}
@@ -581,9 +571,7 @@ const AppContent: React.FC = () => {
             <MonthlySummary expenses={householdExpenses} settlements={houseSettlements} lang={lang} />
           )}
 
-          {activeTab === 'settings' && (
-            <SettingsView lang={lang} accent={accent} setAccent={handleSetAccent} />
-          )}
+          {activeTab === 'settings' && <SettingsView lang={lang} />}
         </Suspense>
       </main>
 

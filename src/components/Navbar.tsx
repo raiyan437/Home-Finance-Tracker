@@ -20,9 +20,10 @@ import {
   Settings,
   Crown,
   LogOut,
+  Building,
 } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'settings';
+export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'house' | 'settings';
 
 export type AccentColor = 'charcoal' | 'midnight' | 'emerald' | 'amber';
 
@@ -34,8 +35,6 @@ interface NavbarProps {
   toggleTheme: () => void;
   lang: Language;
   toggleLang: () => void;
-  accent?: AccentColor;
-  setAccent?: (accent: AccentColor) => void;
   expenseCount?: number;
   settlementCount?: number;
   personalCount?: number;
@@ -50,8 +49,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   toggleTheme,
   lang,
   toggleLang,
-  accent = 'charcoal',
-  setAccent,
   expenseCount,
   settlementCount,
   personalCount,
@@ -63,6 +60,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleLogoutClick = async () => {
     await logout();
   };
+
+  const displayName = dbUserProfile?.displayName || userProfile.name || 'User';
 
   return (
     <>
@@ -81,21 +80,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* User Account / Profile Box (Clean non-modal profile card) */}
+        {/* User Account / Profile Box (Clean dynamic initials badge) */}
         <div className="user-profile-card" style={{ cursor: 'default' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
             <UserAvatar
               user={{
                 id: userProfile.id,
-                name: dbUserProfile?.displayName || userProfile.name,
-                avatar: userProfile.avatar,
-                color: userProfile.color,
+                name: displayName,
+                avatar: displayName.slice(0, 1).toUpperCase(),
+                color: userProfile.color || '#3b82f6',
               }}
               size={40}
             />
             <div className="user-profile-info" style={{ flex: 1 }}>
               <div className="user-name-row">
-                <span className="user-name">{dbUserProfile?.displayName || userProfile.name}</span>
+                <span className="user-name">{displayName}</span>
                 {dbUserProfile?.role === 'leader' && (
                   <Crown size={14} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
                 )}
@@ -149,6 +148,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
+            className={`nav-item ${activeTab === 'house' ? 'active' : ''}`}
+            onClick={() => setActiveTab('house')}
+          >
+            <div className="nav-item-left">
+              <Building size={19} style={{ color: 'var(--accent-emerald)' }} />
+              <span>House 🏠</span>
+            </div>
+          </button>
+
+          <button
             className={`nav-item ${activeTab === 'personal' ? 'active' : ''}`}
             onClick={() => setActiveTab('personal')}
           >
@@ -199,11 +208,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        <button className="add-expense-btn-sidebar" onClick={onOpenAddExpense}>
-          <Plus size={20} />
-          <span>{t('newExpense')}</span>
-        </button>
-
         {/* Footer Toggles (Language, Theme & Log Out) */}
         <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -226,36 +230,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{theme === 'dark' ? t('light') : t('dark')}</span>
             </button>
           </div>
-
-          {/* Accent Theme Selector */}
-          {setAccent && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 700 }}>Theme Accent</span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {[
-                  { id: 'charcoal', color: '#e4e4e7' },
-                  { id: 'midnight', color: '#3b82f6' },
-                  { id: 'emerald', color: '#10b981' },
-                  { id: 'amber', color: '#f59e0b' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setAccent(item.id as AccentColor)}
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      backgroundColor: item.color,
-                      border: accent === item.id ? '2px solid #ffffff' : '1px solid transparent',
-                      cursor: 'pointer',
-                      boxShadow: accent === item.id ? `0 0 8px ${item.color}` : 'none',
-                    }}
-                    title={`${item.id} accent`}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Clean Log Out Button */}
           <button
@@ -292,11 +266,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
-          className={`mobile-nav-item ${activeTab === 'cards' ? 'active' : ''}`}
-          onClick={() => setActiveTab('cards')}
+          className={`mobile-nav-item ${activeTab === 'house' ? 'active' : ''}`}
+          onClick={() => setActiveTab('house')}
         >
-          <CreditCard size={20} />
-          <span>{t('paymentCards')}</span>
+          <Building size={20} />
+          <span>House</span>
         </button>
 
         <button
