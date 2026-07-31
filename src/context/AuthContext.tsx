@@ -25,7 +25,7 @@ interface AuthContextType {
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
-  createHouse: (houseName: string) => Promise<void>;
+  createHouse: (houseName: string, customHouseCode?: string) => Promise<void>;
   joinHouse: (houseCode: string) => Promise<void>;
   updateHouseName: (newName: string) => Promise<void>;
   kickMember: (targetUid: string) => Promise<void>;
@@ -184,12 +184,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Create House Handler
-  const createHouse = async (houseName: string) => {
+  const createHouse = async (houseName: string, customHouseCode?: string) => {
     if (!dbUserProfile) throw new Error('You must be logged in to create a house');
     const name = houseName.trim();
     if (!name) throw new Error('House name cannot be empty');
 
-    const randomCode = `HM-${Math.floor(1000 + Math.random() * 9000)}`;
+    let cleanCode = (customHouseCode || '').trim().toUpperCase();
+    if (!cleanCode) {
+      cleanCode = `HM-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    const houses = loadHousesDB();
+    const existingCodeMatch = houses.find((h) => h.code.toUpperCase() === cleanCode);
+    if (existingCodeMatch) {
+      throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
+    }
+
     const houseId = `house-${Date.now()}`;
     const now = new Date().toISOString();
 
@@ -203,14 +213,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const newHouse: House = {
       id: houseId,
-      code: randomCode,
+      code: cleanCode,
       name,
       leaderUid: dbUserProfile.uid,
       members: [leaderMember],
       createdAt: now,
     };
 
-    const houses = loadHousesDB();
     saveHousesDB([...houses, newHouse]);
 
     const users = loadUsersDB();

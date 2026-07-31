@@ -35,6 +35,7 @@ export const HouseView: React.FC<HouseViewProps> = () => {
   } = useAuth();
 
   const [createHouseName, setCreateHouseName] = useState('');
+  const [createHouseCode, setCreateHouseCode] = useState('');
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -74,8 +75,9 @@ export const HouseView: React.FC<HouseViewProps> = () => {
     setIsSubmitting(true);
 
     try {
-      await createHouse(createHouseName);
+      await createHouse(createHouseName, createHouseCode);
       setCreateHouseName('');
+      setCreateHouseCode('');
       setSuccessMsg('House created successfully! You are now the House Leader.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to create house. Please try again.');
@@ -189,14 +191,28 @@ export const HouseView: React.FC<HouseViewProps> = () => {
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Bachelor House Villa"
+                  placeholder="e.g. Bachelor Villa 4B"
                   value={createHouseName}
                   onChange={(e) => setCreateHouseName(e.target.value)}
                   required
                 />
               </div>
 
-              <button type="submit" className="btn btn-primary" disabled={isSubmitting || !createHouseName.trim()}>
+              <div>
+                <label className="form-label">Custom House Code (6 Characters)</label>
+                <input
+                  type="text"
+                  className="form-input tabular-nums"
+                  maxLength={6}
+                  placeholder="e.g. 123456"
+                  value={createHouseCode}
+                  onChange={(e) => setCreateHouseCode(e.target.value.toUpperCase())}
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn btn-primary" disabled={isSubmitting || !createHouseName.trim() || !createHouseCode.trim()}>
                 <Plus size={16} />
                 <span>{isSubmitting ? 'Creating House...' : 'Create Household'}</span>
               </button>
