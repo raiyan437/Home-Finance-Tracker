@@ -283,13 +283,17 @@
 * **4.1 Native Web Share API Integration (`src/utils/share.ts`, `SettingsView.tsx`, `SettlementView.tsx`)**: Created Web Share API helper wrapping `navigator.share()` with clipboard fallback for sharing House Join Codes (`HM-8823`) and settlement transfer instructions via WhatsApp/SMS.
 * **4.2 Custom Theme Accent Picker (`index.css`, `Navbar.tsx`, `SettingsView.tsx`)**: Added CSS attributes and UI color pickers for `charcoal`, `midnight`, `emerald`, and `amber` accents persisted in `localStorage`.
 
-### 2026-07-31: Live Firebase Production Credentials Configured
-* **Live Production Cloud Config (`.env`, `src/config/firebase.ts`)**:
-  * Configured live credentials for project `home-finance-1ah277j9` in `.env` and `src/config/firebase.ts`.
-* **Unlocked Email Authentication (`src/context/AuthContext.tsx`)**:
-  * Unlocked registration & sign-in for any valid email address and password using Firebase Authentication.
-* **Firestore Users & Houses Sync (`src/utils/firebaseSync.ts`, `src/context/AuthContext.tsx`)**:
-  * Implemented `syncSaveUser` and `syncSaveHouse` to sync user profiles and households to Firestore `users` and `houses` collections.
+### 2026-07-31: Transition App to Production (Open Public Registration & Zero Demo Data)
+* **Purged Demo Accounts & Sample Seed Data (`mockAuthDatabase.ts`, `storage.ts`)**:
+  * Set `DEFAULT_USERS = []` and `DEFAULT_HOUSE = null`. Default `loadExpenses()`, `loadSettlements()`, and `loadCards()` to `[]`.
+* **Clean Production Login UI (`LoginPage.tsx`, `AuthModal.tsx`)**:
+  * Removed 1-click quick demo buttons. Rendered clean login form with email, password, and sign up links.
+* **Open Registration & Strict Password Authentication (`AuthContext.tsx`)**:
+  * Removed `AUTHORIZED_DEMO_ACCOUNTS` map. Open registration allows any visitor to sign up with valid email, password (>= 6 chars), and display name.
+  * Throws `"Email is already registered. Please log in."` if email is taken. Strict login throws `"Invalid email or password. Please verify your credentials or Sign Up."`.
+* **First-Time User Onboarding Banner (`App.tsx`)**:
+  * Added onboarding banner when `currentHouse === null` prompting new users to **👑 Create a New House** or **👤 Join Existing House**.
+
 
 
 
