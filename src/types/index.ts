@@ -34,7 +34,7 @@ export interface House {
 export interface User {
   id: UserId;
   name: string;
-  avatar: string;
+  avatar?: string;
   color: string; // CSS color string or accent token
   email?: string;
   uid?: string; // Firebase Auth UID if authenticated

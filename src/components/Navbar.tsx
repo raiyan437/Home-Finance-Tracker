@@ -91,7 +91,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               user={{
                 id: dbUserProfile?.uid || userProfile.id,
                 name: displayName,
-                avatar: dbUserProfile?.avatar || firebaseUser?.photoURL || userProfile.avatar || displayName.slice(0, 1).toUpperCase(),
+                avatar:
+                  dbUserProfile?.avatar && (dbUserProfile.avatar.startsWith('data:') || dbUserProfile.avatar.startsWith('http'))
+                    ? dbUserProfile.avatar
+                    : firebaseUser?.photoURL && firebaseUser.photoURL.startsWith('http')
+                    ? firebaseUser.photoURL
+                    : undefined,
                 color: userProfile.color || '#3b82f6',
               }}
               size={40}

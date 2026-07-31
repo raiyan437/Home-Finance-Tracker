@@ -1,26 +1,22 @@
 import type { User, UserId, Expense, Settlement, UserBalance, SimplifiedTransaction, House, UserProfile } from '../types';
 
-import raiyanAvatar from '../assets/avatars/raiyan.png';
-import himelAvatar from '../assets/avatars/himel.png';
-import lazimAvatar from '../assets/avatars/lazim.png';
-
 export const USERS: Record<UserId, User> = {
   raiyan: {
     id: 'raiyan',
     name: 'Raiyan',
-    avatar: raiyanAvatar,
+    avatar: undefined,
     color: '#3b82f6', // Ocean Blue
   },
   himel: {
     id: 'himel',
     name: 'Himel',
-    avatar: himelAvatar,
+    avatar: undefined,
     color: '#10b981', // Emerald Green
   },
   lazim: {
     id: 'lazim',
     name: 'Lazim',
-    avatar: lazimAvatar,
+    avatar: undefined,
     color: '#8b5cf6', // Violet Purple
   },
 };
@@ -30,7 +26,7 @@ export const ALL_USERS: User[] = Object.values(USERS);
 export const LEGACY_USER: User = {
   id: 'legacy_departed',
   name: 'Departed Member',
-  avatar: 'D',
+  avatar: undefined,
   color: '#6b7280', // Gray
 };
 
@@ -44,15 +40,15 @@ export const getHouseUsers = (
 ): User[] => {
   if (house && house.members && house.members.length > 0) {
     return house.members.map((m) => {
-      const staticUser = Object.values(USERS).find(
-        (u) => u.id === m.uid || (u as any).uid === m.uid || u.name.toLowerCase() === m.displayName.toLowerCase().trim()
-      );
-      const userId = m.uid || staticUser?.id || m.displayName.toLowerCase().trim();
+      const hasCustomPhoto =
+        typeof m.avatar === 'string' &&
+        (m.avatar.startsWith('data:') || m.avatar.startsWith('http') || m.avatar.includes('/'));
+
       return {
-        id: userId,
-        name: m.displayName,
-        avatar: staticUser?.avatar || m.avatar || m.displayName.toLowerCase().slice(0, 5),
-        color: staticUser?.color || '#3b82f6',
+        id: m.uid,
+        name: m.displayName || m.email?.split('@')[0] || 'Member',
+        avatar: hasCustomPhoto ? m.avatar : undefined,
+        color: '#3b82f6',
         email: m.email,
         uid: m.uid,
       };
@@ -61,23 +57,25 @@ export const getHouseUsers = (
 
   // If user is logged in but not in any house, return ONLY that user
   if (currentUser) {
-    const nameStr = (currentUser as any).displayName || (currentUser as any).name || 'User';
-    const cleanName = nameStr.toLowerCase().trim();
-    const staticUser = USERS[cleanName] || Object.values(USERS).find((u) => u.name.toLowerCase() === cleanName);
-    const userId = (currentUser as any).uid || (currentUser as any).id || staticUser?.id || cleanName || 'user';
+    const nameStr = (currentUser as any).displayName || (currentUser as any).name || (currentUser as any).email?.split('@')[0] || 'User';
+    const userAvatar = (currentUser as any).avatar;
+    const hasCustomPhoto =
+      typeof userAvatar === 'string' &&
+      (userAvatar.startsWith('data:') || userAvatar.startsWith('http') || userAvatar.includes('/'));
+
     return [
       {
-        id: userId,
+        id: (currentUser as any).uid || (currentUser as any).id || 'user',
         name: nameStr,
-        avatar: staticUser?.avatar || (currentUser as any).avatar || nameStr.slice(0, 5),
-        color: staticUser?.color || '#3b82f6',
+        avatar: hasCustomPhoto ? userAvatar : undefined,
+        color: '#3b82f6',
         email: (currentUser as any).email,
         uid: (currentUser as any).uid,
       },
     ];
   }
 
-  return ALL_USERS;
+  return [];
 };
 
 /**

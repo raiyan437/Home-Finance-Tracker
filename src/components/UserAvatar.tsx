@@ -9,12 +9,12 @@ interface UserAvatarProps {
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, className = '', style = {} }) => {
-  const safeUser = user || { name: 'User', avatar: 'U', color: '#3b82f6' };
+  const safeUser = user || { name: 'User', avatar: undefined, color: '#3b82f6' };
   const isImage =
     typeof safeUser.avatar === 'string' &&
-    (safeUser.avatar.includes('/') || safeUser.avatar.includes('.') || safeUser.avatar.startsWith('data:'));
+    (safeUser.avatar.startsWith('data:') || safeUser.avatar.startsWith('http'));
 
-  const initial = (safeUser.name?.charAt(0) || safeUser.avatar?.charAt(0) || 'U').toUpperCase();
+  const initial = (safeUser.name?.trim().charAt(0) || 'U').toUpperCase();
 
   return (
     <div
