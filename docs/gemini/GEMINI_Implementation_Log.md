@@ -312,8 +312,10 @@
 * **Left Column Card Restructuring (`Dashboard.tsx`, `CategoryChart.tsx`)**:
   * Extracted `PayerContributionCard` from `CategoryChart.tsx`.
   * Positioned **Payer Out-of-Pocket Contribution Ratio** card and **Payment Channel Distribution** card directly beneath `Recent Shared Expenses` in the Left Column of the dashboard grid, eliminating empty whitespace beneath the recent expenses card.
-* **Restored Metrics Cards Styling (`Dashboard.tsx`)**:
-  * Restored `.grid-summary` and `.summary-card` layout structure for **Total Household Spend**, **Outstanding Debt**, and **Average Per Member** top cards.
+### 2026-08-01: Side-by-Side House Creation & Join Cards Layout
+* **Side-by-Side Grid Layout (`HouseView.tsx`, `index.css`)**:
+  * Added `.grid-2` CSS rule (`repeat(2, 1fr)` on viewports $\ge 768\text{px}$) to display **Create a New House** and **Join an Existing House** cards side-by-side with equal flex heights.
+
 
 
 
