@@ -10,12 +10,12 @@ export const isFirebaseConfigured = Boolean(
 );
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyDemoPlaceholderKeyForLocalFallback123',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'home-finance-tracker.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'home-finance-tracker',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'home-finance-tracker.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1234567890',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:1234567890:web:abcdef123456',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAIycj6LtKtndvgXKkZPa7fNpTdlrByzwc',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'home-finance-1ah277j9.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'home-finance-1ah277j9',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'home-finance-1ah277j9.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '728739828558',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:728739828558:web:48676750e96c2be089041f',
 };
 
 // Safe initialization
