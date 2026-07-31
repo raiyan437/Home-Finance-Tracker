@@ -190,30 +190,46 @@ const AppContent: React.FC = () => {
 
   // Filter household expenses (shared scope) vs personal expenses (private scope)
   const householdExpenses = useMemo(() => {
+    const myUid = dbUserProfile?.uid || activeUserId;
+    const memberUids = currentHouse?.members?.map((m) => m.uid) || [myUid];
+
     return expenses.filter((e) => {
       const isHousehold = !e.scope || e.scope === 'household';
       if (!isHousehold) return false;
 
-      if (currentHouse) {
-        return e.houseId === currentHouse.id || !e.houseId;
+      if (currentHouse?.id) {
+        if (e.houseId === currentHouse.id) return true;
+        // Also include expenses paid by or shared with any active house member
+        const isMemberPayer = memberUids.includes(e.paidBy) || memberUids.some((uid) => e.paidBy?.toLowerCase() === uid.toLowerCase());
+        const isMemberShare = e.shares && e.shares.some((s) => memberUids.includes(s.userId));
+        return isMemberPayer || isMemberShare;
       }
 
-      // If user is not in any house, only show expenses created by or involving this user
       return (
+        e.paidBy === myUid ||
         e.paidBy === activeUserId ||
-        (e.shares && e.shares.some((s) => s.userId === activeUserId))
+        (e.shares && e.shares.some((s) => s.userId === myUid || s.userId === activeUserId))
       );
     });
-  }, [expenses, currentHouse, activeUserId]);
+  }, [expenses, currentHouse, activeUserId, dbUserProfile]);
 
   const houseSettlements = useMemo(() => {
+    const myUid = dbUserProfile?.uid || activeUserId;
+    const memberUids = currentHouse?.members?.map((m) => m.uid) || [myUid];
+
     return settlements.filter((s) => {
-      if (currentHouse) {
-        return (s as any).houseId === currentHouse.id || !(s as any).houseId;
+      if (currentHouse?.id) {
+        if ((s as any).houseId === currentHouse.id) return true;
+        return memberUids.includes(s.fromUserId) || memberUids.includes(s.toUserId);
       }
-      return s.fromUserId === activeUserId || s.toUserId === activeUserId;
+      return (
+        s.fromUserId === myUid ||
+        s.toUserId === myUid ||
+        s.fromUserId === activeUserId ||
+        s.toUserId === activeUserId
+      );
     });
-  }, [settlements, currentHouse, activeUserId]);
+  }, [settlements, currentHouse, activeUserId, dbUserProfile]);
 
   const personalExpenses = useMemo(() => {
     return expenses.filter((e) => e.scope === 'personal' && (e.ownerId === activeUserId || e.paidBy === activeUserId));

@@ -25,7 +25,8 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   onDeleteExpense,
   lang = 'en',
 }) => {
-  const { activeUserId } = useAuth();
+  const { activeUserId, dbUserProfile } = useAuth();
+  const myUid = dbUserProfile?.uid || activeUserId;
 
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -44,6 +45,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   // Persistent budget target (৳15,000.00 default)
   const [monthlyBudgetTaka, setMonthlyBudgetTaka] = useState<string>(() => {
     return (
+      localStorage.getItem(`${BUDGET_STORAGE_KEY}_${myUid}`) ||
       localStorage.getItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`) ||
       localStorage.getItem('home_finance_personal_budget_v1') ||
       '15000.00'
@@ -52,7 +54,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
   // Persistent category monthly budget limits (in Taka strings)
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${activeUserId}`);
+    const saved = localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${myUid}`) || localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${activeUserId}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -72,17 +74,19 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
   // Save budget targets to localStorage
   useEffect(() => {
+    localStorage.setItem(`${BUDGET_STORAGE_KEY}_${myUid}`, monthlyBudgetTaka);
     localStorage.setItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`, monthlyBudgetTaka);
     localStorage.setItem('home_finance_personal_budget_v1', monthlyBudgetTaka);
-  }, [monthlyBudgetTaka, activeUserId]);
+  }, [monthlyBudgetTaka, myUid, activeUserId]);
 
   useEffect(() => {
+    localStorage.setItem(`${CAT_BUDGET_STORAGE_KEY}_${myUid}`, JSON.stringify(categoryBudgets));
     localStorage.setItem(`${CAT_BUDGET_STORAGE_KEY}_${activeUserId}`, JSON.stringify(categoryBudgets));
-  }, [categoryBudgets, activeUserId]);
+  }, [categoryBudgets, myUid, activeUserId]);
 
   const userCards = useMemo(() => {
-    return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
-  }, [cards, activeUserId]);
+    return cards.filter((c) => !c.ownerId || c.ownerId === myUid || c.ownerId === activeUserId);
+  }, [cards, myUid, activeUserId]);
 
   const cardsMap = useMemo(() => {
     const map: Record<string, PaymentCard> = {};
@@ -95,9 +99,9 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   // Filter personal expenses belonging strictly to the active user
   const personalExpenses = useMemo(() => {
     return expenses
-      .filter((e) => e.scope === 'personal' && (e.ownerId === activeUserId || e.paidBy === activeUserId))
+      .filter((e) => e.scope === 'personal' && (e.ownerId === myUid || e.paidBy === myUid || e.ownerId === activeUserId || e.paidBy === activeUserId))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, activeUserId]);
+  }, [expenses, myUid, activeUserId]);
 
   // Available months list for month selector
   const availableMonths = useMemo(() => {
@@ -156,20 +160,24 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const cents = dollarsToCents(amountStr);
-    if (!title.trim() || cents <= 0) return;
+    if (!title.trim() || !amountStr.trim()) return;
+
+    const val = parseFloat(amountStr);
+    if (isNaN(val) || val <= 0) return;
+
+    const cents = dollarsToCents(val);
 
     onSaveExpense(
       {
         title: title.trim(),
         amountCents: cents,
-        paidBy: activeUserId,
+        paidBy: myUid,
         category,
         date,
         splitMethod: 'equal',
-        shares: [{ userId: activeUserId, amountCents: cents }],
+        shares: [{ userId: myUid, amountCents: cents }],
         scope: 'personal',
-        ownerId: activeUserId,
+        ownerId: myUid,
         paymentMethod: {
           type: paymentType,
           cardId: paymentType === 'card' ? (selectedCardId || userCards[0]?.id) : undefined,
