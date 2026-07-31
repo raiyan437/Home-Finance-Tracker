@@ -43,7 +43,11 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
 
   // Persistent budget target (৳15,000.00 default)
   const [monthlyBudgetTaka, setMonthlyBudgetTaka] = useState<string>(() => {
-    return localStorage.getItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`) || '15000.00';
+    return (
+      localStorage.getItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`) ||
+      localStorage.getItem('home_finance_personal_budget_v1') ||
+      '15000.00'
+    );
   });
 
   // Persistent category monthly budget limits (in Taka strings)
@@ -69,6 +73,7 @@ export const PersonalWallet: React.FC<PersonalWalletProps> = ({
   // Save budget targets to localStorage
   useEffect(() => {
     localStorage.setItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`, monthlyBudgetTaka);
+    localStorage.setItem('home_finance_personal_budget_v1', monthlyBudgetTaka);
   }, [monthlyBudgetTaka, activeUserId]);
 
   useEffect(() => {

@@ -20,6 +20,7 @@ import {
   updatePassword,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  onAuthStateChanged,
   type User as FirebaseUser,
 } from 'firebase/auth';
 
@@ -56,7 +57,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [dbUserProfile, setDbUserProfile] = useState<UserProfile | null>(() => getActiveSession());
   const [currentHouse, setCurrentHouse] = useState<House | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Connect Firebase Auth Listener (Bug 1.1)
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Helper: Refresh house object from DB based on user profile
   const syncHouseForUser = (profile: UserProfile | null) => {
@@ -506,7 +517,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userProfile,
         dbUserProfile,
         currentHouse,
-        firebaseUser: auth?.currentUser || null,
+        firebaseUser: firebaseUser || auth?.currentUser || null,
         isAuthenticated: Boolean(dbUserProfile),
         loading,
         switchProfile,

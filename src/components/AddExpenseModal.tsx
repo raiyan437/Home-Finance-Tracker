@@ -219,10 +219,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
     if (scope === 'personal') {
       if (paidBy !== activeUserId) {
-        const eqSplits = calculateEqualSplits(totalCents, [paidBy, activeUserId]);
         finalShares = [
-          { userId: paidBy, amountCents: eqSplits[paidBy] || 0 },
-          { userId: activeUserId, amountCents: eqSplits[activeUserId] || 0 },
+          { userId: paidBy, amountCents: 0 },
+          { userId: activeUserId, amountCents: totalCents },
         ];
       } else {
         finalShares = [{ userId: activeUserId, amountCents: totalCents }];
