@@ -312,15 +312,16 @@
 * **Left Column Card Restructuring (`Dashboard.tsx`, `CategoryChart.tsx`)**:
   * Extracted `PayerContributionCard` from `CategoryChart.tsx`.
   * Positioned **Payer Out-of-Pocket Contribution Ratio** card and **Payment Channel Distribution** card directly beneath `Recent Shared Expenses` in the Left Column of the dashboard grid, eliminating empty whitespace beneath the recent expenses card.
-### 2026-08-01: Card Persistence, Cross-Device House Joining & Live Date Defaults
-* **Cross-Device House Joining (`AuthContext.tsx`)**:
-  * Enhanced `joinHouse(houseCode)` to search local browser `loadHousesDB()` first, and query Firestore `houses` collection (`where('code', '==', cleanCode)`) if not found locally, enabling User B on a different phone/laptop to join User A's house seamlessly.
-* **Card Persistence & Selection Dropdown (`CardsManager.tsx`, `App.tsx`, `AddExpenseModal.tsx`)**:
-  * Saved `ownerId: activeUserId` and `houseId: currentHouse?.id` for payment cards across `localStorage` and Firestore `cards` collection (`syncSaveCard`).
-  * Updated `userCards` filter and passed `cards={userCards}` to `AddExpenseModal.tsx`.
-  * Auto-selected `cards[0]?.id` when `paymentType === 'card'` in `AddExpenseModal.tsx`.
-* **Live Current Date Initialization (`AddExpenseModal.tsx`)**:
-  * Defaulted `date` state to today's local date (`new Date().toISOString().split('T')[0]`) for new expenses.
+### 2026-08-01: Live Production Multi-User Sync Bug Fixes
+* **Realtime House Roster Listener (`firebaseSync.ts`, `AuthContext.tsx`)**:
+  * Implemented `subscribeHouse(houseId)` in `firebaseSync.ts` and subscribed in `AuthContext.tsx`. When Member B joins via house code, Member A's screen updates the member roster live in real-time without reloading.
+* **Strict Card Ownership Isolation (`CardsManager.tsx`, `App.tsx`)**:
+  * Filtered `userCards` by `ownerId === myUid || ownerId === activeUserId` to prevent payment card leakage between different housemates.
+  * Explicitly attached `ownerId: dbUserProfile.uid || activeUserId` and `houseId: currentHouse?.id` on newly created cards.
+* **Settlement Sync & House Creation Async (`App.tsx`, `AuthContext.tsx`)**:
+  * Attached `houseId: currentHouse?.id` to all settlements before calling `syncSaveSettlement`.
+  * `await`ed `syncSaveHouse(newHouse)` in `createHouse` so the house code document is committed to Firestore immediately before completing execution.
+
 
 
 
