@@ -93,52 +93,52 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Top Metric Cards */}
-      <div className="metrics-grid">
+      {/* Top Summary Metric Cards */}
+      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
         {/* Metric 1: Total Household Spend */}
-        <div className="glass-card metric-card">
-          <div className="metric-header">
-            <span className="metric-label">Total Household Spend</span>
-            <div className="metric-icon" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
-              <TrendingUp size={20} />
+        <div className="glass-card summary-card">
+          <div className="summary-card-header">
+            <span className="summary-title">Total Household Spend</span>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
+              <TrendingUp size={22} />
             </div>
           </div>
-          <div className="metric-value tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-primary)' }}>
             {formatCurrency(totalSpentCents, false, lang)}
           </div>
-          <div className="metric-subtext">
+          <div className="summary-footer">
             <span>Overall expenses logged across {expenses.length} records</span>
           </div>
         </div>
 
         {/* Metric 2: Total Outstanding Debt */}
-        <div className="glass-card metric-card">
-          <div className="metric-header">
-            <span className="metric-label">Outstanding Debt</span>
-            <div className="metric-icon" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
-              <Activity size={20} />
+        <div className="glass-card summary-card">
+          <div className="summary-card-header">
+            <span className="summary-title">Outstanding Debt</span>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
+              <Activity size={22} />
             </div>
           </div>
-          <div className="metric-value tabular-nums" style={{ color: 'var(--accent-amber)' }}>
+          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-amber)' }}>
             {formatCurrency(totalPendingDebtCents, false, lang)}
           </div>
-          <div className="metric-subtext">
+          <div className="summary-footer">
             <span>{simplifiedSettlements.length} active settlement transactions required</span>
           </div>
         </div>
 
         {/* Metric 3: Average Per Member */}
-        <div className="glass-card metric-card">
-          <div className="metric-header">
-            <span className="metric-label">Average Per Member</span>
-            <div className="metric-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
-              <CheckCircle2 size={20} />
+        <div className="glass-card summary-card">
+          <div className="summary-card-header">
+            <span className="summary-title">Average Per Member</span>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
+              <CheckCircle2 size={22} />
             </div>
           </div>
-          <div className="metric-value tabular-nums" style={{ color: 'var(--accent-emerald)' }}>
+          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-emerald)' }}>
             {formatCurrency(averagePerMemberCents, false, lang)}
           </div>
-          <div className="metric-subtext">
+          <div className="summary-footer">
             <span>Fair share target for {memberCount} active housemates</span>
           </div>
         </div>
