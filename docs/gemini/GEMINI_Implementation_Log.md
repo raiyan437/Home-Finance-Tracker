@@ -2,7 +2,7 @@
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
 **Last Updated**: 2026-07-30  
-**Current Status**: 10 Broken Business Logics Fixed & Features 1, 4, 6, 8 Complete  
+**Current Status**: Active Production Deployment (Vercel Live)  
 
 ---
 
@@ -273,13 +273,8 @@
   * Purged all expenses, cards, settlements, and category budget data across `localStorage` and Cloud Firestore.
   * Preserved intact demo user IDs (`raiyan`, `himel`, `lazim`) and standard house structure (`house-demo-001`).
 
-
-
-
-
-
-
-
-
-
-
+### 2026-07-31: Successful Vercel Production Deployment
+* **Live Production Web Application**:
+  * Successfully built and deployed the Home Finance Tracker application to **Vercel** connected directly via GitHub continuous integration.
+  * **Live Production URL**: [https://home-finance-tracker-kappa.vercel.app/](https://home-finance-tracker-kappa.vercel.app/)
+  * Configured instant build pipeline (`npm run build` -> `dist/`) with zero-config Vite edge delivery and automated deployment triggers on every `git push`.
