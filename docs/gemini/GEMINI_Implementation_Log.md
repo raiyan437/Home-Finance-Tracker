@@ -286,7 +286,10 @@
 ### 2026-07-31: Live Firebase Production Credentials Configured
 * **Live Production Cloud Config (`.env`, `src/config/firebase.ts`)**:
   * Configured live credentials for project `home-finance-1ah277j9` in `.env` and `src/config/firebase.ts`.
-  * Enabled 🟢 **Cloud Sync Active** mode across all devices.
+* **Unlocked Email Authentication (`src/context/AuthContext.tsx`)**:
+  * Unlocked registration & sign-in for any valid email address and password using Firebase Authentication.
+  * Preserved 1-click demo shortcuts (`raiyan@gmail.com`, `himel@gmail.com`, `lazim@gmail.com`).
+
 
 
 
