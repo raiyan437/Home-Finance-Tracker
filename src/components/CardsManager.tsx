@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { PaymentCard, Expense } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { USERS } from '../utils/settlementEngine';
+import { USERS, getHouseUsers } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
 import { ConfirmModal } from './ConfirmModal';
@@ -37,6 +37,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
   lang = 'en',
 }) => {
   const { userProfile, activeUserId, dbUserProfile, currentHouse } = useAuth();
+  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<PaymentCard | null>(null);
@@ -44,6 +45,25 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
   const [bankName, setBankName] = useState('');
   const [cardType, setCardType] = useState<'credit' | 'debit'>('credit');
   const [selectedColor, setSelectedColor] = useState(CARD_COLOR_PRESETS[0].value);
+
+  const getCardOwner = (cardOwnerId?: string) => {
+    const targetId = cardOwnerId || dbUserProfile?.uid || activeUserId;
+    const found = houseUsers.find(
+      (u) =>
+        u.id === targetId ||
+        (u.uid && u.uid === targetId) ||
+        u.name.toLowerCase() === targetId?.toLowerCase()
+    );
+    if (found) return found;
+    if (USERS[targetId]) return USERS[targetId];
+
+    const fallbackName = dbUserProfile?.displayName || userProfile?.name || 'User';
+    return {
+      id: targetId || 'owner',
+      name: fallbackName,
+      color: '#3b82f6',
+    };
+  };
 
   // Background body scroll lock when modal is active
   useEffect(() => {
@@ -120,6 +140,8 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
     setIsModalOpen(false);
   };
 
+  const activeUserName = dbUserProfile?.displayName || userProfile?.name || 'My';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Header */}
@@ -146,7 +168,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
       <div>
         <div className="housemates-section-title">
           <Wallet size={20} style={{ color: 'var(--accent-primary)' }} />
-          <span>{userProfile.name}'s Active Cards ({userCards.length})</span>
+          <span>{activeUserName}'s Active Cards ({userCards.length})</span>
         </div>
 
         {userCards.length === 0 ? (
@@ -162,7 +184,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 360px))', gap: '20px' }}>
             {userCards.map((card) => {
               const spentCents = cardSpentTotals[card.id] || 0;
-              const owner = USERS[card.ownerId || activeUserId];
+              const owner = getCardOwner(card.ownerId);
               const cardTypeLabel = card.cardType === 'debit' ? 'DEBIT CARD' : 'CREDIT CARD';
 
               return (
