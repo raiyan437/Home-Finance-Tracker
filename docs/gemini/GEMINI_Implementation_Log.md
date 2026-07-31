@@ -300,11 +300,17 @@
 * **Dedicated House Navigation Tab (`HouseView.tsx`, `Navbar.tsx`, `App.tsx`)**:
   * Created `HouseView.tsx` and added `House` (🏠) tab to desktop sidebar & mobile nav.
   * Moved House Creation, House Join, House Join Code 1-click copy/share, inline House Name edit, and Member Roster Table into `HouseView.tsx`.
-### 2026-08-01: Custom Unique House Code Input & Validation
-* **Custom House Code Creation (`AuthContext.tsx`, `HouseView.tsx`)**:
-  * Updated `createHouse(houseName: string, customHouseCode?: string)` to allow users to specify a custom 6-character code (e.g. `123456`).
-  * Enforced strict uniqueness validation. If the code exists in `loadHousesDB()` or Firestore, rejects submission with `"Warning: House code '${cleanCode}' is already taken. Please choose a different unique code."`.
-  * Updated Create House Form in `HouseView.tsx` with uppercase monospace styling for code input.
+### 2026-08-01: Profile Picture Upload, Password Change & Universal Show/Hide Password Toggles
+* **Custom Profile Picture Upload (`SettingsView.tsx`, `AuthContext.tsx`, `UserAvatar.tsx`)**:
+  * Added image upload input (< 2MB) converting profile photo to base64 data URL.
+  * Implemented `updateUserProfilePhoto(avatarUrl)` in `AuthContext.tsx` syncing to `loadUsersDB()`, Firestore, and Firebase Auth `updateProfile({ photoURL })`.
+  * Updated `UserAvatar.tsx` to render base64/URL profile avatar images seamlessly across all user cards.
+* **Current Password Verification & Change Password (`SettingsView.tsx`, `AuthContext.tsx`)**:
+  * Implemented `changeUserPassword(currentPass, newPass)` verifying `currentPass` against stored local credentials and Firebase Auth re-authentication (`EmailAuthProvider.credential`).
+  * Throws `"Current password is incorrect."` on invalid verification.
+* **Universal Show/Hide Password Toggle Buttons (`LoginPage.tsx`, `SignUpPage.tsx`, `SettingsView.tsx`)**:
+  * Wrapped all password inputs with inline Lucide `Eye` and `EyeOff` toggle buttons across login, sign-up, and password change forms.
+
 
 
 
