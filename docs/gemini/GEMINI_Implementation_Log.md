@@ -331,9 +331,12 @@
 * **Firestore Data Sanitization (`firebaseSync.ts`)**:
   * Implemented `sanitizeForFirestore<T>(data)` to recursively strip `undefined` properties from JavaScript objects before calling `setDoc()`.
   * Fixes the hidden Firestore `Unsupported field value: undefined` exception that caused `syncSaveHouse(house)` and `syncSaveUser(userProfile)` to throw silently on live Cloud Firestore.
-* **Realtime User & House Document Listeners (`AuthContext.tsx`)**:
-  * Upgraded `onAuthStateChanged` to maintain a realtime `onSnapshot(doc(db, 'users', user.uid))` subscription.
-  * Subscribed `subscribeHouse` to `dbUserProfile?.houseId || currentHouse?.id`, ensuring that when Member B joins Member A's household on live Vercel, Firestore pushes the updated member roster to both devices instantly in real-time.
+### 2026-08-01: Settlement Debt Recalculation & Live Expense Attribution Fix
+* **Live Member UID Expense Attribution (`AddExpenseModal.tsx`, `App.tsx`)**:
+  * Passed `houseUsers={houseUsers}` and `activeUserId={dbUserProfile?.uid || activeUserId}` to `<AddExpenseModal>` in `App.tsx`.
+  * Updated `AddExpenseModal` to default `paidBy` to the authenticated user's actual UID (`dbUserProfile.uid`) instead of falling back to static `'raiyan'`.
+  * Guarantees that newly created expenses attribute payments and split shares to the active household member UIDs, enabling `calculateNetBalances` and `calculateSimplifiedSettlements` in `SettlementView.tsx` to update instantly upon expense creation.
+
 
 
 
