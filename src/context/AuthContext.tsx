@@ -24,7 +24,6 @@ interface AuthContextType {
   switchProfile: (userId: UserId) => void;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
-  loginOrSignUpDemoAccount: (email: string, pass: string, displayName: string, housemateId: UserId) => Promise<void>;
   logout: () => Promise<void>;
   createHouse: (houseName: string) => Promise<void>;
   joinHouse: (houseCode: string) => Promise<void>;
@@ -36,13 +35,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ACTIVE_USER_STORAGE_KEY = 'home_finance_active_user_v1';
-
-// Strict Authorized Accounts Map
-const AUTHORIZED_DEMO_ACCOUNTS: Record<string, { pass: string; id: UserId; displayName: string }> = {
-  'raiyan@gmail.com': { pass: 'dummy123', id: 'raiyan', displayName: 'Raiyan' },
-  'himel@gmail.com': { pass: 'dummy123', id: 'himel', displayName: 'Himel' },
-  'lazim@gmail.com': { pass: 'dummy123', id: 'lazim', displayName: 'Lazim' },
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeUserId, setActiveUserId] = useState<UserId>(() => {
@@ -77,11 +69,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Login Handler (Realtime Firebase Auth + Demo Fallbacks)
+  // Strict Login Handler
   const loginWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
-    const demo = AUTHORIZED_DEMO_ACCOUNTS[cleanEmail];
     let firebaseUid: string | null = null;
 
     if (auth) {
@@ -89,31 +80,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
         firebaseUid = userCred.user.uid;
       } catch (fbErr: any) {
-        if (!demo) {
-          setLoading(false);
-          throw new Error(fbErr.message || 'Invalid email or password. Please check your credentials.');
-        }
+        console.warn('Firebase login attempt notice:', fbErr);
       }
     }
 
     const users = loadUsersDB();
     let existingUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
 
+    if (!existingUser && !firebaseUid) {
+      setLoading(false);
+      throw new Error('Invalid email or password. Please verify your credentials or Sign Up.');
+    }
+
     if (!existingUser) {
       existingUser = {
-        uid: firebaseUid || (demo ? `user-${demo.id}-001` : `user-${Date.now()}`),
-        displayName: demo ? demo.displayName : cleanEmail.split('@')[0],
+        uid: firebaseUid || `user-${Date.now()}`,
+        displayName: cleanEmail.split('@')[0],
         email: cleanEmail,
-        houseId: demo ? (demo.id === 'himel' ? null : 'house-demo-001') : null,
-        role: demo ? (demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null) : null,
+        houseId: null,
+        role: null,
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existingUser]);
     }
 
-    if (demo) {
-      switchProfile(demo.id);
-    }
     setActiveSession(existingUser);
     setDbUserProfile(existingUser);
     syncHouseForUser(existingUser);
@@ -121,11 +111,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   };
 
-  // Sign Up Handler (Realtime Firebase Auth + Unlimited Email Signups)
+  // Open Sign Up Handler
   const signUpWithEmail = async (email: string, pass: string, displayName: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
-    const demo = AUTHORIZED_DEMO_ACCOUNTS[cleanEmail];
 
     if (!cleanEmail || !cleanEmail.includes('@')) {
       setLoading(false);
@@ -136,6 +125,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Password must be at least 6 characters long.');
     }
 
+    const users = loadUsersDB();
+    const existing = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (existing) {
+      setLoading(false);
+      throw new Error('Email is already registered. Please log in.');
+    }
+
     let firebaseUid: string | null = null;
 
     if (auth) {
@@ -144,53 +141,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         firebaseUid = userCred.user.uid;
       } catch (fbErr: any) {
         if (fbErr.code === 'auth/email-already-in-use') {
-          // If email exists, fallback to sign in
-          try {
-            const loginCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-            firebaseUid = loginCred.user.uid;
-          } catch (loginErr) {
-            setLoading(false);
-            throw new Error('This email is already registered. Please enter the correct password to log in.');
-          }
-        } else if (!demo) {
           setLoading(false);
-          throw new Error(fbErr.message || 'Failed to create account in Firebase. Please try again.');
+          throw new Error('Email is already registered. Please log in.');
+        } else {
+          console.warn('Firebase signup notice:', fbErr);
         }
       }
     }
 
-    const users = loadUsersDB();
-    let existing = users.find((u) => u.email.toLowerCase() === cleanEmail);
+    const newUser: UserProfile = {
+      uid: firebaseUid || `user-${Date.now()}`,
+      displayName: displayName.trim() || cleanEmail.split('@')[0],
+      email: cleanEmail,
+      houseId: null,
+      role: null,
+      createdAt: new Date().toISOString(),
+    };
 
-    if (!existing) {
-      existing = {
-        uid: firebaseUid || (demo ? `user-${demo.id}-001` : `user-${Date.now()}`),
-        displayName: displayName.trim() || (demo ? demo.displayName : cleanEmail.split('@')[0]),
-        email: cleanEmail,
-        houseId: demo ? (demo.id === 'himel' ? null : 'house-demo-001') : null,
-        role: demo ? (demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null) : null,
-        createdAt: new Date().toISOString(),
-      };
-      saveUsersDB([...users, existing]);
-    } else {
-      existing.displayName = displayName.trim() || existing.displayName;
-      saveUsersDB(users);
-    }
-
-    if (demo) {
-      switchProfile(demo.id);
-    }
-    setActiveSession(existing);
-    setDbUserProfile(existing);
-    syncHouseForUser(existing);
-    syncSaveUser(existing);
+    saveUsersDB([...users, newUser]);
+    setActiveSession(newUser);
+    setDbUserProfile(newUser);
+    syncHouseForUser(newUser);
+    syncSaveUser(newUser);
     setLoading(false);
-  };
-
-  // 1-Click Demo Login
-  const loginOrSignUpDemoAccount = async (email: string, pass: string, _displayName: string, housemateId: UserId) => {
-    switchProfile(housemateId);
-    await loginWithEmail(email, pass);
   };
 
   // Logout Handler
@@ -299,38 +272,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Update House Name Handler (Leader Power)
   const updateHouseName = async (newName: string) => {
-    if (!dbUserProfile || !currentHouse) throw new Error('No active house session found');
-    if (currentHouse.leaderUid !== dbUserProfile.uid && dbUserProfile.role !== 'leader') {
-      throw new Error('Only the House Leader can update the house name');
-    }
-    const cleanName = newName.trim();
-    if (!cleanName) {
-      throw new Error('House name cannot be empty');
-    }
+    if (!currentHouse) throw new Error('No active house found');
+    const trimmed = newName.trim();
+    if (!trimmed) throw new Error('House name cannot be empty');
 
+    const updatedHouse = { ...currentHouse, name: trimmed };
     const houses = loadHousesDB();
-    const house = houses.find((h) => h.id === currentHouse.id);
-    if (house) {
-      house.name = cleanName;
-      saveHousesDB(houses);
-      setCurrentHouse({ ...house });
-    }
+    const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
+    saveHousesDB(updatedHouses);
+    setCurrentHouse(updatedHouse);
+    syncSaveHouse(updatedHouse);
   };
 
-  // Kick Member Handler
+  // Kick Member Handler (Leader Power)
   const kickMember = async (targetUid: string) => {
-    if (!dbUserProfile || !currentHouse) return;
-    if (currentHouse.leaderUid !== dbUserProfile.uid && dbUserProfile.role !== 'leader') {
-      throw new Error('Only the House Leader can kick members');
-    }
+    if (!currentHouse) throw new Error('No active house found');
+    if (currentHouse.leaderUid === targetUid) throw new Error('House leader cannot be kicked from house');
+
+    const updatedMembers = currentHouse.members.filter((m) => m.uid !== targetUid);
+    const updatedHouse = { ...currentHouse, members: updatedMembers };
 
     const houses = loadHousesDB();
-    const house = houses.find((h) => h.id === currentHouse.id);
-    if (house) {
-      house.members = house.members.filter((m) => m.uid !== targetUid);
-      saveHousesDB(houses);
-      setCurrentHouse({ ...house });
-    }
+    const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
+    saveHousesDB(updatedHouses);
+    setCurrentHouse(updatedHouse);
+    syncSaveHouse(updatedHouse);
 
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {
@@ -345,13 +311,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Leave House Handler
   const leaveHouse = async () => {
     if (!dbUserProfile || !currentHouse) return;
+    if (currentHouse.leaderUid === dbUserProfile.uid) {
+      throw new Error('House Leaders cannot leave house. Delete or transfer ownership first.');
+    }
+
+    const updatedMembers = currentHouse.members.filter((m) => m.uid !== dbUserProfile.uid);
+    const updatedHouse = { ...currentHouse, members: updatedMembers };
 
     const houses = loadHousesDB();
-    const house = houses.find((h) => h.id === currentHouse.id);
-    if (house) {
-      house.members = house.members.filter((m) => m.uid !== dbUserProfile.uid);
-      saveHousesDB(houses);
-    }
+    const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
+    saveHousesDB(updatedHouses);
 
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {
@@ -366,9 +335,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse(null);
+    syncSaveHouse(updatedHouse);
+    syncSaveUser(updatedProfile);
   };
 
-  const userProfile = USERS[activeUserId] || USERS.raiyan;
+  const userProfile: User = {
+    id: activeUserId,
+    name: dbUserProfile?.displayName || USERS[activeUserId]?.name || 'User',
+    avatar: dbUserProfile?.avatar || USERS[activeUserId]?.avatar || activeUserId,
+    color: USERS[activeUserId]?.color || '#3b82f6',
+  };
 
   return (
     <AuthContext.Provider
@@ -377,13 +353,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userProfile,
         dbUserProfile,
         currentHouse,
-        firebaseUser: null,
+        firebaseUser: auth?.currentUser || null,
         isAuthenticated: Boolean(dbUserProfile),
         loading,
         switchProfile,
         loginWithEmail,
         signUpWithEmail,
-        loginOrSignUpDemoAccount,
         logout,
         createHouse,
         joinHouse,
@@ -397,10 +372,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

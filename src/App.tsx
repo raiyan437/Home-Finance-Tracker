@@ -474,6 +474,42 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Viewport */}
       <main className="main-content">
+        {/* First-Time User House Onboarding Banner */}
+        {!currentHouse && (
+          <div
+            className="glass-card"
+            style={{
+              borderLeft: '4px solid var(--accent-primary)',
+              marginBottom: '24px',
+              padding: '20px 24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '16px',
+              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+            }}
+          >
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🏠 Welcome! You are not in a Household yet</span>
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Create a new household space to invite housemates or join an existing household using a join code.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={() => setActiveTab('settings')}>
+                <span>👑 Create a New House</span>
+              </button>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('settings')}>
+                <span>👤 Join Existing House</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <Suspense
           fallback={
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--accent-primary)' }}>

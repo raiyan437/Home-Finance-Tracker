@@ -3,18 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { ALL_USERS } from '../utils/settlementEngine';
 import type { UserId } from '../types';
 import { UserAvatar } from './UserAvatar';
-import { X, Lock, User, KeyRound, ShieldCheck, Check, AlertCircle, LogOut, Sparkles } from 'lucide-react';
+import { X, Lock, User, KeyRound, ShieldCheck, Check, AlertCircle, LogOut } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const DEMO_ACCOUNTS = [
-  { id: 'raiyan' as UserId, name: 'Raiyan', email: 'raiyan@gmail.com', password: 'dummy123' },
-  { id: 'himel' as UserId, name: 'Himel', email: 'himel@gmail.com', password: 'dummy123' },
-  { id: 'lazim' as UserId, name: 'Lazim', email: 'lazim@gmail.com', password: 'dummy123' },
-];
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const {
@@ -24,7 +18,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     dbUserProfile,
     loginWithEmail,
     signUpWithEmail,
-    loginOrSignUpDemoAccount,
     logout,
   } = useAuth();
   
@@ -42,19 +35,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleSelectProfile = (userId: UserId) => {
     switchProfile(userId);
     onClose();
-  };
-
-  const handleDemoAccountClick = async (demo: typeof DEMO_ACCOUNTS[0]) => {
-    setErrorMsg(null);
-    setIsSubmitting(true);
-    try {
-      await loginOrSignUpDemoAccount(demo.email, demo.password, demo.name, demo.id);
-      onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to authenticate demo account.');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleFirebaseSubmit = async (e: React.FormEvent) => {
@@ -115,34 +95,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Quick Demo Accounts Banner */}
-        <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '8px' }}>
-            <Sparkles size={14} />
-            <span>1-CLICK DEMO ACCOUNTS (Raiyan, Himel, Lazim)</span>
-          </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {DEMO_ACCOUNTS.map((demo) => (
-              <button
-                key={demo.id}
-                type="button"
-                className="btn btn-secondary btn-sm"
-                style={{ justifyContent: 'space-between', padding: '8px 12px' }}
-                onClick={() => handleDemoAccountClick(demo)}
-                disabled={isSubmitting}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <UserAvatar user={ALL_USERS.find((u) => u.id === demo.id)!} size={24} />
-                  <span style={{ fontWeight: 700 }}>{demo.name}</span>
-                </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {demo.email} • {demo.password}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {activeTab === 'profile' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

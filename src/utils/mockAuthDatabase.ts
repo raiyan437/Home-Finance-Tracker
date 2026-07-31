@@ -4,60 +4,8 @@ const USERS_DB_KEY = 'home_finance_users_db_v3';
 const HOUSES_DB_KEY = 'home_finance_houses_db_v3';
 const ACTIVE_SESSION_KEY = 'home_finance_active_session_v3';
 
-// Default Seed Accounts: Raiyan (Leader) & Lazim (Member) belong to house-demo-001. Himel is unassigned initially.
-const DEFAULT_USERS: UserProfile[] = [
-  {
-    uid: 'user-raiyan-001',
-    displayName: 'Raiyan',
-    email: 'raiyan@gmail.com',
-    avatar: 'raiyan',
-    houseId: 'house-demo-001',
-    role: 'leader',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    uid: 'user-lazim-003',
-    displayName: 'Lazim',
-    email: 'lazim@gmail.com',
-    avatar: 'lazim',
-    houseId: 'house-demo-001',
-    role: 'member',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    uid: 'user-himel-002',
-    displayName: 'Himel',
-    email: 'himel@gmail.com',
-    avatar: 'himel',
-    houseId: null,
-    role: null,
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const DEFAULT_HOUSE: House = {
-  id: 'house-demo-001',
-  code: 'HM-8823',
-  name: 'Bachelor House Villa',
-  leaderUid: 'user-raiyan-001',
-  members: [
-    {
-      uid: 'user-raiyan-001',
-      displayName: 'Raiyan',
-      email: 'raiyan@gmail.com',
-      role: 'leader',
-      joinedAt: new Date().toISOString(),
-    },
-    {
-      uid: 'user-lazim-003',
-      displayName: 'Lazim',
-      email: 'lazim@gmail.com',
-      role: 'member',
-      joinedAt: new Date().toISOString(),
-    },
-  ],
-  createdAt: new Date().toISOString(),
-};
+// Empty Production User & House DB Default Arrays
+const DEFAULT_USERS: UserProfile[] = [];
 
 // Helper: Load Users DB
 export const loadUsersDB = (): UserProfile[] => {
@@ -88,7 +36,7 @@ export const loadHousesDB = (): House[] => {
       console.warn('Failed to parse houses db:', e);
     }
   }
-  const initial = [DEFAULT_HOUSE];
+  const initial: House[] = [];
   localStorage.setItem(HOUSES_DB_KEY, JSON.stringify(initial));
   return initial;
 };
@@ -110,8 +58,7 @@ export const getActiveSession = (): UserProfile | null => {
       return null;
     }
   }
-  // Default to Raiyan
-  return DEFAULT_USERS[0];
+  return null;
 };
 
 // Helper: Save Active Session
@@ -123,9 +70,9 @@ export const setActiveSession = (user: UserProfile | null) => {
   }
 };
 
-// Helper: Reset Mock DB to Default Seed Users & Houses
+// Helper: Reset Mock DB to Clean State
 export const resetMockDBToDefault = () => {
-  saveUsersDB(DEFAULT_USERS);
-  saveHousesDB([DEFAULT_HOUSE]);
-  setActiveSession(DEFAULT_USERS[0]);
+  saveUsersDB([]);
+  saveHousesDB([]);
+  setActiveSession(null);
 };

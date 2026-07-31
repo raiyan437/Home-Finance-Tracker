@@ -1,22 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserAvatar } from './UserAvatar';
-import { ALL_USERS } from '../utils/settlementEngine';
-import type { UserId } from '../types';
-import { Home, KeyRound, Sparkles, AlertCircle } from 'lucide-react';
+import { Home, KeyRound, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
   onSwitchToSignUp: () => void;
 }
 
-const DEMO_ACCOUNTS = [
-  { id: 'raiyan' as UserId, name: 'Raiyan', email: 'raiyan@gmail.com', password: 'dummy123' },
-  { id: 'himel' as UserId, name: 'Himel', email: 'himel@gmail.com', password: 'dummy123' },
-  { id: 'lazim' as UserId, name: 'Lazim', email: 'lazim@gmail.com', password: 'dummy123' },
-];
-
 export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
-  const { loginWithEmail, loginOrSignUpDemoAccount } = useAuth();
+  const { loginWithEmail } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,18 +23,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
       await loginWithEmail(email.trim(), password);
     } catch (err: any) {
       setErrorMsg(err.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDemoLogin = async (demo: typeof DEMO_ACCOUNTS[0]) => {
-    setErrorMsg(null);
-    setIsSubmitting(true);
-    try {
-      await loginOrSignUpDemoAccount(demo.email, demo.password, demo.name, demo.id);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to authenticate demo account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -80,7 +59,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
       <div
         className="glass-card"
         style={{
-          maxWidth: '460px',
+          maxWidth: '440px',
           width: '100%',
           padding: '36px',
           borderRadius: '20px',
@@ -112,60 +91,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
           </p>
         </div>
 
-        {/* 1-Click Quick Demo Sign In Cards */}
-        <div
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.04)',
-            padding: '16px',
-            borderRadius: '14px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            marginBottom: '24px',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              color: '#3b82f6',
-              marginBottom: '10px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-            }}
-          >
-            <Sparkles size={14} />
-            <span>1-Click Demo Accounts (Raiyan, Himel, Lazim)</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {DEMO_ACCOUNTS.map((demo) => (
-              <button
-                key={demo.id}
-                type="button"
-                className="btn btn-secondary btn-sm"
-                style={{
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                }}
-                onClick={() => handleDemoLogin(demo)}
-                disabled={isSubmitting}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <UserAvatar user={ALL_USERS.find((u) => u.id === demo.id)!} size={26} />
-                  <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{demo.name}</span>
-                </div>
-                <span style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
-                  {demo.email} • {demo.password}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Email & Password Login Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {errorMsg && (
@@ -192,7 +117,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
             <input
               type="email"
               className="form-input"
-              placeholder="raiyan@gmail.com"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -204,7 +129,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
             <input
               type="password"
               className="form-input"
-              placeholder="dummy123"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -238,7 +163,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
               textDecoration: 'underline',
             }}
           >
-            Sign Up Here
+            Sign Up
           </button>
         </div>
       </div>
