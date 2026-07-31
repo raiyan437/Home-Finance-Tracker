@@ -292,9 +292,17 @@
   * Removed `AUTHORIZED_DEMO_ACCOUNTS` map. Open registration allows any visitor to sign up with valid email, password (>= 6 chars), and display name.
   * Throws `"Email is already registered. Please log in."` if email is taken. Strict login throws `"Invalid email or password. Please verify your credentials or Sign Up."`.
 * **First-Time User Onboarding Banner (`App.tsx`)**:
-* **Strict Firebase Auth Verification (`AuthContext.tsx`)**:
-  * Fixed login flow to strictly require successful `signInWithEmailAndPassword` when Firebase Auth is active.
-  * Automatically purges stale deleted accounts from local storage cache if rejected by Firebase Auth.
+### 2026-07-31: UI/UX Refinement — Dynamic Initials, House Tab & Clean Settings
+* **Dynamic Initials Avatar (`UserAvatar.tsx`, `Navbar.tsx`)**:
+  * Removed demo PNG image fallbacks from sidebar profile card. Replaced with dynamic uppercase initials badge rendered on a clean HSL gradient circle.
+* **Sidebar Cleanup (`Navbar.tsx`)**:
+  * Removed `+ New Expense` button from desktop sidebar. Expense creation is handled directly in Expense List view.
+* **Dedicated House Navigation Tab (`HouseView.tsx`, `Navbar.tsx`, `App.tsx`)**:
+  * Created `HouseView.tsx` and added `House` (🏠) tab to desktop sidebar & mobile nav.
+  * Moved House Creation, House Join, House Join Code 1-click copy/share, inline House Name edit, and Member Roster Table into `HouseView.tsx`.
+* **Focused Settings View (`SettingsView.tsx`)**:
+  * Removed custom theme accent color picker. Kept SettingsView focused strictly on account details, cloud sync status, 1-click JSON backup export/import, push alerts, and logout.
+
 
 
 
