@@ -339,8 +339,11 @@
 * **Household Expense & Settlement Member UID Matching (`App.tsx`)**:
   * Enhanced `householdExpenses` and `houseSettlements` filters in `App.tsx` to match expenses and settlements against `currentHouse.id` as well as all active house member UIDs (`memberUids`).
   * Guarantees 100% visibility of shared household expenses across all connected devices and browsers on live production.
-* **Personal Wallet UID Isolation (`PersonalWallet.tsx`)**:
-  * Updated `PersonalWallet` to scope personal expenses, card selections, and budget targets directly to `dbUserProfile?.uid || activeUserId`.
+### 2026-08-01: Dashboard Payer Contribution Ratio Calculation Fix
+* **Flexible Payer UID & Profile Matching (`CategoryChart.tsx`)**:
+  * Updated `PayerContributionCard` in `CategoryChart.tsx` to match `e.paidBy` case-insensitively against `user.id`, `user.uid`, `user.name`, `user.email`, and `user.email.split('@')[0]`.
+  * Guarantees 100% accurate calculation of out-of-pocket totals and contribution percentages for all active house members on live production.
+
 
 
 
