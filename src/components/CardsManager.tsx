@@ -36,7 +36,7 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
   onDeleteCard,
   lang = 'en',
 }) => {
-  const { userProfile, activeUserId } = useAuth();
+  const { userProfile, activeUserId, dbUserProfile, currentHouse } = useAuth();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<PaymentCard | null>(null);
@@ -57,10 +57,11 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
     };
   }, [isModalOpen, deletingCard]);
 
-  // Filter cards by active user or show all household cards
+  // Enforce strict card ownership filtering per member (prevent card leakage)
   const userCards = useMemo(() => {
-    return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
-  }, [cards, activeUserId]);
+    const myUid = dbUserProfile?.uid || activeUserId;
+    return cards.filter((c) => c.ownerId === myUid || c.ownerId === activeUserId || c.ownerId === dbUserProfile?.uid);
+  }, [cards, activeUserId, dbUserProfile]);
 
   // Calculate spent total per card
   const cardSpentTotals = useMemo(() => {
@@ -110,7 +111,8 @@ export const CardsManager: React.FC<CardsManagerProps> = ({
         bankName: bankName.trim(),
         cardType,
         color: selectedColor,
-        ownerId: activeUserId,
+        ownerId: dbUserProfile?.uid || activeUserId,
+        houseId: currentHouse?.id,
       },
       editingCard ? editingCard.id : undefined
     );

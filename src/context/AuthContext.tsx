@@ -11,7 +11,7 @@ import {
 } from '../utils/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { syncSaveUser, syncSaveHouse } from '../utils/firebaseSync';
+import { syncSaveUser, syncSaveHouse, subscribeHouse } from '../utils/firebaseSync';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -73,6 +73,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     syncHouseForUser(dbUserProfile);
   }, [dbUserProfile]);
+
+  // Realtime House Roster Listener (Live multi-user roster updates across devices)
+  useEffect(() => {
+    if (!currentHouse?.id) return;
+    const unsub = subscribeHouse(currentHouse.id, (updatedHouse) => {
+      if (updatedHouse) {
+        setCurrentHouse(updatedHouse);
+        const houses = loadHousesDB();
+        const existingIdx = houses.findIndex((h) => h.id === updatedHouse.id);
+        if (existingIdx >= 0) {
+          houses[existingIdx] = updatedHouse;
+          saveHousesDB(houses);
+        } else {
+          saveHousesDB([...houses, updatedHouse]);
+        }
+      }
+    });
+    return () => unsub();
+  }, [currentHouse?.id]);
 
   const switchProfile = (userId: UserId) => {
     if (USERS[userId]) {
@@ -333,8 +352,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse(newHouse);
-    syncSaveHouse(newHouse);
-    syncSaveUser(updatedProfile);
+    await syncSaveHouse(newHouse);
+    await syncSaveUser(updatedProfile);
   };
 
   // Join House Handler (Supports Local & Firestore Cross-Device Queries)
@@ -400,8 +419,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse({ ...house });
-    syncSaveHouse(house);
-    syncSaveUser(updatedProfile);
+    await syncSaveHouse(house);
+    await syncSaveUser(updatedProfile);
   };
 
   // Update House Name Handler (Leader Power)

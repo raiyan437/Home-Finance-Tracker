@@ -29,6 +29,27 @@ export const syncSaveHouse = async (house: House) => {
 };
 
 /**
+ * Listens for realtime changes to a specific house document in Firestore `houses` collection.
+ */
+export const subscribeHouse = (houseId: string, onUpdate: (house: House | null) => void) => {
+  if (!isFirebaseConfigured || !db || !houseId) return () => {};
+
+  try {
+    return onSnapshot(
+      doc(db, 'houses', houseId),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          onUpdate(snapshot.data() as House);
+        }
+      },
+      (err) => console.warn('Firestore House Sync Warning:', err)
+    );
+  } catch (err) {
+    return () => {};
+  }
+};
+
+/**
  * Listens for realtime changes to the Firestore `expenses` collection (optionally house-scoped).
  */
 export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void, houseId?: string | null) => {
