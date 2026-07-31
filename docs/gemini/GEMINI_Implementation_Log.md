@@ -318,25 +318,12 @@
 * **Strict Card Ownership Isolation (`CardsManager.tsx`, `App.tsx`)**:
   * Filtered `userCards` by `ownerId === myUid || ownerId === activeUserId` to prevent payment card leakage between different housemates.
   * Explicitly attached `ownerId: dbUserProfile.uid || activeUserId` and `houseId: currentHouse?.id` on newly created cards.
-* **Settlement Sync & House Creation Async (`App.tsx`, `AuthContext.tsx`)**:
-  * Attached `houseId: currentHouse?.id` to all settlements before calling `syncSaveSettlement`.
-  * `await`ed `syncSaveHouse(newHouse)` in `createHouse` so the house code document is committed to Firestore immediately before completing execution.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+### 2026-08-01: Comprehensive Production Bugs 1.1 to 6.2 Audit & Fix
+* **Section 1 (Auth Lifecycle & Listener)**: Attached `onAuthStateChanged(auth, (user) => setFirebaseUser(user))` in `AuthContext.tsx` to keep `firebaseUser` reactive across sessions.
+* **Section 2 (House Roster & Realtime Sync)**: Added `subscribeHouse(houseId)` for live multi-device roster updates and `await`ed `syncSaveHouse(newHouse)` during house creation.
+* **Section 3 (Financial Calculations & Settlement Reversals)**: Standardized expense shares strictly by UID in `settlementEngine.ts` and enabled settlement reversals (`status: 'reversed'`) in `SettlementView.tsx`.
+* **Section 4 (Expenses, OCR & Personal Scope Isolation)**: Fixed personal scope out-of-pocket shares in `AddExpenseModal.tsx` so non-owner payers receive 100% credit, integrated canvas/text OCR scanner in `ocrScanner.ts`, and active automated recurring expense generator in `App.tsx`.
+* **Section 5 (Cards & Wallet Isolation)**: Enforced strict card ownership filtering in `CardsManager.tsx` & `App.tsx`, persisted personal monthly budget target in `PersonalWallet.tsx`, and handled deleted card cascades.
+* **Section 6 (Persistence & i18n)**: Synced demo data reset with Cloud Firestore and bound UI labels to the bilingual `i18n.ts` engine (`t(key, lang)`).
 
 
