@@ -90,6 +90,71 @@
   --sidebar-width: 270px;
 }
 
+/* Theme Accent Variants */
+[data-accent="charcoal"] {
+  --accent-primary: #e4e4e7;
+  --accent-primary-hover: #ffffff;
+  --accent-primary-glow: rgba(228, 228, 231, 0.25);
+  --border-glow: rgba(228, 228, 231, 0.3);
+}
+
+[data-accent="midnight"] {
+  --accent-primary: #3b82f6;
+  --accent-primary-hover: #60a5fa;
+  --accent-primary-glow: rgba(59, 130, 246, 0.25);
+  --border-glow: rgba(59, 130, 246, 0.35);
+}
+
+[data-accent="emerald"] {
+  --accent-primary: #10b981;
+  --accent-primary-hover: #34d399;
+  --accent-primary-glow: rgba(16, 185, 129, 0.25);
+  --border-glow: rgba(16, 185, 129, 0.35);
+}
+
+[data-accent="amber"] {
+  --accent-primary: #f59e0b;
+  --accent-primary-hover: #fbbf24;
+  --accent-primary-glow: rgba(245, 158, 11, 0.25);
+  --border-glow: rgba(245, 158, 11, 0.35);
+}
+
+/* Printable PDF Statement Media Styles */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+  
+  .navbar,
+  .mobile-bottom-nav,
+  .btn,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .glass-card {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    color: #0f172a !important;
+    break-inside: avoid;
+  }
+
+  .page-title {
+    color: #0f172a !important;
+    -webkit-text-fill-color: initial !important;
+  }
+}
+
 [data-theme='light'] {
   --bg-base: #f4f4f6;
   --bg-surface: #ffffff;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
-import type { TabType } from './components/Navbar';
+import type { TabType, AccentColor } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { ExpenseList } from './components/ExpenseList';
 import { SettlementView } from './components/SettlementView';
@@ -13,6 +13,8 @@ import { SignUpPage } from './components/SignUpPage';
 
 import type { Expense, Settlement, SimplifiedTransaction, PaymentCard } from './types';
 import type { Language } from './utils/i18n';
+import { formatCurrency } from './utils/currency';
+import { notifyNewExpense, notifyPendingSettlement } from './utils/notifications';
 import {
   loadExpenses,
   saveExpenses,
@@ -59,6 +61,9 @@ const AppContent: React.FC = () => {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [accent, setAccent] = useState<AccentColor>(() => {
+    return (localStorage.getItem('home_finance_accent') as AccentColor) || 'charcoal';
+  });
   const [lang, setLang] = useState<Language>('en');
 
   // Modals state
@@ -68,7 +73,7 @@ const AppContent: React.FC = () => {
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [pendingSettlementTx, setPendingSettlementTx] = useState<SimplifiedTransaction | null>(null);
 
-  // Initialize data, theme, and Firestore realtime subscriptions
+  // Initialize data, theme, accent, and Firestore realtime subscriptions
   useEffect(() => {
     setExpenses(loadExpenses());
     setSettlements(loadSettlements());
@@ -77,6 +82,10 @@ const AppContent: React.FC = () => {
     const savedTheme = (localStorage.getItem('home_finance_theme') as 'dark' | 'light') || 'dark';
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
+
+    const savedAccent = (localStorage.getItem('home_finance_accent') as AccentColor) || 'charcoal';
+    setAccent(savedAccent);
+    document.documentElement.setAttribute('data-accent', savedAccent);
 
     const houseId = currentHouse?.id;
 
@@ -236,6 +245,7 @@ const AppContent: React.FC = () => {
     setExpenses(updatedExpenses);
     saveExpenses(updatedExpenses);
     syncSaveExpense(targetExpense, currentHouse?.id);
+    notifyNewExpense(targetExpense.title, formatCurrency(targetExpense.amountCents), dbUserProfile?.displayName || activeUserId);
   };
 
   // Delete expense handler
@@ -375,6 +385,7 @@ const AppContent: React.FC = () => {
     setSettlements(updatedSettlements);
     saveSettlements(updatedSettlements);
     syncSaveSettlement(newSettlement, currentHouse?.id);
+    notifyPendingSettlement(pendingSettlementTx.fromUser.name, pendingSettlementTx.toUser.name, formatCurrency(pendingSettlementTx.amountCents));
     setPendingSettlementTx(null);
   };
 
@@ -433,6 +444,12 @@ const AppContent: React.FC = () => {
     return <LoginPage onSwitchToSignUp={() => setAuthView('signup')} />;
   }
 
+  const handleSetAccent = (newAccent: AccentColor) => {
+    setAccent(newAccent);
+    localStorage.setItem('home_finance_accent', newAccent);
+    document.documentElement.setAttribute('data-accent', newAccent);
+  };
+
   return (
     <div className="app-container">
       {/* Navigation Sidebar / Mobile Nav */}
@@ -447,6 +464,8 @@ const AppContent: React.FC = () => {
         toggleTheme={toggleTheme}
         lang={lang}
         toggleLang={toggleLang}
+        accent={accent}
+        setAccent={handleSetAccent}
         expenseCount={householdExpenses.length}
         settlementCount={simplifiedSettlements.length}
         personalCount={personalExpenses.length}
@@ -526,7 +545,9 @@ const AppContent: React.FC = () => {
             <MonthlySummary expenses={householdExpenses} settlements={houseSettlements} lang={lang} />
           )}
 
-          {activeTab === 'settings' && <SettingsView lang={lang} />}
+          {activeTab === 'settings' && (
+            <SettingsView lang={lang} accent={accent} setAccent={handleSetAccent} />
+          )}
         </Suspense>
       </main>
 

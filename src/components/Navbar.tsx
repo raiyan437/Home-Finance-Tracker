@@ -24,6 +24,8 @@ import {
 
 export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'settings';
 
+export type AccentColor = 'charcoal' | 'midnight' | 'emerald' | 'amber';
+
 interface NavbarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
@@ -32,6 +34,8 @@ interface NavbarProps {
   toggleTheme: () => void;
   lang: Language;
   toggleLang: () => void;
+  accent?: AccentColor;
+  setAccent?: (accent: AccentColor) => void;
   expenseCount?: number;
   settlementCount?: number;
   personalCount?: number;
@@ -46,6 +50,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   toggleTheme,
   lang,
   toggleLang,
+  accent = 'charcoal',
+  setAccent,
   expenseCount,
   settlementCount,
   personalCount,
@@ -220,6 +226,36 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{theme === 'dark' ? t('light') : t('dark')}</span>
             </button>
           </div>
+
+          {/* Accent Theme Selector */}
+          {setAccent && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 700 }}>Theme Accent</span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {[
+                  { id: 'charcoal', color: '#e4e4e7' },
+                  { id: 'midnight', color: '#3b82f6' },
+                  { id: 'emerald', color: '#10b981' },
+                  { id: 'amber', color: '#f59e0b' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setAccent(item.id as AccentColor)}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: item.color,
+                      border: accent === item.id ? '2px solid #ffffff' : '1px solid transparent',
+                      cursor: 'pointer',
+                      boxShadow: accent === item.id ? `0 0 8px ${item.color}` : 'none',
+                    }}
+                    title={`${item.id} accent`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Clean Log Out Button */}
           <button

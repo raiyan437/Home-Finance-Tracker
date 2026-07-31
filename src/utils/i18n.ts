@@ -51,6 +51,8 @@ export const TRANSLATIONS = {
     deleteComment: 'Delete comment',
     confirmDeleteCard: 'Delete Payment Card',
     deletedCardBadge: 'Deleted Card',
+    noSettlementsYet: 'No Settlement History Yet',
+    markAsSettled: 'Mark as Paid',
   },
   bn: {
     appTitle: 'হোম ফাইন্যান্স',
@@ -98,13 +100,17 @@ export const TRANSLATIONS = {
     proofAttached: 'পেমেন্টের প্রমাণ সংযুক্ত',
     categoryBudgets: 'ক্যাটাগরি অনুযায়ী মাসিক বাজেট সীমা',
     overBudgetWarning: 'বাজেট সীমা অতিক্রমের সতর্কতা',
-    nearBudgetWarning: 'বাজেটের কাছাকাছি পৌঁছানোর সতর্কতা (৮০%+)',
+    nearBudgetWarning: 'বাজেট সময়সীমার কাছাকাছি (৮০%+)',
     deleteComment: 'মন্তব্য মুছুন',
     confirmDeleteCard: 'পেমেন্ট কার্ড মুছুন',
-    deletedCardBadge: 'অপসারিত কার্ড',
+    deletedCardBadge: 'মুছে ফেলা কার্ড',
+    noSettlementsYet: 'কোন পেমেন্ট হিস্ট্রি নেই',
+    markAsSettled: 'পরিশোধ চিহ্নিত করুন',
   },
 };
 
-export const getTranslation = (key: keyof typeof TRANSLATIONS['en'], lang: Language = 'en'): string => {
-  return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['en'][key] || key;
+export type TranslationKey = keyof typeof TRANSLATIONS.en;
+
+export const getTranslation = (key: TranslationKey, lang: Language = 'en'): string => {
+  return TRANSLATIONS[lang][key] || TRANSLATIONS.en[key] || key;
 };

@@ -6,7 +6,7 @@ import { exportAuditReportCsv } from '../utils/exportCsv';
 import { useAuth } from '../context/AuthContext';
 import { CategoryChart } from './CategoryChart';
 import { UserAvatar } from './UserAvatar';
-import { Calendar, Users, Download } from 'lucide-react';
+import { Calendar, Users, Download, Printer } from 'lucide-react';
 
 import type { Language } from '../utils/i18n';
 
@@ -50,6 +50,10 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settle
     return dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }, [selectedMonth]);
 
+  const handlePrintPDF = () => {
+    window.print();
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Header & Month Picker */}
@@ -64,7 +68,16 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settle
         {/* Actions & Month Selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <button
-            className="btn btn-secondary"
+            className="btn btn-primary no-print"
+            onClick={handlePrintPDF}
+            title="Print or Save PDF Financial Statement"
+          >
+            <Printer size={16} />
+            <span>Download Statement PDF</span>
+          </button>
+
+          <button
+            className="btn btn-secondary no-print"
             onClick={() => exportAuditReportCsv(monthExpenses, settlements, `report_${selectedMonth}.csv`)}
             title="Download CSV Audit Report"
           >

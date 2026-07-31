@@ -4,7 +4,9 @@ import { getFirestore } from 'firebase/firestore';
 
 export const isFirebaseConfigured = Boolean(
   import.meta.env.VITE_FIREBASE_API_KEY &&
-    import.meta.env.VITE_FIREBASE_API_KEY !== 'your_api_key_here'
+    import.meta.env.VITE_FIREBASE_PROJECT_ID &&
+    import.meta.env.VITE_FIREBASE_API_KEY !== 'your_api_key_here' &&
+    import.meta.env.VITE_FIREBASE_PROJECT_ID !== 'your_project_id_here'
 );
 
 const firebaseConfig = {
@@ -19,7 +21,11 @@ const firebaseConfig = {
 // Safe initialization
 let appInstance;
 try {
-  appInstance = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  appInstance = isFirebaseConfigured
+    ? getApps().length > 0
+      ? getApp()
+      : initializeApp(firebaseConfig)
+    : null;
 } catch (err) {
   console.warn('Firebase initialization skipped (using offline LocalStorage fallback):', err);
   appInstance = null;

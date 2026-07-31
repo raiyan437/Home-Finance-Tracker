@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
-import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Image as ImageIcon, X, Trash2 } from 'lucide-react';
+import { shareSettlementInstructions } from '../utils/share';
+import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Image as ImageIcon, X, Trash2, Share2, Paperclip } from 'lucide-react';
 
 interface SettlementViewProps {
   expenses: Expense[];
@@ -31,6 +32,8 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
   const [confirmingTx, setConfirmingTx] = useState<SimplifiedTransaction | null>(null);
   const [proofUrl, setProofUrl] = useState<string>('');
+  const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   const userBalances = useMemo(
     () => calculateNetBalances(expenses, settlements, houseUsers),
@@ -63,6 +66,15 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
     }
   };
 
+  const handleShareTx = async (tx: SimplifiedTransaction) => {
+    const amountStr = formatCurrency(tx.amountCents, false, lang);
+    const res = await shareSettlementInstructions(tx.fromUser.name, tx.toUser.name, amountStr);
+    if (res.success) {
+      setShareFeedback(res.method === 'share' ? 'Shared payment notice!' : 'Instructions copied to clipboard!');
+      setTimeout(() => setShareFeedback(null), 2500);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       {/* Header */}
@@ -76,7 +88,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
       </div>
 
       {/* Tabs Switcher */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             className={`btn ${activeTab === 'pending' ? 'btn-primary' : 'btn-secondary'}`}
@@ -108,84 +120,91 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
         )}
       </div>
 
+      {shareFeedback && (
+        <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-emerald)', padding: '12px 18px', fontSize: '0.85rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>
+          ✓ {shareFeedback}
+        </div>
+      )}
+
       {/* TAB 1: PENDING MIN-CASH-FLOW RECOMMENDATIONS */}
       {activeTab === 'pending' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {simplifiedTransactions.length === 0 ? (
             <div className="glass-card empty-state">
               <CheckCircle2 className="empty-icon" style={{ color: 'var(--accent-emerald)' }} />
-              <div className="empty-title">{getTranslation('allDebtsSettled', lang)}</div>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-                Every housemate has a ৳0.00 net balance position. No peer-to-peer transfers required.
-              </p>
+              <h3>All Debts Fully Settled!</h3>
+              <p>Minimum cash flow engine reports zero pending transfers needed between active housemates.</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {simplifiedTransactions.map((tx) => (
-                <div key={tx.id} className="settlement-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="badge badge-negative">Debt Payment Pending</span>
-                    <span className="tabular-nums" style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-amber)' }}>
+            simplifiedTransactions.map((tx) => (
+              <div key={tx.id} className="glass-card transaction-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                  {/* From User */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <UserAvatar user={tx.fromUser} size={48} />
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{tx.fromUser.name}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--accent-rose)' }}>Payer (Owes balance)</div>
+                    </div>
+                  </div>
+
+                  {/* Transfer Direction */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-amber)' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pays</span>
+                      <ArrowRight size={20} />
+                    </div>
+                    <div className="tabular-nums" style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent-amber)' }}>
                       {formatCurrency(tx.amountCents, false, lang)}
-                    </span>
-                  </div>
-
-                  <div className="settlement-flow">
-                    <div className="flow-user">
-                      <UserAvatar user={tx.fromUser} size={48} />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{tx.fromUser.name}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--accent-rose)', fontWeight: 700 }}>
-                          Payer (Owes Money)
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flow-arrow">
-                      <ArrowRight size={28} className="flow-arrow-icon" style={{ color: 'var(--accent-amber)' }} />
-                      <div className="flow-amount tabular-nums">{formatCurrency(tx.amountCents, false, lang)}</div>
-                    </div>
-
-                    <div className="flow-user">
-                      <UserAvatar user={tx.toUser} size={48} />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{tx.toUser.name}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>
-                          Receiver (Gets Paid)
-                        </div>
-                      </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px' }}>
-                    <button
-                      className="btn btn-success"
-                      onClick={() => {
-                        setProofUrl('');
-                        setConfirmingTx(tx);
-                      }}
-                    >
-                      <Check size={18} />
-                      <span>{getTranslation('markAsPaid', lang)}</span>
-                    </button>
+                  {/* To User */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{tx.toUser.name}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>Recipient (Receives debt)</div>
+                    </div>
+                    <UserAvatar user={tx.toUser} size={48} />
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Card Footer Actions */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleShareTx(tx)}
+                    title="Share transfer instructions via WhatsApp/SMS"
+                  >
+                    <Share2 size={14} />
+                    <span>Share App</span>
+                  </button>
+
+                  <button
+                    className="btn btn-success btn-sm"
+                    onClick={() => {
+                      setProofUrl('');
+                      setConfirmingTx(tx);
+                    }}
+                  >
+                    <Check size={16} />
+                    <span>{getTranslation('markAsPaid', lang)}</span>
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       )}
 
-      {/* TAB 2: SETTLEMENT AUDIT HISTORY */}
+      {/* TAB 2: SETTLEMENT AUDIT LOG */}
       {activeTab === 'history' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {allSettlements.length === 0 ? (
             <div className="glass-card empty-state">
               <History className="empty-icon" />
-              <div className="empty-title">No completed settlement audit records</div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                When payments are completed and confirmed, they will be archived safely here.
-              </p>
+              <h3>{getTranslation('noSettlementsYet', lang)}</h3>
+              <p>Completed debt settlements and proof-of-payment logs will appear here.</p>
             </div>
           ) : (
             <div>
@@ -193,7 +212,6 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                 const fromUser = getUser(st.fromUserId);
                 const toUser = getUser(st.toUserId);
                 const isReversed = st.status === 'reversed';
-
                 const settledDate = new Date(st.settledAt || st.createdAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -215,7 +233,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                       opacity: isReversed ? 0.65 : 1,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center' }}>
                           <UserAvatar user={fromUser} size={36} />
@@ -252,6 +270,17 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                           {formatCurrency(st.amountCents, false, lang)}
                         </div>
 
+                        {st.proofUrl && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setPreviewProofUrl(st.proofUrl || null)}
+                            title="View Payment Proof Screenshot"
+                          >
+                            <Paperclip size={14} style={{ color: 'var(--accent-primary)' }} />
+                            <span>[Attached Proof 📎]</span>
+                          </button>
+                        )}
+
                         {!isReversed && onReverseSettlement && (
                           <button
                             className="btn btn-secondary btn-sm"
@@ -265,23 +294,6 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                         )}
                       </div>
                     </div>
-
-                    {/* Proof of Payment Image Preview */}
-                    {st.proofUrl && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
-                        <ImageIcon size={16} style={{ color: 'var(--accent-primary)' }} />
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>
-                          {getTranslation('proofAttached', lang)}:
-                        </span>
-                        <a href={st.proofUrl} target="_blank" rel="noreferrer">
-                          <img
-                            src={st.proofUrl}
-                            alt="Payment Proof"
-                            style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-medium)' }}
-                          />
-                        </a>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -312,7 +324,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
               {proofUrl ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
                   <img src={proofUrl} alt="Proof" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} />
-                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', flex: 1 }}>✓ Proof uploaded</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', flex: 1 }}>✓ Proof attached</span>
                   <button type="button" className="btn btn-danger btn-sm" onClick={() => setProofUrl('')}>
                     Remove
                   </button>
@@ -333,13 +345,37 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  onMarkSettled(confirmingTx);
+                  onMarkSettled({ ...confirmingTx, proofUrl: proofUrl || undefined } as any);
                   setConfirmingTx(null);
                 }}
               >
                 Confirm Payment
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Photo Preview Modal for Attached Payment Proof */}
+      {previewProofUrl && (
+        <div className="modal-overlay" onClick={() => setPreviewProofUrl(null)}>
+          <div className="modal-card" style={{ maxWidth: '520px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Payment Proof Screenshot</h3>
+              <button className="close-btn" onClick={() => setPreviewProofUrl(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: '12px 0' }}>
+              <img
+                src={previewProofUrl}
+                alt="Full Payment Proof"
+                style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-medium)' }}
+              />
+            </div>
+            <button className="btn btn-secondary" onClick={() => setPreviewProofUrl(null)} style={{ margin: '0 auto' }}>
+              Close Preview
+            </button>
           </div>
         </div>
       )}

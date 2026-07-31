@@ -82,3 +82,63 @@ export const resetToSeedData = (): { expenses: Expense[]; settlements: Settlemen
   clearAllFinancialData();
   return { expenses: [], settlements: [], cards: [] };
 };
+
+export interface BackupDataPayload {
+  version: string;
+  exportedAt: string;
+  expenses: Expense[];
+  settlements: Settlement[];
+  cards: PaymentCard[];
+  usersDB?: any[];
+  housesDB?: any[];
+  personalBudgetTaka?: number;
+  categoryBudgets?: Record<string, number>;
+}
+
+export const exportBackupJSON = (): string => {
+  const payload: BackupDataPayload = {
+    version: '1.0.0',
+    exportedAt: new Date().toISOString(),
+    expenses: loadExpenses(),
+    settlements: loadSettlements(),
+    cards: loadCards(),
+    usersDB: JSON.parse(localStorage.getItem('home_finance_users_db_v3') || '[]'),
+    housesDB: JSON.parse(localStorage.getItem('home_finance_houses_db_v3') || '[]'),
+    personalBudgetTaka: Number(localStorage.getItem('home_finance_personal_budget_v1')) || 15000,
+    categoryBudgets: JSON.parse(localStorage.getItem('home_finance_category_budgets_v1') || '{}'),
+  };
+  return JSON.stringify(payload, null, 2);
+};
+
+export const importBackupJSON = (jsonStr: string): boolean => {
+  try {
+    const data: BackupDataPayload = JSON.parse(jsonStr);
+    if (!data || typeof data !== 'object') return false;
+
+    if (Array.isArray(data.expenses)) {
+      saveExpenses(data.expenses);
+    }
+    if (Array.isArray(data.settlements)) {
+      saveSettlements(data.settlements);
+    }
+    if (Array.isArray(data.cards)) {
+      saveCards(data.cards);
+    }
+    if (Array.isArray(data.usersDB) && data.usersDB.length > 0) {
+      localStorage.setItem('home_finance_users_db_v3', JSON.stringify(data.usersDB));
+    }
+    if (Array.isArray(data.housesDB) && data.housesDB.length > 0) {
+      localStorage.setItem('home_finance_houses_db_v3', JSON.stringify(data.housesDB));
+    }
+    if (data.personalBudgetTaka) {
+      localStorage.setItem('home_finance_personal_budget_v1', String(data.personalBudgetTaka));
+    }
+    if (data.categoryBudgets) {
+      localStorage.setItem('home_finance_category_budgets_v1', JSON.stringify(data.categoryBudgets));
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to import JSON backup payload:', err);
+    return false;
+  }
+};
