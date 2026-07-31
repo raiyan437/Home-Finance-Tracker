@@ -55,16 +55,40 @@ const HouseView = lazy(() =>
   import('./components/HouseView').then((m) => ({ default: m.HouseView }))
 );
 
+const VALID_TABS: TabType[] = ['dashboard', 'expenses', 'settlement', 'personal', 'cards', 'monthly', 'house', 'settings'];
+
+const getInitialTabFromHash = (): TabType => {
+  const hash = window.location.hash.replace('#', '').trim().toLowerCase() as TabType;
+  return VALID_TABS.includes(hash) ? hash : 'dashboard';
+};
+
 const AppContent: React.FC = () => {
   const { activeUserId, currentHouse, isAuthenticated, dbUserProfile } = useAuth();
 
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTabState] = useState<TabType>(getInitialTabFromHash);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [lang, setLang] = useState<Language>('en');
+
+  const handleTabChange = (nextTab: TabType) => {
+    setActiveTabState(nextTab);
+    if (window.location.hash !== `#${nextTab}`) {
+      window.location.hash = nextTab;
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const currentHashTab = getInitialTabFromHash();
+      setActiveTabState(currentHashTab);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -445,7 +469,7 @@ const AppContent: React.FC = () => {
       {/* Navigation Sidebar / Mobile Nav */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         onOpenAddExpense={() => {
           setEditingExpense(null);
           setIsAddExpenseOpen(true);
@@ -488,10 +512,10 @@ const AppContent: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <button className="btn btn-primary" onClick={() => setActiveTab('house')}>
+              <button className="btn btn-primary" onClick={() => handleTabChange('house')}>
                 <span>👑 Create a New House</span>
               </button>
-              <button className="btn btn-secondary" onClick={() => setActiveTab('house')}>
+              <button className="btn btn-secondary" onClick={() => handleTabChange('house')}>
                 <span>👤 Join Existing House</span>
               </button>
             </div>
@@ -509,8 +533,8 @@ const AppContent: React.FC = () => {
             <Dashboard
               expenses={householdExpenses}
               settlements={houseSettlements}
-              onNavigateToExpenses={() => setActiveTab('expenses')}
-              onNavigateToSettlement={() => setActiveTab('settlement')}
+              onNavigateToExpenses={() => handleTabChange('expenses')}
+              onNavigateToSettlement={() => handleTabChange('settlement')}
               lang={lang}
             />
           )}
