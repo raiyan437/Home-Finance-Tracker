@@ -220,8 +220,10 @@ const AppContent: React.FC = () => {
   }, [expenses, activeUserId]);
 
   const userCards = useMemo(() => {
-    return cards.filter((c) => !c.ownerId || c.ownerId === activeUserId);
-  }, [cards, activeUserId]);
+    return cards.filter(
+      (c) => !c.ownerId || c.ownerId === activeUserId || (currentHouse && c.houseId === currentHouse.id)
+    );
+  }, [cards, activeUserId, currentHouse]);
 
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
@@ -608,7 +610,7 @@ const AppContent: React.FC = () => {
         }}
         onSaveExpense={handleSaveExpense}
         initialExpense={editingExpense}
-        cards={cards}
+        cards={userCards}
         lang={lang}
       />
 

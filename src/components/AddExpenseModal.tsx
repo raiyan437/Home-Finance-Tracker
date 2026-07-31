@@ -479,19 +479,25 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </button>
             </div>
 
-            {paymentType === 'card' && cards.length > 0 && (
+            {paymentType === 'card' && (
               <div style={{ marginTop: '10px' }}>
-                <select
-                  className="form-select"
-                  value={selectedCardId}
-                  onChange={(e) => setSelectedCardId(e.target.value)}
-                >
-                  {cards.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit' : 'Credit'})
-                    </option>
-                  ))}
-                </select>
+                {cards.length === 0 ? (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', padding: '6px 10px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-sm)' }}>
+                    ⚠️ No bank cards added yet. Go to Payment Cards tab to add your credit/debit card.
+                  </div>
+                ) : (
+                  <select
+                    className="form-select"
+                    value={selectedCardId || (cards[0]?.id || '')}
+                    onChange={(e) => setSelectedCardId(e.target.value)}
+                  >
+                    {cards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit Card' : 'Credit Card'})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
           </div>

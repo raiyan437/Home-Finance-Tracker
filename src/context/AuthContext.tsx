@@ -9,7 +9,8 @@ import {
   getActiveSession,
   setActiveSession,
 } from '../utils/mockAuthDatabase';
-import { auth } from '../config/firebase';
+import { auth, db, isFirebaseConfigured } from '../config/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { syncSaveUser, syncSaveHouse } from '../utils/firebaseSync';
 import {
   signInWithEmailAndPassword,
@@ -284,6 +285,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
     }
 
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, 'houses'), where('code', '==', cleanCode));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('already taken')) throw err;
+      }
+    }
+
     const houseId = `house-${Date.now()}`;
     const now = new Date().toISOString();
 
@@ -324,14 +337,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncSaveUser(updatedProfile);
   };
 
-  // Join House Handler
+  // Join House Handler (Supports Local & Firestore Cross-Device Queries)
   const joinHouse = async (houseCode: string) => {
     if (!dbUserProfile) throw new Error('You must be logged in to join a house');
     const cleanCode = houseCode.trim().toUpperCase();
     if (!cleanCode) throw new Error('Please enter a house code');
 
     const houses = loadHousesDB();
-    const house = houses.find((h) => h.code.toUpperCase() === cleanCode);
+    let house = houses.find((h) => h.code.toUpperCase() === cleanCode);
+
+    // Cross-Device Fallback: If not found in local browser storage, query Firestore!
+    if (!house && isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, 'houses'), where('code', '==', cleanCode));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          house = snapshot.docs[0].data() as House;
+        }
+      } catch (err) {
+        console.warn('Firestore joinHouse query fallback notice:', err);
+      }
+    }
 
     if (!house) {
       throw new Error(`No house found with code "${cleanCode}". Please verify and try again.`);
@@ -350,13 +376,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       house.members.push(newMember);
-      saveHousesDB(houses);
+
+      // Save/update house in local DB
+      const existingIdx = houses.findIndex((h) => h.id === house!.id);
+      if (existingIdx >= 0) {
+        houses[existingIdx] = house;
+        saveHousesDB(houses);
+      } else {
+        saveHousesDB([...houses, house]);
+      }
     }
 
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {
       if (u.uid === dbUserProfile.uid) {
-        return { ...u, houseId: house.id, role: 'member' as const };
+        return { ...u, houseId: house!.id, role: 'member' as const };
       }
       return u;
     });
