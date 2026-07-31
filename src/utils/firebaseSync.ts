@@ -177,14 +177,14 @@ export const syncDeleteSettlement = async (settlementId: string) => {
 };
 
 /**
- * Listens for realtime changes to the Firestore `cards` collection (optionally house-scoped).
+ * Listens for realtime changes to the Firestore `cards` collection (strictly owner/user-scoped).
  */
-export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void, houseId?: string | null) => {
+export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void, ownerId?: string | null) => {
   if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'cards');
-    const q = houseId ? query(colRef, where('houseId', '==', houseId)) : colRef;
+    const q = ownerId ? query(colRef, where('ownerId', '==', ownerId)) : colRef;
 
     return onSnapshot(
       q,

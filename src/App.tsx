@@ -120,17 +120,18 @@ const AppContent: React.FC = () => {
       saveSettlements(fbSettlements);
     }, houseId);
 
+    const cardOwnerId = dbUserProfile?.uid || activeUserId;
     const unsubCards = subscribeCards((fbCards) => {
       setCards(fbCards);
       saveCards(fbCards);
-    }, houseId);
+    }, cardOwnerId);
 
     return () => {
       unsubExp();
       unsubSt();
       unsubCards();
     };
-  }, [currentHouse?.id]);
+  }, [currentHouse?.id, dbUserProfile?.uid, activeUserId]);
 
   // Automated Recurring Expense Generator Engine
   useEffect(() => {
@@ -236,10 +237,11 @@ const AppContent: React.FC = () => {
   }, [expenses, activeUserId]);
 
   const userCards = useMemo(() => {
+    const myUid = dbUserProfile?.uid || activeUserId;
     return cards.filter(
-      (c) => !c.ownerId || c.ownerId === activeUserId || (currentHouse && c.houseId === currentHouse.id)
+      (c) => c.ownerId === myUid || c.ownerId === activeUserId || c.ownerId === dbUserProfile?.uid
     );
-  }, [cards, activeUserId, currentHouse]);
+  }, [cards, activeUserId, dbUserProfile]);
 
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
