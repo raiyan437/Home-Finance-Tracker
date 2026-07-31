@@ -342,7 +342,11 @@
 ### 2026-08-01: Dashboard Payer Contribution Ratio Calculation Fix
 * **Flexible Payer UID & Profile Matching (`CategoryChart.tsx`)**:
   * Updated `PayerContributionCard` in `CategoryChart.tsx` to match `e.paidBy` case-insensitively against `user.id`, `user.uid`, `user.name`, `user.email`, and `user.email.split('@')[0]`.
-  * Guarantees 100% accurate calculation of out-of-pocket totals and contribution percentages for all active house members on live production.
+### 2026-08-01: Settlement Recipient-Only Mark as Paid Restriction
+* **Recipient Confirmation Authorization (`SettlementView.tsx`, `i18n.ts`)**:
+  * Implemented `isRecipientUser(tx)` in `SettlementView.tsx` matching `myUid` against `tx.toUser` (the recipient receiving the money).
+  * Restricted the green **Mark as Paid** button strictly to the recipient user. Payers and third-party members see an informative badge: `"Only recipient (RecipientName) can mark as paid"` / `"শুধুমাত্র প্রাপক পরিশোধ চিহ্নিত করতে পারবেন"`.
+
 
 
 
