@@ -26,8 +26,22 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
   onClearSettlements,
   lang = 'en',
 }) => {
-  const { currentHouse, dbUserProfile } = useAuth();
+  const { currentHouse, dbUserProfile, activeUserId } = useAuth();
+  const myUid = dbUserProfile?.uid || activeUserId;
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
+
+  const isRecipientUser = (tx: SimplifiedTransaction): boolean => {
+    if (!myUid) return false;
+    const cleanMyUid = myUid.toLowerCase().trim();
+    const toUser = tx.toUser;
+    return Boolean(
+      (toUser.id && toUser.id.toLowerCase().trim() === cleanMyUid) ||
+      (toUser.uid && toUser.uid.toLowerCase().trim() === cleanMyUid) ||
+      (toUser.name && toUser.name.toLowerCase().trim() === cleanMyUid) ||
+      (toUser.email && toUser.email.toLowerCase().trim() === cleanMyUid) ||
+      (toUser.email && toUser.email.toLowerCase().split('@')[0] === cleanMyUid)
+    );
+  };
 
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
   const [confirmingTx, setConfirmingTx] = useState<SimplifiedTransaction | null>(null);
@@ -170,7 +184,7 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                 </div>
 
                 {/* Card Footer Actions */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() => handleShareTx(tx)}
@@ -180,16 +194,36 @@ export const SettlementView: React.FC<SettlementViewProps> = ({
                     <span>Share App</span>
                   </button>
 
-                  <button
-                    className="btn btn-success btn-sm"
-                    onClick={() => {
-                      setProofUrl('');
-                      setConfirmingTx(tx);
-                    }}
-                  >
-                    <Check size={16} />
-                    <span>{getTranslation('markAsPaid', lang)}</span>
-                  </button>
+                  {isRecipientUser(tx) ? (
+                    <button
+                      className="btn btn-success btn-sm"
+                      onClick={() => {
+                        setProofUrl('');
+                        setConfirmingTx(tx);
+                      }}
+                      title="Confirm receipt of debt payment"
+                    >
+                      <Check size={16} />
+                      <span>{getTranslation('markAsPaid', lang)}</span>
+                    </button>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        padding: '6px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-subtle)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span>{getTranslation('onlyRecipientCanMarkPaid', lang)} ({tx.toUser.name})</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))

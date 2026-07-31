@@ -53,6 +53,7 @@ export const TRANSLATIONS = {
     deletedCardBadge: 'Deleted Card',
     noSettlementsYet: 'No Settlement History Yet',
     markAsSettled: 'Mark as Paid',
+    onlyRecipientCanMarkPaid: 'Only recipient can mark as paid',
   },
   bn: {
     appTitle: 'হোম ফাইন্যান্স',
@@ -106,6 +107,7 @@ export const TRANSLATIONS = {
     deletedCardBadge: 'মুছে ফেলা কার্ড',
     noSettlementsYet: 'কোন পেমেন্ট হিস্ট্রি নেই',
     markAsSettled: 'পরিশোধ চিহ্নিত করুন',
+    onlyRecipientCanMarkPaid: 'শুধুমাত্র প্রাপক পরিশোধ চিহ্নিত করতে পারবেন',
   },
 };
 
