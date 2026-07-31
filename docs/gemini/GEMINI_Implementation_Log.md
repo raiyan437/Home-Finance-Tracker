@@ -288,7 +288,9 @@
   * Configured live credentials for project `home-finance-1ah277j9` in `.env` and `src/config/firebase.ts`.
 * **Unlocked Email Authentication (`src/context/AuthContext.tsx`)**:
   * Unlocked registration & sign-in for any valid email address and password using Firebase Authentication.
-  * Preserved 1-click demo shortcuts (`raiyan@gmail.com`, `himel@gmail.com`, `lazim@gmail.com`).
+* **Firestore Users & Houses Sync (`src/utils/firebaseSync.ts`, `src/context/AuthContext.tsx`)**:
+  * Implemented `syncSaveUser` and `syncSaveHouse` to sync user profiles and households to Firestore `users` and `houses` collections.
+
 
 
 
