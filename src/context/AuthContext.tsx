@@ -10,7 +10,7 @@ import {
   setActiveSession,
 } from '../utils/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { syncSaveUser, syncSaveHouse, subscribeHouse } from '../utils/firebaseSync';
 import {
   signInWithEmailAndPassword,
@@ -60,27 +60,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Connect Firebase Auth Listener & Sync Profile from Firestore (Bug 1.1)
+  // Connect Firebase Auth Listener & Realtime Profile Sync from Firestore
   useEffect(() => {
     if (!auth) return;
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubUserDoc: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
+      if (unsubUserDoc) {
+        unsubUserDoc();
+        unsubUserDoc = null;
+      }
+
       if (user && isFirebaseConfigured && db) {
         try {
           const userDocRef = doc(db, 'users', user.uid);
-          const userSnap = await getDoc(userDocRef);
-          if (userSnap.exists()) {
-            const fbProfile = userSnap.data() as UserProfile;
-            setDbUserProfile((prev) => ({ ...prev, ...fbProfile }));
-            setActiveSession(fbProfile);
-            syncHouseForUser(fbProfile);
-          }
+          unsubUserDoc = onSnapshot(
+            userDocRef,
+            (snap) => {
+              if (snap.exists()) {
+                const fbProfile = snap.data() as UserProfile;
+                setDbUserProfile((prev) => ({ ...prev, ...fbProfile }));
+                setActiveSession(fbProfile);
+                syncHouseForUser(fbProfile);
+              }
+            },
+            (err) => console.warn('Firestore User Profile Sync Warning:', err)
+          );
         } catch (e) {
           console.warn('Firestore auth listener sync notice:', e);
         }
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubUserDoc) unsubUserDoc();
+    };
   }, []);
 
   // Helper: Refresh house object from DB based on user profile (with Firestore cloud sync)
@@ -120,8 +136,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Realtime House Roster Listener (Live multi-user roster updates across devices)
   useEffect(() => {
-    if (!currentHouse?.id) return;
-    const unsub = subscribeHouse(currentHouse.id, (updatedHouse) => {
+    const targetHouseId = dbUserProfile?.houseId || currentHouse?.id;
+    if (!targetHouseId) return;
+
+    const unsub = subscribeHouse(targetHouseId, (updatedHouse) => {
       if (updatedHouse) {
         setCurrentHouse(updatedHouse);
         const houses = loadHousesDB();
@@ -135,7 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
     return () => unsub();
-  }, [currentHouse?.id]);
+  }, [dbUserProfile?.houseId, currentHouse?.id]);
 
   const switchProfile = (userId: UserId) => {
     if (USERS[userId]) {
