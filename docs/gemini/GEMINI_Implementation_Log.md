@@ -300,9 +300,12 @@
 * **Dedicated House Navigation Tab (`HouseView.tsx`, `Navbar.tsx`, `App.tsx`)**:
   * Created `HouseView.tsx` and added `House` (🏠) tab to desktop sidebar & mobile nav.
   * Moved House Creation, House Join, House Join Code 1-click copy/share, inline House Name edit, and Member Roster Table into `HouseView.tsx`.
-* **Dynamic Sidebar Member Count (`Navbar.tsx`, `i18n.ts`)**:
-  * Fixed sidebar header subtitle to dynamically calculate and display `${members.length} Members • Code: ${code}` when inside an active household.
-  * Displays `"No Active Household"` when `currentHouse === null` instead of the legacy demo count.
+### 2026-08-01: Custom Unique House Code Input & Validation
+* **Custom House Code Creation (`AuthContext.tsx`, `HouseView.tsx`)**:
+  * Updated `createHouse(houseName: string, customHouseCode?: string)` to allow users to specify a custom 6-character code (e.g. `123456`).
+  * Enforced strict uniqueness validation. If the code exists in `loadHousesDB()` or Firestore, rejects submission with `"Warning: House code '${cleanCode}' is already taken. Please choose a different unique code."`.
+  * Updated Create House Form in `HouseView.tsx` with uppercase monospace styling for code input.
+
 
 
 
