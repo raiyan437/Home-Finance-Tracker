@@ -76,24 +76,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Login Handler (Strict Demo Account Enforcement & Realtime House Sync)
+  // Login Handler (Realtime Firebase Auth + Demo Fallbacks)
   const loginWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
     const demo = AUTHORIZED_DEMO_ACCOUNTS[cleanEmail];
-
-    if (!demo || pass !== demo.pass) {
-      setLoading(false);
-      throw new Error(
-        'Access Denied: Only pre-approved housemate accounts (raiyan@gmail.com, himel@gmail.com, lazim@gmail.com) with password "dummy123" are authorized.'
-      );
-    }
+    let firebaseUid: string | null = null;
 
     if (auth) {
       try {
-        await signInWithEmailAndPassword(auth, cleanEmail, pass);
-      } catch (fbErr) {
-        console.warn('Firebase Auth notice (falling back to local database):', fbErr);
+        const userCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+        firebaseUid = userCred.user.uid;
+      } catch (fbErr: any) {
+        if (!demo) {
+          setLoading(false);
+          throw new Error(fbErr.message || 'Invalid email or password. Please check your credentials.');
+        }
       }
     }
 
@@ -102,41 +100,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!existingUser) {
       existingUser = {
-        uid: `user-${demo.id}-001`,
-        displayName: demo.displayName,
+        uid: firebaseUid || (demo ? `user-${demo.id}-001` : `user-${Date.now()}`),
+        displayName: demo ? demo.displayName : cleanEmail.split('@')[0],
         email: cleanEmail,
-        houseId: demo.id === 'himel' ? null : 'house-demo-001',
-        role: demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null,
+        houseId: demo ? (demo.id === 'himel' ? null : 'house-demo-001') : null,
+        role: demo ? (demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null) : null,
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existingUser]);
     }
 
-    switchProfile(demo.id);
+    if (demo) {
+      switchProfile(demo.id);
+    }
     setActiveSession(existingUser);
     setDbUserProfile(existingUser);
     syncHouseForUser(existingUser);
     setLoading(false);
   };
 
-  // Sign Up Handler (Strict Demo Account Enforcement & Realtime House Sync)
+  // Sign Up Handler (Realtime Firebase Auth + Unlimited Email Signups)
   const signUpWithEmail = async (email: string, pass: string, displayName: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
     const demo = AUTHORIZED_DEMO_ACCOUNTS[cleanEmail];
 
-    if (!demo || pass !== demo.pass) {
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setLoading(false);
-      throw new Error(
-        'Access Denied: Registration is restricted to pre-approved housemate credentials (raiyan@gmail.com, himel@gmail.com, lazim@gmail.com) with password "dummy123".'
-      );
+      throw new Error('Please provide a valid email address.');
     }
+    if (!pass || pass.length < 6) {
+      setLoading(false);
+      throw new Error('Password must be at least 6 characters long.');
+    }
+
+    let firebaseUid: string | null = null;
 
     if (auth) {
       try {
-        await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-      } catch (fbErr) {
-        console.warn('Firebase Sign Up notice:', fbErr);
+        const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+        firebaseUid = userCred.user.uid;
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/email-already-in-use') {
+          // If email exists, fallback to sign in
+          try {
+            const loginCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+            firebaseUid = loginCred.user.uid;
+          } catch (loginErr) {
+            setLoading(false);
+            throw new Error('This email is already registered. Please enter the correct password to log in.');
+          }
+        } else if (!demo) {
+          setLoading(false);
+          throw new Error(fbErr.message || 'Failed to create account in Firebase. Please try again.');
+        }
       }
     }
 
@@ -145,11 +162,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!existing) {
       existing = {
-        uid: `user-${demo.id}-001`,
-        displayName: displayName.trim() || demo.displayName,
+        uid: firebaseUid || (demo ? `user-${demo.id}-001` : `user-${Date.now()}`),
+        displayName: displayName.trim() || (demo ? demo.displayName : cleanEmail.split('@')[0]),
         email: cleanEmail,
-        houseId: demo.id === 'himel' ? null : 'house-demo-001',
-        role: demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null,
+        houseId: demo ? (demo.id === 'himel' ? null : 'house-demo-001') : null,
+        role: demo ? (demo.id === 'raiyan' ? 'leader' : demo.id === 'lazim' ? 'member' : null) : null,
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existing]);
@@ -158,7 +175,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveUsersDB(users);
     }
 
-    switchProfile(demo.id);
+    if (demo) {
+      switchProfile(demo.id);
+    }
     setActiveSession(existing);
     setDbUserProfile(existing);
     syncHouseForUser(existing);
