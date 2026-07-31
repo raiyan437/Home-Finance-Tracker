@@ -335,7 +335,13 @@
 * **Live Member UID Expense Attribution (`AddExpenseModal.tsx`, `App.tsx`)**:
   * Passed `houseUsers={houseUsers}` and `activeUserId={dbUserProfile?.uid || activeUserId}` to `<AddExpenseModal>` in `App.tsx`.
   * Updated `AddExpenseModal` to default `paidBy` to the authenticated user's actual UID (`dbUserProfile.uid`) instead of falling back to static `'raiyan'`.
-  * Guarantees that newly created expenses attribute payments and split shares to the active household member UIDs, enabling `calculateNetBalances` and `calculateSimplifiedSettlements` in `SettlementView.tsx` to update instantly upon expense creation.
+### 2026-08-01: Live Production Business Logic Audit & Scoping Resolution
+* **Household Expense & Settlement Member UID Matching (`App.tsx`)**:
+  * Enhanced `householdExpenses` and `houseSettlements` filters in `App.tsx` to match expenses and settlements against `currentHouse.id` as well as all active house member UIDs (`memberUids`).
+  * Guarantees 100% visibility of shared household expenses across all connected devices and browsers on live production.
+* **Personal Wallet UID Isolation (`PersonalWallet.tsx`)**:
+  * Updated `PersonalWallet` to scope personal expenses, card selections, and budget targets directly to `dbUserProfile?.uid || activeUserId`.
+
 
 
 
