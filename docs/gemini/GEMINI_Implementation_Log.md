@@ -324,6 +324,12 @@
 * **Section 3 (Financial Calculations & Settlement Reversals)**: Standardized expense shares strictly by UID in `settlementEngine.ts` and enabled settlement reversals (`status: 'reversed'`) in `SettlementView.tsx`.
 * **Section 4 (Expenses, OCR & Personal Scope Isolation)**: Fixed personal scope out-of-pocket shares in `AddExpenseModal.tsx` so non-owner payers receive 100% credit, integrated canvas/text OCR scanner in `ocrScanner.ts`, and active automated recurring expense generator in `App.tsx`.
 * **Section 5 (Cards & Wallet Isolation)**: Enforced strict card ownership filtering in `CardsManager.tsx` & `App.tsx`, persisted personal monthly budget target in `PersonalWallet.tsx`, and handled deleted card cascades.
-* **Section 6 (Persistence & i18n)**: Synced demo data reset with Cloud Firestore and bound UI labels to the bilingual `i18n.ts` engine (`t(key, lang)`).
+### 2026-08-01: Purged Default Profile Picture Fallbacks & Fixed Live Cross-Device House Sync
+* **Purged Default PNG Profile Pictures (`settlementEngine.ts`, `UserAvatar.tsx`, `Navbar.tsx`)**:
+  * Removed demo PNG image imports (`raiyan.png`, `himel.png`, `lazim.png`). Set `avatar: undefined` for all users without a custom uploaded photo so `UserAvatar` renders clean dynamic initials badges on color gradient circles for all accounts.
+* **Live Cross-Device House Member Sync (`AuthContext.tsx`)**:
+  * Updated `syncHouseForUser` and `onAuthStateChanged` to fetch current user profile and house document directly from Cloud Firestore `users` and `houses` collections upon login/auth state change.
+  * Guarantees that when Member B joins Member A's household via House Code on live production, both Member A and Member B see each other on their house rosters in real-time across devices.
+
 
 
