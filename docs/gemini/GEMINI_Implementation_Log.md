@@ -312,9 +312,12 @@
 * **Left Column Card Restructuring (`Dashboard.tsx`, `CategoryChart.tsx`)**:
   * Extracted `PayerContributionCard` from `CategoryChart.tsx`.
   * Positioned **Payer Out-of-Pocket Contribution Ratio** card and **Payment Channel Distribution** card directly beneath `Recent Shared Expenses` in the Left Column of the dashboard grid, eliminating empty whitespace beneath the recent expenses card.
-### 2026-08-01: Side-by-Side House Creation & Join Cards Layout
-* **Side-by-Side Grid Layout (`HouseView.tsx`, `index.css`)**:
-  * Added `.grid-2` CSS rule (`repeat(2, 1fr)` on viewports $\ge 768\text{px}$) to display **Create a New House** and **Join an Existing House** cards side-by-side with equal flex heights.
+### 2026-08-01: URL Hash Routing & Page Refresh Tab Restoration
+* **Hash Routing & Event Listening (`App.tsx`)**:
+  * Implemented `getInitialTabFromHash` resolving valid active tabs (`dashboard`, `expenses`, `settlement`, `personal`, `cards`, `monthly`, `house`, `settings`) from `window.location.hash`.
+  * Added `handleTabChange` wrapper setting `window.location.hash = `#${nextTab}` on tab switches.
+  * Added `hashchange` window event listener for seamless browser Back/Forward navigation and page refresh (F5) tab restoration.
+
 
 
 
