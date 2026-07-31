@@ -312,11 +312,11 @@
 * **Left Column Card Restructuring (`Dashboard.tsx`, `CategoryChart.tsx`)**:
   * Extracted `PayerContributionCard` from `CategoryChart.tsx`.
   * Positioned **Payer Out-of-Pocket Contribution Ratio** card and **Payment Channel Distribution** card directly beneath `Recent Shared Expenses` in the Left Column of the dashboard grid, eliminating empty whitespace beneath the recent expenses card.
-### 2026-08-01: URL Hash Routing & Page Refresh Tab Restoration
-* **Hash Routing & Event Listening (`App.tsx`)**:
-  * Implemented `getInitialTabFromHash` resolving valid active tabs (`dashboard`, `expenses`, `settlement`, `personal`, `cards`, `monthly`, `house`, `settings`) from `window.location.hash`.
-  * Added `handleTabChange` wrapper setting `window.location.hash = `#${nextTab}` on tab switches.
-  * Added `hashchange` window event listener for seamless browser Back/Forward navigation and page refresh (F5) tab restoration.
+### 2026-08-01: Fixed Payment Card Width & Auto-Fill Grid Layout
+* **Payment Card Sizing (`CardsManager.tsx`)**:
+  * Updated cards deck grid to `grid-template-columns: repeat(auto-fill, minmax(300px, 360px))` and set `max-width: 360px` on card elements.
+  * Single cards maintain standard credit card proportions instead of stretching 100% full width; new cards render side-by-side cleanly.
+
 
 
 
