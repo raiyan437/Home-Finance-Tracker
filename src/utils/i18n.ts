@@ -3,7 +3,7 @@ export type Language = 'en' | 'bn';
 export const TRANSLATIONS = {
   en: {
     appTitle: 'Home Finance',
-    housematesCount: '3 Housemates',
+    housematesCount: 'No Active Household',
     activeProfile: 'Active Profile',
     dashboard: 'Dashboard',
     householdExpenses: 'Household Expenses',
@@ -56,7 +56,7 @@ export const TRANSLATIONS = {
   },
   bn: {
     appTitle: 'হোম ফাইন্যান্স',
-    housematesCount: '৩ জন রুমমেট',
+    housematesCount: 'কোন মেস যুক্ত নেই',
     activeProfile: 'সক্রিয় প্রোফাইল',
     dashboard: 'ড্যাশবোর্ড',
     householdExpenses: 'মেসের খরচসমূহ',

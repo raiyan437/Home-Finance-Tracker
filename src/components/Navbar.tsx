@@ -74,8 +74,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="brand-title-box">
             <div className="brand-title">{currentHouse?.name || t('appTitle')}</div>
             <div className="brand-subtitle">
-              <span className="status-dot" />
-              <span>{currentHouse ? `Code: ${currentHouse.code}` : t('housematesCount')}</span>
+              <span className="status-dot" style={{ backgroundColor: currentHouse ? 'var(--accent-emerald)' : 'var(--text-muted)' }} />
+              <span>
+                {currentHouse
+                  ? `${currentHouse.members?.length || 1} Member${(currentHouse.members?.length || 1) === 1 ? '' : 's'} • Code: ${currentHouse.code}`
+                  : t('housematesCount')}
+              </span>
             </div>
           </div>
         </div>
