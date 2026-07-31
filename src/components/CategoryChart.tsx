@@ -119,7 +119,17 @@ export const PayerContributionCard: React.FC<CategoryChartProps> = ({ expenses }
   const userContributions = useMemo(() => {
     return houseUsers.map((user: UserType) => {
       const totalPaid = expenses
-        .filter((e) => e.paidBy === user.id || e.paidBy.toLowerCase() === user.name.toLowerCase())
+        .filter((e) => {
+          if (!e.paidBy) return false;
+          const cleanPaidBy = e.paidBy.toLowerCase().trim();
+          return (
+            (user.id && user.id.toLowerCase().trim() === cleanPaidBy) ||
+            (user.uid && user.uid.toLowerCase().trim() === cleanPaidBy) ||
+            (user.name && user.name.toLowerCase().trim() === cleanPaidBy) ||
+            (user.email && user.email.toLowerCase().trim() === cleanPaidBy) ||
+            (user.email && user.email.toLowerCase().split('@')[0] === cleanPaidBy)
+          );
+        })
         .reduce((sum, e) => sum + e.amountCents, 0);
 
       const percentage = grandTotalCents > 0 ? (totalPaid / grandTotalCents) * 100 : 0;
