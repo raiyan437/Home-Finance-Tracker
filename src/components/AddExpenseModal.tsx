@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType, RecurringFrequency } from '../types';
+import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType, RecurringFrequency, User } from '../types';
 import { getHouseUsers } from '../utils/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -21,6 +21,8 @@ interface AddExpenseModalProps {
   onSaveExpense: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>, editingId?: string) => void;
   initialExpense?: Expense | null;
   cards?: PaymentCard[];
+  houseUsers?: User[];
+  activeUserId?: UserId;
   lang?: Language;
 }
 
@@ -40,14 +42,21 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onSaveExpense,
   initialExpense,
   cards = [],
+  houseUsers: propsHouseUsers,
+  activeUserId: propsActiveUserId,
   lang = 'en',
 }) => {
   const { currentHouse, activeUserId, dbUserProfile } = useAuth();
-  const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
+  const houseUsers = useMemo(
+    () => propsHouseUsers || getHouseUsers(currentHouse, dbUserProfile),
+    [propsHouseUsers, currentHouse, dbUserProfile]
+  );
+  const activeUserKey = propsActiveUserId || dbUserProfile?.uid || activeUserId;
+  const allUserIds = useMemo(() => houseUsers.map((u) => u.id), [houseUsers]);
 
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [paidBy, setPaidBy] = useState<UserId>(activeUserId || 'raiyan');
+  const [paidBy, setPaidBy] = useState<UserId>(activeUserKey || 'raiyan');
   const [category, setCategory] = useState<Category>('Groceries');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
@@ -84,12 +93,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     setErrorMessage(null);
     setIsSubmitting(false);
 
-    const allUserIds = houseUsers.map((u) => u.id);
+    const defaultPaidBy = allUserIds.includes(activeUserKey) ? activeUserKey : (allUserIds[0] || activeUserKey);
 
     if (initialExpense) {
       setTitle(initialExpense.title || '');
       setAmountStr((initialExpense.amountCents / 100).toFixed(2));
-      setPaidBy(initialExpense.paidBy || activeUserId || allUserIds[0] || 'raiyan');
+      setPaidBy(initialExpense.paidBy || defaultPaidBy);
       setCategory(initialExpense.category || 'Groceries');
       setDate(initialExpense.date || new Date().toISOString().split('T')[0]);
       setSplitMethod(initialExpense.splitMethod || 'equal');
@@ -128,7 +137,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     } else {
       setTitle('');
       setAmountStr('');
-      setPaidBy(activeUserId || allUserIds[0] || 'raiyan');
+      setPaidBy(defaultPaidBy);
       setCategory('Groceries');
       setDate(new Date().toISOString().split('T')[0]);
       setSplitMethod('equal');

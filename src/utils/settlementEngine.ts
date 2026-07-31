@@ -111,7 +111,8 @@ export const calculateNetBalances = (
         k.toLowerCase() === targetClean ||
         (u.uid && u.uid.toLowerCase() === targetClean) ||
         (u.id && u.id.toLowerCase() === targetClean) ||
-        u.name.toLowerCase().trim() === targetClean
+        u.name.toLowerCase().trim() === targetClean ||
+        (u.email && u.email.toLowerCase().startsWith(targetClean))
       );
     });
     return found || LEGACY_USER.id;

@@ -611,6 +611,8 @@ const AppContent: React.FC = () => {
         onSaveExpense={handleSaveExpense}
         initialExpense={editingExpense}
         cards={userCards}
+        houseUsers={houseUsers}
+        activeUserId={dbUserProfile?.uid || activeUserId}
         lang={lang}
       />
 
