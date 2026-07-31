@@ -308,8 +308,9 @@
 * **Current Password Verification & Change Password (`SettingsView.tsx`, `AuthContext.tsx`)**:
   * Implemented `changeUserPassword(currentPass, newPass)` verifying `currentPass` against stored local credentials and Firebase Auth re-authentication (`EmailAuthProvider.credential`).
   * Throws `"Current password is incorrect."` on invalid verification.
-* **Universal Show/Hide Password Toggle Buttons (`LoginPage.tsx`, `SignUpPage.tsx`, `SettingsView.tsx`)**:
-  * Wrapped all password inputs with inline Lucide `Eye` and `EyeOff` toggle buttons across login, sign-up, and password change forms.
+* **Sidebar Avatar Photo Sync (`Navbar.tsx`)**:
+  * Fixed `Navbar.tsx` user card to pass `dbUserProfile?.avatar || firebaseUser?.photoURL || userProfile.avatar` to `UserAvatar` so custom uploaded profile photos render cleanly in the leftbar sidebar.
+
 
 
 
