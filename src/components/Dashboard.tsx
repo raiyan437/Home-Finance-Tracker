@@ -3,7 +3,7 @@ import type { Expense, Settlement } from '../types';
 import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from '../utils/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
-import { CategoryChart } from './CategoryChart';
+import { CategoryChart, PayerContributionCard } from './CategoryChart';
 import { CategoryPieChart } from './CategoryPieChart';
 import { UserAvatar } from './UserAvatar';
 import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote } from 'lucide-react';
@@ -50,16 +50,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
-  // Payment Channel Analysis (Bank Cards vs Cash Outlay)
+  // Calculate Payment Channel Ratios (Bank Cards vs Cash)
   const paymentChannelStats = useMemo(() => {
     let cardCents = 0;
     let cashCents = 0;
 
-    expenses.forEach((e) => {
-      if (e.paymentMethod?.type === 'card') {
-        cardCents += e.amountCents;
+    expenses.forEach((exp) => {
+      if (exp.paymentMethod?.type === 'card' || exp.paymentMethod?.cardId) {
+        cardCents += exp.amountCents;
       } else {
-        cashCents += e.amountCents;
+        cashCents += exp.amountCents;
       }
     });
 
@@ -67,92 +67,90 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const cardPercentage = grandTotal > 0 ? (cardCents / grandTotal) * 100 : 0;
     const cashPercentage = grandTotal > 0 ? (cashCents / grandTotal) * 100 : 0;
 
-    return { cardCents, cashCents, grandTotal, cardPercentage, cashPercentage };
+    return { cardCents, cashCents, cardPercentage, cashPercentage };
   }, [expenses]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      {/* Top Banner */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      {/* Top Banner & Quick Metrics Header */}
       <div className="page-header">
         <div className="page-title-group">
-          <h1 className="page-title">{currentHouse ? currentHouse.name : 'Household Dashboard'}</h1>
+          <h1 className="page-title">Household Financial Dashboard</h1>
           <p className="page-description">
-            Real-time expense tracking & automated debt settlement engine for {memberNamesText}
+            Live overview of household expenses, net debtor positions, and settlement recommendations for {memberNamesText}
           </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={onNavigateToExpenses}>
+            <span>Log Expense</span>
+            <Receipt size={16} />
+          </button>
+          <button className="btn btn-secondary" onClick={onNavigateToSettlement}>
+            <span>Settlement Hub</span>
+            <ArrowRight size={16} />
+          </button>
         </div>
       </div>
 
-      {/* Grid of 4 Hero Summary Stat Cards */}
-      <div className="grid-summary">
-        <div className="glass-card summary-card">
-          <div className="summary-card-header">
-            <span className="summary-title">Total Household Spend</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(228, 228, 231, 0.15)', color: 'var(--accent-primary)' }}>
+      {/* Top Metric Cards */}
+      <div className="metrics-grid">
+        {/* Metric 1: Total Household Spend */}
+        <div className="glass-card metric-card">
+          <div className="metric-header">
+            <span className="metric-label">Total Household Spend</span>
+            <div className="metric-icon" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
               <TrendingUp size={20} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+          <div className="metric-value tabular-nums" style={{ color: 'var(--accent-primary)' }}>
             {formatCurrency(totalSpentCents, false, lang)}
           </div>
-          <div className="summary-footer">
-            <Activity size={14} style={{ color: 'var(--accent-primary)' }} />
-            <span>{expenses.length} expense record{expenses.length === 1 ? '' : 's'}</span>
+          <div className="metric-subtext">
+            <span>Overall expenses logged across {expenses.length} records</span>
           </div>
         </div>
 
-        <div className="glass-card summary-card">
-          <div className="summary-card-header">
-            <span className="summary-title">Outstanding Debt</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
-              <Receipt size={20} />
-            </div>
-          </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-amber)' }}>
-            {formatCurrency(totalPendingDebtCents, false, lang)}
-          </div>
-          <div className="summary-footer">
-            <span>{simplifiedSettlements.length} transfer{simplifiedSettlements.length === 1 ? '' : 's'} required</span>
-          </div>
-        </div>
-
-        <div className="glass-card summary-card">
-          <div className="summary-card-header">
-            <span className="summary-title">Settled Debt Paid</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
-              <CheckCircle2 size={20} />
-            </div>
-          </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-emerald)' }}>
-            {formatCurrency(settlements.reduce((sum, st) => sum + st.amountCents, 0), false, lang)}
-          </div>
-          <div className="summary-footer">
-            <span>{settlements.length} settlement records</span>
-          </div>
-        </div>
-
-        <div className="glass-card summary-card">
-          <div className="summary-card-header">
-            <span className="summary-title">Average Per Member</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}>
+        {/* Metric 2: Total Outstanding Debt */}
+        <div className="glass-card metric-card">
+          <div className="metric-header">
+            <span className="metric-label">Outstanding Debt</span>
+            <div className="metric-icon" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
               <Activity size={20} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums">
+          <div className="metric-value tabular-nums" style={{ color: 'var(--accent-amber)' }}>
+            {formatCurrency(totalPendingDebtCents, false, lang)}
+          </div>
+          <div className="metric-subtext">
+            <span>{simplifiedSettlements.length} active settlement transactions required</span>
+          </div>
+        </div>
+
+        {/* Metric 3: Average Per Member */}
+        <div className="glass-card metric-card">
+          <div className="metric-header">
+            <span className="metric-label">Average Per Member</span>
+            <div className="metric-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
+              <CheckCircle2 size={20} />
+            </div>
+          </div>
+          <div className="metric-value tabular-nums" style={{ color: 'var(--accent-emerald)' }}>
             {formatCurrency(averagePerMemberCents, false, lang)}
           </div>
-          <div className="summary-footer">
-            <span>Split evenly across {memberCount} member{memberCount === 1 ? '' : 's'}</span>
+          <div className="metric-subtext">
+            <span>Fair share target for {memberCount} active housemates</span>
           </div>
         </div>
       </div>
 
-      {/* Main Dashboard Layout: Left Primary Ledger & Right Visual Analytics Panel */}
+      {/* Main 2-Column Dashboard Grid */}
       <div className="dashboard-main-grid">
         
-        {/* Left Column: Housemate Net Balances, Debt Action Cards & Recent History */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+        {/* Left Column: Housemate Net Balances, Debt Action Cards, Recent History & Analytics */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Housemate Net Balances Grid */}
+          {/* 1. Housemate Net Balances Grid */}
           <div>
             <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em' }}>
               Housemate Net Balances ({houseUsers.length})
@@ -229,7 +227,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          {/* Direct Debt Settlement Action Cards */}
+          {/* 2. Direct Debt Settlement Action Cards */}
           {simplifiedSettlements.length > 0 && (
             <div className="glass-card">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
@@ -290,7 +288,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           )}
 
-          {/* Recent Expenses List */}
+          {/* 3. Recent Shared Expenses List */}
           <div className="glass-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
@@ -349,18 +347,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-        </div>
+          {/* 4. Payer Out-of-Pocket Contribution Ratio Card (Moved to Left Column beneath Recent Expenses) */}
+          <PayerContributionCard expenses={expenses} />
 
-        {/* Right Column: Visual Charts, Donut Pie Chart & Payment Channel Analytics */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-          
-          {/* 1. Category Donut Pie Chart */}
-          <CategoryPieChart expenses={expenses} lang={lang} />
-
-          {/* 2. Category Progress Bars & Payer Out-of-Pocket Ratios */}
-          <CategoryChart expenses={expenses} />
-
-          {/* 3. Payment Method Channel Ratio Card (Bank Cards vs Cash) */}
+          {/* 5. Payment Channel Distribution Card (Bank Cards vs Cash) */}
           <div className="glass-card">
             <div style={{ marginBottom: '16px' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -445,6 +435,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
           </div>
+
+        </div>
+
+        {/* Right Column: Visual Category Charts */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* 1. Category Donut Pie Chart */}
+          <CategoryPieChart expenses={expenses} lang={lang} />
+
+          {/* 2. Category Progress Bars */}
+          <CategoryChart expenses={expenses} />
 
         </div>
 
