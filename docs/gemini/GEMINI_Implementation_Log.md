@@ -345,7 +345,12 @@
 ### 2026-08-01: Settlement Recipient-Only Mark as Paid Restriction
 * **Recipient Confirmation Authorization (`SettlementView.tsx`, `i18n.ts`)**:
   * Implemented `isRecipientUser(tx)` in `SettlementView.tsx` matching `myUid` against `tx.toUser` (the recipient receiving the money).
-  * Restricted the green **Mark as Paid** button strictly to the recipient user. Payers and third-party members see an informative badge: `"Only recipient (RecipientName) can mark as paid"` / `"শুধুমাত্র প্রাপক পরিশোধ চিহ্নিত করতে পারবেন"`.
+### 2026-08-01: Strict Private Payment Card Ownership Isolation
+* **User-Scoped Card Subscription & Filter (`firebaseSync.ts`, `App.tsx`)**:
+  * Updated `subscribeCards` in `firebaseSync.ts` to query Cloud Firestore `cards` strictly by `ownerId == cardOwnerId` (`dbUserProfile?.uid || activeUserId`).
+  * Updated `userCards` in `App.tsx` to filter cards strictly by `ownerId === myUid`.
+  * Prevents payment card leakage across household members. Each user's credit/debit cards are now 100% private and visible ONLY to their creator.
+
 
 
 
