@@ -54,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   personalCount,
   cardsCount,
 }) => {
-  const { userProfile, dbUserProfile, currentHouse, logout } = useAuth();
+  const { userProfile, dbUserProfile, firebaseUser, currentHouse, logout } = useAuth();
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
 
   const handleLogoutClick = async () => {
@@ -89,9 +89,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
             <UserAvatar
               user={{
-                id: userProfile.id,
+                id: dbUserProfile?.uid || userProfile.id,
                 name: displayName,
-                avatar: displayName.slice(0, 1).toUpperCase(),
+                avatar: dbUserProfile?.avatar || firebaseUser?.photoURL || userProfile.avatar || displayName.slice(0, 1).toUpperCase(),
                 color: userProfile.color || '#3b82f6',
               }}
               size={40}
