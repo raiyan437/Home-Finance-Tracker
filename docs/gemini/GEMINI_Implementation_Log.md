@@ -349,7 +349,11 @@
 * **User-Scoped Card Subscription & Filter (`firebaseSync.ts`, `App.tsx`)**:
   * Updated `subscribeCards` in `firebaseSync.ts` to query Cloud Firestore `cards` strictly by `ownerId == cardOwnerId` (`dbUserProfile?.uid || activeUserId`).
   * Updated `userCards` in `App.tsx` to filter cards strictly by `ownerId === myUid`.
-  * Prevents payment card leakage across household members. Each user's credit/debit cards are now 100% private and visible ONLY to their creator.
+### 2026-08-01: Cards Manager Undefined Owner Resolver Crash Fix
+* **Safe Card Owner Resolver (`CardsManager.tsx`)**:
+  * Implemented `getCardOwner(cardOwnerId)` in `CardsManager.tsx` to search `houseUsers`, `dbUserProfile`, `userProfile`, `USERS`, or construct a fallback user object.
+  * Completely eliminates the `Cannot read properties of undefined (reading 'name')` crash when viewing user cards on live production.
+
 
 
 
