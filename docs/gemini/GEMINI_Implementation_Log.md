@@ -283,9 +283,10 @@
 * **4.1 Native Web Share API Integration (`src/utils/share.ts`, `SettingsView.tsx`, `SettlementView.tsx`)**: Created Web Share API helper wrapping `navigator.share()` with clipboard fallback for sharing House Join Codes (`HM-8823`) and settlement transfer instructions via WhatsApp/SMS.
 * **4.2 Custom Theme Accent Picker (`index.css`, `Navbar.tsx`, `SettingsView.tsx`)**: Added CSS attributes and UI color pickers for `charcoal`, `midnight`, `emerald`, and `amber` accents persisted in `localStorage`.
 
-### 2026-07-31: Created Local & Production Firebase Environment Config Files
-* **Environment Configuration (`.env`, `.env.example`, `.gitignore`)**:
-  * Created local `.env` and version-controlled `.env.example` templates containing the 6 required `VITE_FIREBASE_*` environment keys.
-  * Added `.env` security exclusions to `.gitignore` to prevent sensitive credentials from leaking to public Git repositories.
+### 2026-07-31: Live Firebase Production Credentials Configured
+* **Live Production Cloud Config (`.env`, `src/config/firebase.ts`)**:
+  * Configured live credentials for project `home-finance-1ah277j9` in `.env` and `src/config/firebase.ts`.
+  * Enabled 🟢 **Cloud Sync Active** mode across all devices.
+
 
 
