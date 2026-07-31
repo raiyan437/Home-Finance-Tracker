@@ -80,7 +80,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
         firebaseUid = userCred.user.uid;
       } catch (fbErr: any) {
-        console.warn('Firebase login attempt notice:', fbErr);
+        // If account was deleted in Firebase Console or credentials don't match, purge stale local cache & throw error
+        const users = loadUsersDB();
+        const filtered = users.filter((u) => u.email.toLowerCase() !== cleanEmail);
+        saveUsersDB(filtered);
+        setLoading(false);
+        throw new Error('Invalid email or password. Please verify your credentials or Sign Up.');
       }
     }
 
