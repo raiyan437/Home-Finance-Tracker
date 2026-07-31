@@ -308,8 +308,12 @@
 * **Current Password Verification & Change Password (`SettingsView.tsx`, `AuthContext.tsx`)**:
   * Implemented `changeUserPassword(currentPass, newPass)` verifying `currentPass` against stored local credentials and Firebase Auth re-authentication (`EmailAuthProvider.credential`).
   * Throws `"Current password is incorrect."` on invalid verification.
-* **Sidebar Avatar Photo Sync (`Navbar.tsx`)**:
-  * Fixed `Navbar.tsx` user card to pass `dbUserProfile?.avatar || firebaseUser?.photoURL || userProfile.avatar` to `UserAvatar` so custom uploaded profile photos render cleanly in the leftbar sidebar.
+### 2026-08-01: Dashboard Layout Optimization (Left Column Analytics)
+* **Left Column Card Restructuring (`Dashboard.tsx`, `CategoryChart.tsx`)**:
+  * Extracted `PayerContributionCard` from `CategoryChart.tsx`.
+  * Positioned **Payer Out-of-Pocket Contribution Ratio** card and **Payment Channel Distribution** card directly beneath `Recent Shared Expenses` in the Left Column of the dashboard grid, eliminating empty whitespace beneath the recent expenses card.
+  * Maintained `CategoryPieChart` and `CategoryChart` in the Right Column dedicated to category analytics.
+
 
 
 
