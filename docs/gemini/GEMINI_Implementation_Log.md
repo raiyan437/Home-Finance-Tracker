@@ -292,7 +292,10 @@
   * Removed `AUTHORIZED_DEMO_ACCOUNTS` map. Open registration allows any visitor to sign up with valid email, password (>= 6 chars), and display name.
   * Throws `"Email is already registered. Please log in."` if email is taken. Strict login throws `"Invalid email or password. Please verify your credentials or Sign Up."`.
 * **First-Time User Onboarding Banner (`App.tsx`)**:
-  * Added onboarding banner when `currentHouse === null` prompting new users to **👑 Create a New House** or **👤 Join Existing House**.
+* **Strict Firebase Auth Verification (`AuthContext.tsx`)**:
+  * Fixed login flow to strictly require successful `signInWithEmailAndPassword` when Firebase Auth is active.
+  * Automatically purges stale deleted accounts from local storage cache if rejected by Firebase Auth.
+
 
 
 
