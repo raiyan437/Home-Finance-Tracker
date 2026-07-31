@@ -327,9 +327,14 @@
 ### 2026-08-01: Purged Default Profile Picture Fallbacks & Fixed Live Cross-Device House Sync
 * **Purged Default PNG Profile Pictures (`settlementEngine.ts`, `UserAvatar.tsx`, `Navbar.tsx`)**:
   * Removed demo PNG image imports (`raiyan.png`, `himel.png`, `lazim.png`). Set `avatar: undefined` for all users without a custom uploaded photo so `UserAvatar` renders clean dynamic initials badges on color gradient circles for all accounts.
-* **Live Cross-Device House Member Sync (`AuthContext.tsx`)**:
-  * Updated `syncHouseForUser` and `onAuthStateChanged` to fetch current user profile and house document directly from Cloud Firestore `users` and `houses` collections upon login/auth state change.
-  * Guarantees that when Member B joins Member A's household via House Code on live production, both Member A and Member B see each other on their house rosters in real-time across devices.
+### 2026-08-01: Firestore Data Sanitization & Realtime User/House Listener Fix
+* **Firestore Data Sanitization (`firebaseSync.ts`)**:
+  * Implemented `sanitizeForFirestore<T>(data)` to recursively strip `undefined` properties from JavaScript objects before calling `setDoc()`.
+  * Fixes the hidden Firestore `Unsupported field value: undefined` exception that caused `syncSaveHouse(house)` and `syncSaveUser(userProfile)` to throw silently on live Cloud Firestore.
+* **Realtime User & House Document Listeners (`AuthContext.tsx`)**:
+  * Upgraded `onAuthStateChanged` to maintain a realtime `onSnapshot(doc(db, 'users', user.uid))` subscription.
+  * Subscribed `subscribeHouse` to `dbUserProfile?.houseId || currentHouse?.id`, ensuring that when Member B joins Member A's household on live Vercel, Firestore pushes the updated member roster to both devices instantly in real-time.
+
 
 
 
