@@ -10,6 +10,7 @@ import {
   setActiveSession,
 } from '../utils/mockAuthDatabase';
 import { auth } from '../config/firebase';
+import { syncSaveUser, syncSaveHouse } from '../utils/firebaseSync';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
 
 interface AuthContextType {
@@ -116,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(existingUser);
     setDbUserProfile(existingUser);
     syncHouseForUser(existingUser);
+    syncSaveUser(existingUser);
     setLoading(false);
   };
 
@@ -181,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(existing);
     setDbUserProfile(existing);
     syncHouseForUser(existing);
+    syncSaveUser(existing);
     setLoading(false);
   };
 
@@ -245,6 +248,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse(newHouse);
+    syncSaveHouse(newHouse);
+    syncSaveUser(updatedProfile);
   };
 
   // Join House Handler
@@ -288,6 +293,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse({ ...house });
+    syncSaveHouse(house);
+    syncSaveUser(updatedProfile);
   };
 
   // Update House Name Handler (Leader Power)

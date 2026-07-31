@@ -1,6 +1,32 @@
 import { collection, onSnapshot, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../config/firebase';
-import type { Expense, Settlement, PaymentCard } from '../types';
+import type { Expense, Settlement, PaymentCard, UserProfile, House } from '../types';
+
+/**
+ * Saves a user profile document in Firestore `users` collection.
+ */
+export const syncSaveUser = async (userProfile: UserProfile) => {
+  if (!isFirebaseConfigured || !db) return;
+  try {
+    const docRef = doc(db, 'users', userProfile.uid);
+    await setDoc(docRef, userProfile, { merge: true });
+  } catch (err) {
+    console.warn('Firestore save user fallback:', err);
+  }
+};
+
+/**
+ * Saves a house document in Firestore `houses` collection.
+ */
+export const syncSaveHouse = async (house: House) => {
+  if (!isFirebaseConfigured || !db) return;
+  try {
+    const docRef = doc(db, 'houses', house.id);
+    await setDoc(docRef, house, { merge: true });
+  } catch (err) {
+    console.warn('Firestore save house fallback:', err);
+  }
+};
 
 /**
  * Listens for realtime changes to the Firestore `expenses` collection (optionally house-scoped).
