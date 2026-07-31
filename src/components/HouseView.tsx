@@ -176,7 +176,7 @@ export const HouseView: React.FC<HouseViewProps> = () => {
       {!currentHouse ? (
         <div className="grid-2">
           {/* Create House Form */}
-          <div className="glass-card">
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
               <Plus size={22} style={{ color: 'var(--accent-emerald)' }} />
               <div>
@@ -185,34 +185,36 @@ export const HouseView: React.FC<HouseViewProps> = () => {
               </div>
             </div>
 
-            <form onSubmit={handleCreateHouseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label className="form-label">Household Name</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g. Bachelor Villa 4B"
-                  value={createHouseName}
-                  onChange={(e) => setCreateHouseName(e.target.value)}
-                  required
-                />
+            <form onSubmit={handleCreateHouseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label className="form-label">Household Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Bachelor Villa 4B"
+                    value={createHouseName}
+                    onChange={(e) => setCreateHouseName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Custom House Code (6 Characters)</label>
+                  <input
+                    type="text"
+                    className="form-input tabular-nums"
+                    maxLength={6}
+                    placeholder="e.g. 123456"
+                    value={createHouseCode}
+                    onChange={(e) => setCreateHouseCode(e.target.value.toUpperCase())}
+                    style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}
+                    required
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="form-label">Custom House Code (6 Characters)</label>
-                <input
-                  type="text"
-                  className="form-input tabular-nums"
-                  maxLength={6}
-                  placeholder="e.g. 123456"
-                  value={createHouseCode}
-                  onChange={(e) => setCreateHouseCode(e.target.value.toUpperCase())}
-                  style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="btn btn-primary" disabled={isSubmitting || !createHouseName.trim() || !createHouseCode.trim()}>
+              <button type="submit" className="btn btn-primary" style={{ marginTop: '12px' }} disabled={isSubmitting || !createHouseName.trim() || !createHouseCode.trim()}>
                 <Plus size={16} />
                 <span>{isSubmitting ? 'Creating House...' : 'Create Household'}</span>
               </button>
@@ -220,7 +222,7 @@ export const HouseView: React.FC<HouseViewProps> = () => {
           </div>
 
           {/* Join House Form */}
-          <div className="glass-card">
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
               <LogIn size={22} style={{ color: 'var(--accent-primary)' }} />
               <div>
@@ -229,20 +231,24 @@ export const HouseView: React.FC<HouseViewProps> = () => {
               </div>
             </div>
 
-            <form onSubmit={handleJoinHouseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label className="form-label">House Join Code</label>
-                <input
-                  type="text"
-                  className="form-input tabular-nums"
-                  placeholder="e.g. HM-8823"
-                  value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                  required
-                />
+            <form onSubmit={handleJoinHouseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label className="form-label">House Join Code</label>
+                  <input
+                    type="text"
+                    className="form-input tabular-nums"
+                    maxLength={6}
+                    placeholder="e.g. 123456"
+                    value={joinCodeInput}
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}
+                    required
+                  />
+                </div>
               </div>
 
-              <button type="submit" className="btn btn-secondary" disabled={isSubmitting || !joinCodeInput.trim()}>
+              <button type="submit" className="btn btn-secondary" style={{ marginTop: '12px' }} disabled={isSubmitting || !joinCodeInput.trim()}>
                 <LogIn size={16} />
                 <span>{isSubmitting ? 'Joining House...' : 'Join Household'}</span>
               </button>

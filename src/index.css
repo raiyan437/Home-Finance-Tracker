@@ -782,6 +782,19 @@ button, input, select, textarea {
   gap: 10px;
 }
 
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 768px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+}
+
 .grid-3 {
   display: grid;
   grid-template-columns: 1fr;
