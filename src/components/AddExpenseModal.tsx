@@ -54,9 +54,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const activeUserKey = propsActiveUserId || dbUserProfile?.uid || activeUserId;
   const allUserIds = useMemo(() => houseUsers.map((u) => u.id), [houseUsers]);
 
+  const isLeader = Boolean(
+    dbUserProfile?.role === 'leader' ||
+    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === activeUserId))
+  );
+  const myUid = dbUserProfile?.uid || activeUserKey;
+  const myUidInUsers = useMemo(
+    () => houseUsers.find((u) => u.id === myUid || (u.uid && u.uid === myUid))?.id || myUid,
+    [houseUsers, myUid]
+  );
+
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [paidBy, setPaidBy] = useState<UserId>(activeUserKey || 'raiyan');
+  const [paidBy, setPaidBy] = useState<UserId>(myUidInUsers || activeUserKey || 'raiyan');
   const [category, setCategory] = useState<Category>('Groceries');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
@@ -93,12 +103,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     setErrorMessage(null);
     setIsSubmitting(false);
 
-    const defaultPaidBy = allUserIds.includes(activeUserKey) ? activeUserKey : (allUserIds[0] || activeUserKey);
+    const defaultPaidBy = isLeader
+      ? (allUserIds.includes(activeUserKey) ? activeUserKey : (allUserIds.includes(myUidInUsers) ? myUidInUsers : (allUserIds[0] || activeUserKey)))
+      : myUidInUsers;
 
     if (initialExpense) {
       setTitle(initialExpense.title || '');
       setAmountStr((initialExpense.amountCents / 100).toFixed(2));
-      setPaidBy(initialExpense.paidBy || defaultPaidBy);
+      setPaidBy(isLeader ? (initialExpense.paidBy || defaultPaidBy) : myUidInUsers);
       setCategory(initialExpense.category || 'Groceries');
       setDate(initialExpense.date || new Date().toISOString().split('T')[0]);
       setSplitMethod(initialExpense.splitMethod || 'equal');
@@ -137,7 +149,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     } else {
       setTitle('');
       setAmountStr('');
-      setPaidBy(defaultPaidBy);
+      setPaidBy(isLeader ? defaultPaidBy : myUidInUsers);
       setCategory('Groceries');
       setDate(new Date().toISOString().split('T')[0]);
       setSplitMethod('equal');
@@ -446,19 +458,41 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
           {/* Paid By Selection Grid */}
           <div className="form-group">
-            <label className="form-label">Who Paid Out-of-Pocket?</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>Who Paid Out-of-Pocket?</label>
+              {!isLeader && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  👑 Leader access required to attribute to others
+                </span>
+              )}
+            </div>
             <div className="user-selector-grid">
-              {houseUsers.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  className={`user-select-btn ${paidBy === user.id ? 'selected' : ''}`}
-                  onClick={() => setPaidBy(user.id)}
-                >
-                  <UserAvatar user={user} size={28} />
-                  <span>{user.name}</span>
-                </button>
-              ))}
+              {houseUsers.map((user) => {
+                const isSelected = paidBy === user.id || (user.uid && paidBy === user.uid);
+                const canSelect = isLeader || user.id === myUid || user.uid === myUid || user.id === myUidInUsers;
+
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    disabled={!canSelect}
+                    className={`user-select-btn ${isSelected ? 'selected' : ''}`}
+                    style={{
+                      opacity: canSelect ? 1 : 0.45,
+                      cursor: canSelect ? 'pointer' : 'not-allowed',
+                      borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                    }}
+                    onClick={() => {
+                      if (canSelect) {
+                        setPaidBy(user.id);
+                      }
+                    }}
+                  >
+                    <UserAvatar user={user} size={28} />
+                    <span>{user.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
