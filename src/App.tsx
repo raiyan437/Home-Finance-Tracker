@@ -191,44 +191,29 @@ const AppContent: React.FC = () => {
 
   // Filter household expenses (shared scope) vs personal expenses (private scope)
   const householdExpenses = useMemo(() => {
+    if (!currentHouse?.id) return [];
     const myUid = dbUserProfile?.uid || activeUserId;
-    const memberUids = currentHouse?.members?.map((m) => m.uid) || [myUid];
+    const memberUids = currentHouse.members?.map((m) => m.uid) || [myUid];
 
     return expenses.filter((e) => {
       const isHousehold = !e.scope || e.scope === 'household';
       if (!isHousehold) return false;
 
-      if (currentHouse?.id) {
-        if (e.houseId === currentHouse.id) return true;
-        // Also include expenses paid by or shared with any active house member
-        const isMemberPayer = memberUids.includes(e.paidBy) || memberUids.some((uid) => e.paidBy?.toLowerCase() === uid.toLowerCase());
-        const isMemberShare = e.shares && e.shares.some((s) => memberUids.includes(s.userId));
-        return isMemberPayer || isMemberShare;
-      }
-
-      return (
-        e.paidBy === myUid ||
-        e.paidBy === activeUserId ||
-        (e.shares && e.shares.some((s) => s.userId === myUid || s.userId === activeUserId))
-      );
+      if (e.houseId === currentHouse.id) return true;
+      const isMemberPayer = memberUids.includes(e.paidBy) || memberUids.some((uid) => e.paidBy?.toLowerCase() === uid.toLowerCase());
+      const isMemberShare = e.shares && e.shares.some((s) => memberUids.includes(s.userId));
+      return isMemberPayer || isMemberShare;
     });
   }, [expenses, currentHouse, activeUserId, dbUserProfile]);
 
   const houseSettlements = useMemo(() => {
+    if (!currentHouse?.id) return [];
     const myUid = dbUserProfile?.uid || activeUserId;
-    const memberUids = currentHouse?.members?.map((m) => m.uid) || [myUid];
+    const memberUids = currentHouse.members?.map((m) => m.uid) || [myUid];
 
     return settlements.filter((s) => {
-      if (currentHouse?.id) {
-        if ((s as any).houseId === currentHouse.id) return true;
-        return memberUids.includes(s.fromUserId) || memberUids.includes(s.toUserId);
-      }
-      return (
-        s.fromUserId === myUid ||
-        s.toUserId === myUid ||
-        s.fromUserId === activeUserId ||
-        s.toUserId === activeUserId
-      );
+      if ((s as any).houseId === currentHouse.id) return true;
+      return memberUids.includes(s.fromUserId) || memberUids.includes(s.toUserId);
     });
   }, [settlements, currentHouse, activeUserId, dbUserProfile]);
 

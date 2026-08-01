@@ -99,29 +99,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Helper: Refresh house object from DB based on user profile (with Firestore cloud sync)
+  // Helper: Refresh house object from DB based on user profile (with Firestore cloud sync & auto-healing fallback)
   const syncHouseForUser = async (profile: UserProfile | null) => {
-    if (!profile?.houseId) {
+    if (!profile) {
       setCurrentHouse(null);
       return;
     }
+
+    let targetHouseId = profile.houseId;
+
+    // Auto-Healing Fallback 1: Check local storage for any house where user is listed as member
+    if (!targetHouseId) {
+      const houses = loadHousesDB();
+      const matchedLocal = houses.find((h) => h.members && h.members.some((m) => m.uid === profile.uid));
+      if (matchedLocal) {
+        targetHouseId = matchedLocal.id;
+        const healedProfile = { ...profile, houseId: targetHouseId };
+        setDbUserProfile(healedProfile);
+        setActiveSession(healedProfile);
+        syncSaveUser(healedProfile);
+      }
+    }
+
+    // Auto-Healing Fallback 2: Check Firestore `houses` collection for any house where user is listed as member
+    if (!targetHouseId && isFirebaseConfigured && db) {
+      try {
+        const housesCol = collection(db, 'houses');
+        const snap = await getDocs(housesCol);
+        if (!snap.empty) {
+          snap.forEach((docSnap) => {
+            const h = docSnap.data() as House;
+            if (h.members && h.members.some((m) => m.uid === profile.uid)) {
+              targetHouseId = h.id;
+              const healedProfile = { ...profile, houseId: targetHouseId };
+              setDbUserProfile(healedProfile);
+              setActiveSession(healedProfile);
+              syncSaveUser(healedProfile);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Firestore syncHouseForUser search notice:', err);
+      }
+    }
+
+    if (!targetHouseId) {
+      setCurrentHouse(null);
+      return;
+    }
+
     const houses = loadHousesDB();
-    const house = houses.find((h) => h.id === profile.houseId) || null;
+    const house = houses.find((h) => h.id === targetHouseId) || null;
     if (house) {
       setCurrentHouse({ ...house });
     }
 
-    if (isFirebaseConfigured && db && profile.houseId) {
+    if (isFirebaseConfigured && db && targetHouseId) {
       try {
-        const docRef = doc(db, 'houses', profile.houseId);
+        const docRef = doc(db, 'houses', targetHouseId);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           const firestoreHouse = snap.data() as House;
-          setCurrentHouse({ ...firestoreHouse });
-          const idx = houses.findIndex((h) => h.id === firestoreHouse.id);
-          if (idx >= 0) houses[idx] = firestoreHouse;
-          else houses.push(firestoreHouse);
-          saveHousesDB(houses);
+          // Verify user is still an active member in this house
+          const isStillMember = firestoreHouse.members && firestoreHouse.members.some((m) => m.uid === profile.uid);
+          if (isStillMember) {
+            setCurrentHouse({ ...firestoreHouse });
+            const idx = houses.findIndex((h) => h.id === firestoreHouse.id);
+            if (idx >= 0) houses[idx] = firestoreHouse;
+            else houses.push(firestoreHouse);
+            saveHousesDB(houses);
+          } else {
+            // User was removed / kicked from house
+            setCurrentHouse(null);
+            const purgedProfile = { ...profile, houseId: null, role: null };
+            setDbUserProfile(purgedProfile);
+            setActiveSession(purgedProfile);
+            syncSaveUser(purgedProfile);
+          }
         }
       } catch (err) {
         console.warn('Firestore syncHouseForUser notice:', err);
@@ -141,6 +195,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const unsub = subscribeHouse(targetHouseId, (updatedHouse) => {
       if (updatedHouse) {
+        const myUid = dbUserProfile?.uid || activeUserId;
+        const amIMember = updatedHouse.members && updatedHouse.members.some((m) => m.uid === myUid);
+
+        if (!amIMember) {
+          // User was kicked/removed in real-time by house leader
+          setCurrentHouse(null);
+          setDbUserProfile((prev) => {
+            const purged = prev ? { ...prev, houseId: null, role: null } : null;
+            if (purged) setActiveSession(purged);
+            return purged;
+          });
+          return;
+        }
+
         setCurrentHouse(updatedHouse);
         const houses = loadHousesDB();
         const existingIdx = houses.findIndex((h) => h.id === updatedHouse.id);
@@ -153,7 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
     return () => unsub();
-  }, [dbUserProfile?.houseId, currentHouse?.id]);
+  }, [dbUserProfile?.houseId, currentHouse?.id, activeUserId]);
 
   const switchProfile = (userId: UserId) => {
     if (USERS[userId]) {

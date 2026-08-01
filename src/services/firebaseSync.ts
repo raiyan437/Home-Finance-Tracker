@@ -74,9 +74,14 @@ export const subscribeHouse = (houseId: string, onUpdate: (house: House | null) 
 export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return () => {};
 
+  if (!houseId) {
+    onUpdate([]);
+    return () => {};
+  }
+
   try {
     const colRef = collection(db, 'expenses');
-    const q = houseId ? query(colRef, where('houseId', '==', houseId)) : colRef;
+    const q = query(colRef, where('houseId', '==', houseId));
 
     return onSnapshot(
       q,
@@ -127,9 +132,14 @@ export const syncDeleteExpense = async (expenseId: string) => {
 export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => void, houseId?: string | null) => {
   if (!isFirebaseConfigured || !db) return () => {};
 
+  if (!houseId) {
+    onUpdate([]);
+    return () => {};
+  }
+
   try {
     const colRef = collection(db, 'settlements');
-    const q = houseId ? query(colRef, where('houseId', '==', houseId)) : colRef;
+    const q = query(colRef, where('houseId', '==', houseId));
 
     return onSnapshot(
       q,
