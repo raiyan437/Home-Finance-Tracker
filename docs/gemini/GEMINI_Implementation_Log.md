@@ -449,8 +449,9 @@
   * Added `fixedScope` prop to `AddExpenseModal`. Household Expense page locks modal to `scope="household"`, while Personal Wallet page manages private outlays locally. Scope toggle tabs hide automatically when locked.
 * **Dual-Ring Titanium Loading Spinner (`LoadingSpinner.tsx`, `App.tsx`)**:
   * Created reusable `<LoadingSpinner>` component with dual-ring glowing keyframes and glassmorphic backdrop for page/view transitions.
-* **Icon-Only Collapsed Sidebar Rendering (`Navbar.tsx`, `index.css`)**:
-  * Updated `Navbar.tsx` so that when `isCollapsed` is true, all section headers, text labels, and numeric count badges are conditionally hidden. Buttons render centered icons only with hover tooltips (`title="..."`), collapsing the sidebar smoothly to `76px`.
+* **Dashboard Current Month Cumulative Spend Metric (`DashboardPage.tsx`)**:
+  * Updated **Cumulative Total Spend** and **Average Per Member** hero metric calculations on `DashboardPage.tsx` to compute current month's cumulative spend (`currentMonthSpentCents`) and current month's per-member fair share target (`Math.round(currentMonthSpentCents / memberCount)`).
+
 
 
 

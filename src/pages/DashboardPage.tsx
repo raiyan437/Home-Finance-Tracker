@@ -37,16 +37,16 @@ export const DashboardPage: React.FC<DashboardProps> = ({
     [userBalances, houseUsers]
   );
 
-  const totalSpentCents = expenses.reduce((sum, exp) => sum + exp.amountCents, 0);
-
-  // Calculate Current Month Spend
+  // Calculate Current Month Spend & Cumulative Month Spend
   const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
   const currentMonthExpenses = useMemo(() => {
     return expenses.filter((e) => e.date && e.date.startsWith(currentMonthStr));
   }, [expenses, currentMonthStr]);
+
   const currentMonthSpentCents = useMemo(() => {
     return currentMonthExpenses.reduce((sum, exp) => sum + exp.amountCents, 0);
   }, [currentMonthExpenses]);
+
   const currentMonthLabel = useMemo(() => {
     const d = new Date(currentMonthStr + '-01');
     return isNaN(d.getTime())
@@ -58,7 +58,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
   const totalPendingDebtCents = simplifiedSettlements.reduce((sum, st) => sum + st.amountCents, 0);
 
   const memberCount = Math.max(1, houseUsers.length);
-  const averagePerMemberCents = Math.round(totalSpentCents / memberCount);
+  const currentMonthAveragePerMemberCents = Math.round(currentMonthSpentCents / memberCount);
   const memberNamesText = houseUsers.map((u) => u.name).join(', ');
 
   const recentExpenses = [...expenses]
@@ -126,7 +126,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Metric 2: Cumulative Total Spend */}
+        {/* Metric 2: Cumulative Total Spend (Current Month) */}
         <div className="glass-card summary-card animate-stagger-2">
           <div className="summary-card-header">
             <span className="summary-title">Cumulative Total Spend</span>
@@ -135,10 +135,10 @@ export const DashboardPage: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-purple)' }}>
-            {formatCurrency(totalSpentCents, false, lang)}
+            {formatCurrency(currentMonthSpentCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Lifetime total across {expenses.length} records</span>
+            <span>Cumulative total for {currentMonthLabel}</span>
           </div>
         </div>
 
@@ -167,10 +167,10 @@ export const DashboardPage: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-emerald)' }}>
-            {formatCurrency(averagePerMemberCents, false, lang)}
+            {formatCurrency(currentMonthAveragePerMemberCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Fair share target per active housemate</span>
+            <span>Fair share target for {currentMonthLabel}</span>
           </div>
         </div>
       </div>
