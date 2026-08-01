@@ -406,3 +406,9 @@
   * Added visual menu sections (`Household Shared`, `Personal Wallet & Cards`, `Preferences`).
   * Added dynamic micro-animations: active titanium pill indicators, icon scale `1.18` on hover, item slide `translateX(4px)`, logo shimmer, and pulsing live status dot.
   * Pinned quick-action `+ Log Expense` CTA button inside sidebar.
+### 2026-08-01: Vercel Live Application Architecture Analysis & Configuration
+* **Vercel SPA Rewrites & Header Caching (`vercel.json`)**:
+  * Created `vercel.json` with wildcard SPA routing rewrites (`/.*` -> `/index.html`) guaranteeing zero 404 URL route refresh issues on live Vercel deployments.
+  * Configured immutable HTTP `Cache-Control` header caching rules (`max-age=31536000, immutable`) for compiled `/assets/` bundles.
+* **POM Architectural Alignment (`docs/gemini/GEMINI_Project_Analysis.md`)**:
+  * Updated complete full-stack architectural document detailing live Vercel and GitHub Pages deployment workflow, Page-Object Model directory structure, authorization rules, and live-app-first balance synchronization.
