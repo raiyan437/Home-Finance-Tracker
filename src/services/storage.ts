@@ -96,13 +96,18 @@ export interface BackupDataPayload {
 }
 
 export const exportBackupJSON = (): string => {
+  const rawUsers = JSON.parse(localStorage.getItem('home_finance_users_db_v3') || '[]');
+  const sanitizedUsers = Array.isArray(rawUsers)
+    ? rawUsers.map(({ password, ...u }: any) => u)
+    : [];
+
   const payload: BackupDataPayload = {
     version: '1.0.0',
     exportedAt: new Date().toISOString(),
     expenses: loadExpenses(),
     settlements: loadSettlements(),
     cards: loadCards(),
-    usersDB: JSON.parse(localStorage.getItem('home_finance_users_db_v3') || '[]'),
+    usersDB: sanitizedUsers,
     housesDB: JSON.parse(localStorage.getItem('home_finance_houses_db_v3') || '[]'),
     personalBudgetTaka: Number(localStorage.getItem('home_finance_personal_budget_v1')) || 15000,
     categoryBudgets: JSON.parse(localStorage.getItem('home_finance_category_budgets_v1') || '{}'),

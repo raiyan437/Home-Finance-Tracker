@@ -24,7 +24,6 @@ import {
   saveCards,
   clearAllFinancialData,
 } from './services/storage';
-import { resetMockDBToDefault } from './services/mockAuthDatabase';
 import {
   subscribeExpenses,
   subscribeSettlements,
@@ -133,14 +132,18 @@ const AppContent: React.FC = () => {
     };
   }, [currentHouse?.id, dbUserProfile?.uid, activeUserId]);
 
-  // Automated Recurring Expense Generator Engine
+  // Automated Recurring Expense Generator Engine (runs once per session on mount)
   useEffect(() => {
     if (expenses.length === 0) return;
     const todayStr = new Date().toISOString().split('T')[0];
     const newGeneratedExpenses: Expense[] = [];
+    const processedParentIds = new Set<string>();
 
     expenses.forEach((exp) => {
       if (!exp.isRecurring) return;
+      if (processedParentIds.has(exp.id)) return;
+      processedParentIds.add(exp.id);
+
       const lastGen = exp.lastGeneratedDate || exp.date;
       const freq = exp.recurringFrequency || 'monthly';
 
@@ -176,7 +179,8 @@ const AppContent: React.FC = () => {
       saveExpenses(updated);
       newGeneratedExpenses.forEach((e) => syncSaveExpense(e, currentHouse?.id));
     }
-  }, [expenses.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentHouse?.id]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -248,11 +252,16 @@ const AppContent: React.FC = () => {
   ) => {
     const now = new Date().toISOString();
     let updatedExpenses: Expense[];
+
+    // Preserve original createdAt when editing; skip houseId for personal expenses
+    const existingExpense = editingId ? expenses.find((e) => e.id === editingId) : null;
+    const isPersonal = expenseData.scope === 'personal';
+
     let targetExpense: Expense = {
       ...expenseData,
       id: editingId || `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      houseId: currentHouse?.id,
-      createdAt: now,
+      houseId: isPersonal ? undefined : currentHouse?.id,
+      createdAt: existingExpense?.createdAt || now,
       updatedAt: now,
     };
 
@@ -269,7 +278,7 @@ const AppContent: React.FC = () => {
 
     setExpenses(updatedExpenses);
     saveExpenses(updatedExpenses);
-    syncSaveExpense(targetExpense, currentHouse?.id);
+    syncSaveExpense(targetExpense, isPersonal ? undefined : currentHouse?.id);
     notifyNewExpense(targetExpense.title, formatCurrency(targetExpense.amountCents), dbUserProfile?.displayName || activeUserId);
   };
 
@@ -446,14 +455,13 @@ const AppContent: React.FC = () => {
     saveSettlements([]);
   };
 
-  // Reset Demo Data handler with Cloud Firestore clearing & re-seeding
+  // Reset Data handler — clears financial data only, preserves user accounts and house membership
   const handleResetDataConfirm = () => {
     expenses.forEach((e) => syncDeleteExpense(e.id));
     settlements.forEach((s) => syncDeleteSettlement(s.id));
     cards.forEach((c) => syncDeleteCard(c.id));
 
     clearAllFinancialData();
-    resetMockDBToDefault();
 
     setExpenses([]);
     setSettlements([]);

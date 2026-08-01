@@ -584,10 +584,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncSaveHouse(updatedHouse);
   };
 
-  // Kick Member Handler (Leader Power)
+  // Kick Member Handler (Leader Power with settlement balance check)
   const kickMember = async (targetUid: string) => {
     if (!currentHouse) throw new Error('No active house found');
     if (currentHouse.leaderUid === targetUid) throw new Error('House leader cannot be kicked from house');
+
+    // Load active expenses & settlements for currentHouse to check target member balance
+    let houseExpenses: Expense[] = loadExpenses().filter((e) => !e.houseId || e.houseId === currentHouse.id);
+    let houseSettlements: Settlement[] = loadSettlements().filter((s) => !(s as any).houseId || (s as any).houseId === currentHouse.id);
+
+    if (isFirebaseConfigured && db) {
+      try {
+        const expSnap = await getDocs(query(collection(db, 'expenses'), where('houseId', '==', currentHouse.id)));
+        if (!expSnap.empty) {
+          const fsExpenses: Expense[] = [];
+          expSnap.forEach((docSnap) => fsExpenses.push(docSnap.data() as Expense));
+          houseExpenses = fsExpenses;
+        }
+
+        const stSnap = await getDocs(query(collection(db, 'settlements'), where('houseId', '==', currentHouse.id)));
+        if (!stSnap.empty) {
+          const fsSettlements: Settlement[] = [];
+          stSnap.forEach((docSnap) => fsSettlements.push(docSnap.data() as Settlement));
+          houseSettlements = fsSettlements;
+        }
+      } catch (err) {
+        console.warn('Firestore kickMember settlement balance check fallback notice:', err);
+      }
+    }
+
+    const houseUsers = getHouseUsers(currentHouse, dbUserProfile);
+    const netBalancesMap = calculateNetBalances(houseExpenses, houseSettlements, houseUsers);
+
+    const targetMember = currentHouse.members.find((m) => m.uid === targetUid);
+    const targetName = targetMember?.displayName || 'This member';
+
+    const targetBalanceKey = Object.keys(netBalancesMap).find((k) => {
+      const u = netBalancesMap[k].user;
+      return k === targetUid || (u && (u.uid === targetUid || u.id === targetUid));
+    });
+
+    const targetNetBalanceCents = targetBalanceKey ? netBalancesMap[targetBalanceKey].netBalanceCents : 0;
+
+    if (Math.abs(targetNetBalanceCents) > 0) {
+      const formattedAmount = (Math.abs(targetNetBalanceCents) / 100).toFixed(2);
+      if (targetNetBalanceCents > 0) {
+        throw new Error(
+          `Cannot kick ${targetName} while they are owed ৳${formattedAmount}. All balances must be settled first.`
+        );
+      } else {
+        throw new Error(
+          `Cannot kick ${targetName} while they owe ৳${formattedAmount}. All balances must be settled first.`
+        );
+      }
+    }
 
     const updatedMembers = currentHouse.members.filter((m) => m.uid !== targetUid);
     const updatedHouse = { ...currentHouse, members: updatedMembers };

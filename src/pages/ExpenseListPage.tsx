@@ -35,6 +35,12 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   const { currentHouse, activeUserId, dbUserProfile, userProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
+  const myUid = dbUserProfile?.uid || activeUserId;
+  const isLeader = Boolean(
+    dbUserProfile?.role === 'leader' ||
+    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === activeUserId))
+  );
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [selectedUserFilter, setSelectedUserFilter] = useState<UserId | 'All'>('All');
@@ -264,26 +270,30 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button
-                        className="btn btn-secondary btn-icon-only"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditExpense(exp);
-                        }}
-                        title="Edit expense"
-                      >
-                        <Edit size={15} />
-                      </button>
-                      <button
-                        className="btn btn-danger btn-icon-only"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteExpense(exp.id);
-                        }}
-                        title="Delete expense"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {(exp.paidBy === myUid || isLeader) && (
+                        <button
+                          className="btn btn-secondary btn-icon-only"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditExpense(exp);
+                          }}
+                          title="Edit expense"
+                        >
+                          <Edit size={15} />
+                        </button>
+                      )}
+                      {(exp.paidBy === myUid || isLeader) && (
+                        <button
+                          className="btn btn-danger btn-icon-only"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteExpense(exp.id);
+                          }}
+                          title="Delete expense"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                       <div style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>
                         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </div>
@@ -351,7 +361,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                               avatar: c.userId?.charAt(0) || 'U',
                               color: '#3b82f6',
                             };
-                            const isMyComment = c.userId === activeUserId || c.userId === dbUserProfile?.uid;
+                            const isMyComment = c.userId === activeUserId || c.userId === dbUserProfile?.uid || isLeader;
 
                             return (
                               <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>

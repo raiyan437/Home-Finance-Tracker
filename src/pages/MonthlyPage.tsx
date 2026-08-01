@@ -38,9 +38,16 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
     return expenses.filter((exp) => exp.date.startsWith(selectedMonth));
   }, [expenses, selectedMonth]);
 
+  const monthSettlements = useMemo(() => {
+    return settlements.filter((s) => {
+      const dateStr = s.settledAt || s.createdAt;
+      return dateStr ? dateStr.startsWith(selectedMonth) : false;
+    });
+  }, [settlements, selectedMonth]);
+
   const monthBalances = useMemo(() => {
-    return calculateNetBalances(monthExpenses, settlements, houseUsers);
-  }, [monthExpenses, settlements, houseUsers]);
+    return calculateNetBalances(monthExpenses, monthSettlements, houseUsers);
+  }, [monthExpenses, monthSettlements, houseUsers]);
 
   const totalMonthSpentCents = monthExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 

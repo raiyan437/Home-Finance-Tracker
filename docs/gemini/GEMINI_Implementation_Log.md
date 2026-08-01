@@ -1,8 +1,8 @@
 # GEMINI Implementation Log
 
 **Purpose**: Track implementation decisions, milestones, and updates for the Household Expense Settlement App.  
-**Last Updated**: 2026-07-30  
-**Current Status**: Active Production Deployment (Vercel Live)  
+**Last Updated**: 2026-08-01  
+**Current Status**: Active Production Deployment (GitHub Pages Live)  
 
 ---
 
@@ -389,24 +389,20 @@
   * Displays explanatory error messages detailing the exact outstanding amount (e.g., *"You cannot leave the household while you owe ৳500.00. Please pay your pending settlements before leaving."*).
   * Only permits leaving after all house settlements are 100% completed and net balance is `৳0.00`.
   * Verified with clean build and deployed to live production.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+### 2026-08-01: Project Business Logic Audit Fixes & Modern Sidebar UI Redesign
+* **Comprehensive Business Logic Fixes**:
+  * **Expense Authorization**: Locked expense editing/deletion in `ExpenseListPage.tsx` to expense creator (`paidBy === myUid`) or House Leader.
+  * **Settlement Reversal Authorization**: Locked settlement reversal in `SettlementPage.tsx` to payment recipient or House Leader.
+  * **Audit Log Clearance Protection**: Locked clearing settlement audit data to House Leaders only with confirmation dialog guard.
+  * **Kick Member Balance Check**: Updated `kickMember()` in `AuthContext.tsx` to compute net balances and block kicking members with active non-zero balances.
+  * **Expense `createdAt` Preservation**: Fixed `handleSaveExpense` in `App.tsx` to preserve original creation timestamps when editing.
+  * **Personal Expense Privacy Isolation**: Prevented `handleSaveExpense` from stamping `houseId` on personal wallet expenses (`scope === 'personal'`).
+  * **House Code Length Mismatch**: Updated input `maxLength` to 10 in `HousePage.tsx` to support `HM-XXXX` prefixed code formats.
+  * **Recurring Expense Generator Guard**: Updated recurring expense engine in `App.tsx` with parent ID tracking and stable dependencies.
+  * **Month-Scoped Settlement Balances**: Filtered settlements by selected month in `MonthlyPage.tsx` for period-isolated reporting.
+  * **Backup Password Stripping**: Sanitized `usersDB` exports in `storage.ts` to remove plaintext passwords.
+* **Modern Redesigned Sidebar UI (`Navbar.tsx`, `index.css`)**:
+  * Matched sidebar color palette to dark greyish charcoal/zinc theme (`#18181b`, `#27272a`, `rgba(24, 24, 27, 0.95)`).
+  * Added visual menu sections (`Household Shared`, `Personal Wallet & Cards`, `Preferences`).
+  * Added dynamic micro-animations: active titanium pill indicators, icon scale `1.18` on hover, item slide `translateX(4px)`, logo shimmer, and pulsing live status dot.
+  * Pinned quick-action `+ Log Expense` CTA button inside sidebar.

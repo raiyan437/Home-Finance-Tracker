@@ -200,12 +200,12 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                 </div>
 
                 <div>
-                  <label className="form-label">Custom House Code (6 Characters)</label>
+                  <label className="form-label">Custom House Code (e.g. HM-8823 or 123456)</label>
                   <input
                     type="text"
                     className="form-input tabular-nums"
-                    maxLength={6}
-                    placeholder="e.g. 123456"
+                    maxLength={10}
+                    placeholder="e.g. HM-8823"
                     value={createHouseCode}
                     onChange={(e) => setCreateHouseCode(e.target.value.toUpperCase())}
                     style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}
@@ -227,7 +227,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
               <LogIn size={22} style={{ color: 'var(--accent-primary)' }} />
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Join an Existing House</h3>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Enter 6-character code provided by your House Leader</p>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Enter house code provided by your House Leader</p>
               </div>
             </div>
 
@@ -238,8 +238,8 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                   <input
                     type="text"
                     className="form-input tabular-nums"
-                    maxLength={6}
-                    placeholder="e.g. 123456"
+                    maxLength={10}
+                    placeholder="e.g. HM-8823"
                     value={joinCodeInput}
                     onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
                     style={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}

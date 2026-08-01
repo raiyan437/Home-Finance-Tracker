@@ -28,6 +28,10 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
 }) => {
   const { currentHouse, dbUserProfile, activeUserId } = useAuth();
   const myUid = dbUserProfile?.uid || activeUserId;
+  const isLeader = Boolean(
+    dbUserProfile?.role === 'leader' ||
+    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === activeUserId))
+  );
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const isRecipientUser = (tx: SimplifiedTransaction): boolean => {
@@ -48,6 +52,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   const [proofUrl, setProofUrl] = useState<string>('');
   const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
 
   const userBalances = useMemo(
     () => calculateNetBalances(expenses, settlements, houseUsers),
@@ -121,11 +126,11 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
           </button>
         </div>
 
-        {onClearSettlements && (allSettlements.length > 0 || simplifiedTransactions.length > 0) && (
+        {isLeader && onClearSettlements && (allSettlements.length > 0 || simplifiedTransactions.length > 0) && (
           <button
             className="btn btn-secondary btn-sm"
             style={{ color: 'var(--accent-rose)', borderColor: 'rgba(244, 63, 94, 0.3)' }}
-            onClick={onClearSettlements}
+            onClick={() => setIsConfirmClearOpen(true)}
             title="Clear all recommendations and audit logs"
           >
             <Trash2 size={14} />
@@ -315,17 +320,23 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
                           </button>
                         )}
 
-                        {!isReversed && onReverseSettlement && (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            style={{ color: 'var(--accent-rose)', border: '1px solid rgba(244, 63, 94, 0.3)' }}
-                            onClick={() => onReverseSettlement(st.id)}
-                            title="Reverse settlement"
-                          >
-                            <RotateCcw size={14} />
-                            <span>{getTranslation('reverseSettlement', lang)}</span>
-                          </button>
-                        )}
+                        {!isReversed && onReverseSettlement && (() => {
+                          const canReverse =
+                            isLeader ||
+                            st.toUserId === myUid ||
+                            (houseUsers.find((u) => u.id === st.toUserId)?.uid === myUid);
+                          return canReverse ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{ color: 'var(--accent-rose)', border: '1px solid rgba(244, 63, 94, 0.3)' }}
+                              onClick={() => onReverseSettlement(st.id)}
+                              title="Reverse settlement"
+                            >
+                              <RotateCcw size={14} />
+                              <span>{getTranslation('reverseSettlement', lang)}</span>
+                            </button>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -410,6 +421,37 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
             <button className="btn btn-secondary" onClick={() => setPreviewProofUrl(null)} style={{ margin: '0 auto' }}>
               Close Preview
             </button>
+          </div>
+        </div>
+      )}
+      {/* Confirmation Modal for Clear Audit Data */}
+      {isConfirmClearOpen && (
+        <div className="modal-overlay" onClick={() => setIsConfirmClearOpen(false)}>
+          <div className="modal-card" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Clear All Settlement Data</h3>
+              <button className="close-btn" onClick={() => setIsConfirmClearOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: '1.5', margin: '10px 0' }}>
+              This will permanently delete all settlement records and audit logs for this household. This action <strong>cannot be undone</strong>.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+              <button className="btn btn-secondary" onClick={() => setIsConfirmClearOpen(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => {
+                  if (onClearSettlements) onClearSettlements();
+                  setIsConfirmClearOpen(false);
+                }}
+              >
+                <Trash2 size={16} />
+                <span>Clear All Data</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
