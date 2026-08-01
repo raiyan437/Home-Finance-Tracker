@@ -449,8 +449,9 @@
   * Added `fixedScope` prop to `AddExpenseModal`. Household Expense page locks modal to `scope="household"`, while Personal Wallet page manages private outlays locally. Scope toggle tabs hide automatically when locked.
 * **Dual-Ring Titanium Loading Spinner (`LoadingSpinner.tsx`, `App.tsx`)**:
   * Created reusable `<LoadingSpinner>` component with dual-ring glowing keyframes and glassmorphic backdrop for page/view transitions.
-* **404 Error Page (`NotFoundPage.tsx`, `App.tsx`)**:
-  * Built `<NotFoundPage>` component featuring 404 illustration, descriptive fallback, and "Return to Dashboard" action for un-matched URL hashes.
+* **Icon-Only Collapsed Sidebar Rendering (`Navbar.tsx`, `index.css`)**:
+  * Updated `Navbar.tsx` so that when `isCollapsed` is true, all section headers, text labels, and numeric count badges are conditionally hidden. Buttons render centered icons only with hover tooltips (`title="..."`), collapsing the sidebar smoothly to `76px`.
+
 
 
 

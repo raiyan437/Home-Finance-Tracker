@@ -148,27 +148,29 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Navigation Section */}
         <div className="nav-container">
           {/* Section 1: Household */}
-          <div className="nav-section-title">Household Shared</div>
+          {!isCollapsed && <div className="nav-section-title">Household Shared</div>}
           <nav className="nav-list">
             <button
               className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
               onClick={() => setActiveTab('dashboard')}
+              title={isCollapsed ? t('dashboard') : undefined}
             >
               <div className="nav-item-left">
                 <LayoutDashboard className="nav-icon" size={18} style={{ color: 'var(--accent-primary)' }} />
-                <span>{t('dashboard')}</span>
+                {!isCollapsed && <span>{t('dashboard')}</span>}
               </div>
             </button>
 
             <button
               className={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`}
               onClick={() => setActiveTab('expenses')}
+              title={isCollapsed ? t('householdExpenses') : undefined}
             >
               <div className="nav-item-left">
                 <Receipt className="nav-icon" size={18} style={{ color: '#38bdf8' }} />
-                <span>{t('householdExpenses')}</span>
+                {!isCollapsed && <span>{t('householdExpenses')}</span>}
               </div>
-              {expenseCount !== undefined && expenseCount > 0 && (
+              {!isCollapsed && expenseCount !== undefined && expenseCount > 0 && (
                 <span className="nav-badge">{expenseCount}</span>
               )}
             </button>
@@ -176,12 +178,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               className={`nav-item ${activeTab === 'settlement' ? 'active' : ''}`}
               onClick={() => setActiveTab('settlement')}
+              title={isCollapsed ? t('settlements') : undefined}
             >
               <div className="nav-item-left">
                 <ArrowLeftRight className="nav-icon" size={18} style={{ color: 'var(--accent-emerald)' }} />
-                <span>{t('settlements')}</span>
+                {!isCollapsed && <span>{t('settlements')}</span>}
               </div>
-              {settlementCount !== undefined && settlementCount > 0 && (
+              {!isCollapsed && settlementCount !== undefined && settlementCount > 0 && (
                 <span className="nav-badge nav-badge-emerald">
                   {settlementCount}
                 </span>
@@ -191,26 +194,28 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               className={`nav-item ${activeTab === 'house' ? 'active' : ''}`}
               onClick={() => setActiveTab('house')}
+              title={isCollapsed ? 'House Management' : undefined}
             >
               <div className="nav-item-left">
                 <Building className="nav-icon" size={18} style={{ color: '#10b981' }} />
-                <span>House Management</span>
+                {!isCollapsed && <span>House Management</span>}
               </div>
             </button>
           </nav>
 
           {/* Section 2: Personal & Wallet */}
-          <div className="nav-section-title">Personal Wallet & Cards</div>
+          {!isCollapsed && <div className="nav-section-title">Personal Wallet & Cards</div>}
           <nav className="nav-list">
             <button
               className={`nav-item ${activeTab === 'personal' ? 'active' : ''}`}
               onClick={() => setActiveTab('personal')}
+              title={isCollapsed ? t('personalWallet') : undefined}
             >
               <div className="nav-item-left">
                 <Wallet className="nav-icon" size={18} style={{ color: 'var(--accent-amber)' }} />
-                <span>{t('personalWallet')}</span>
+                {!isCollapsed && <span>{t('personalWallet')}</span>}
               </div>
-              {personalCount !== undefined && personalCount > 0 && (
+              {!isCollapsed && personalCount !== undefined && personalCount > 0 && (
                 <span className="nav-badge nav-badge-amber">
                   {personalCount}
                 </span>
@@ -220,12 +225,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               className={`nav-item ${activeTab === 'cards' ? 'active' : ''}`}
               onClick={() => setActiveTab('cards')}
+              title={isCollapsed ? t('paymentCards') : undefined}
             >
               <div className="nav-item-left">
                 <CreditCard className="nav-icon" size={18} style={{ color: 'var(--accent-cyan)' }} />
-                <span>{t('paymentCards')}</span>
+                {!isCollapsed && <span>{t('paymentCards')}</span>}
               </div>
-              {cardsCount !== undefined && cardsCount > 0 && (
+              {!isCollapsed && cardsCount !== undefined && cardsCount > 0 && (
                 <span className="nav-badge nav-badge-cyan">
                   {cardsCount}
                 </span>
@@ -235,24 +241,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               className={`nav-item ${activeTab === 'monthly' ? 'active' : ''}`}
               onClick={() => setActiveTab('monthly')}
+              title={isCollapsed ? t('monthlyReport') : undefined}
             >
               <div className="nav-item-left">
                 <Calendar className="nav-icon" size={18} style={{ color: '#a855f7' }} />
-                <span>{t('monthlyReport')}</span>
+                {!isCollapsed && <span>{t('monthlyReport')}</span>}
               </div>
             </button>
           </nav>
 
           {/* Section 3: Preferences */}
-          <div className="nav-section-title">Preferences</div>
+          {!isCollapsed && <div className="nav-section-title">Preferences</div>}
           <nav className="nav-list">
             <button
               className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
               onClick={() => setActiveTab('settings')}
+              title={isCollapsed ? 'Settings & Account' : undefined}
             >
               <div className="nav-item-left">
                 <Settings className="nav-icon" size={18} style={{ color: '#ec4899' }} />
-                <span>Settings & Account</span>
+                {!isCollapsed && <span>Settings & Account</span>}
               </div>
             </button>
           </nav>
@@ -260,33 +268,40 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Footer Toggles */}
         <div className="sidebar-footer">
-          <div className="sidebar-footer-row">
-            <div className="sidebar-footer-label">
-              <Languages size={15} style={{ color: 'var(--accent-cyan)' }} />
-              <span>Language</span>
-            </div>
-            <button className="theme-toggle-btn" onClick={toggleLang} title="Switch English / Bangla">
-              <span>{lang === 'en' ? '🇧🇩 বাংলা' : '🇬🇧 EN'}</span>
+          <div className="sidebar-footer-row" style={{ justifyContent: isCollapsed ? 'center' : 'space-between' }}>
+            {!isCollapsed && (
+              <div className="sidebar-footer-label">
+                <Languages size={15} style={{ color: 'var(--accent-cyan)' }} />
+                <span>Language</span>
+              </div>
+            )}
+            <button className="theme-toggle-btn" onClick={toggleLang} title={isCollapsed ? 'Switch English / Bangla' : 'Switch English / Bangla'}>
+              <span>{lang === 'en' ? '🇧🇩' : '🇬🇧'}</span>
+              {!isCollapsed && <span>{lang === 'en' ? ' বাংলা' : ' EN'}</span>}
             </button>
           </div>
 
-          <div className="sidebar-footer-row">
-            <div className="sidebar-footer-label">
-              <Sparkles size={15} style={{ color: 'var(--accent-primary)' }} />
-              <span>{t('appearance')}</span>
-            </div>
-            <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle theme">
+          <div className="sidebar-footer-row" style={{ justifyContent: isCollapsed ? 'center' : 'space-between' }}>
+            {!isCollapsed && (
+              <div className="sidebar-footer-label">
+                <Sparkles size={15} style={{ color: 'var(--accent-primary)' }} />
+                <span>{t('appearance')}</span>
+              </div>
+            )}
+            <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === 'dark' ? t('light') : t('dark')}>
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-              <span>{theme === 'dark' ? t('light') : t('dark')}</span>
+              {!isCollapsed && <span>{theme === 'dark' ? t('light') : t('dark')}</span>}
             </button>
           </div>
 
           <button
             className="sidebar-logout-btn"
             onClick={handleLogoutClick}
+            title={isCollapsed ? 'Log Out' : undefined}
+            style={{ justifyContent: isCollapsed ? 'center' : 'flex-start' }}
           >
             <LogOut size={15} />
-            <span>Log Out</span>
+            {!isCollapsed && <span>Log Out</span>}
           </button>
         </div>
       </aside>

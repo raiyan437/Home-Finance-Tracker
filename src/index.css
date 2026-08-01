@@ -431,8 +431,31 @@ button, input, select, textarea {
     border-right: 1px solid var(--border-subtle);
     padding: 24px 16px;
     z-index: 100;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease, border-color 0.3s ease;
+  }
+
+  .sidebar.collapsed {
+    width: 76px !important;
+    padding: 24px 10px !important;
+  }
+
+  .sidebar.collapsed .brand-header {
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  .sidebar.collapsed .user-profile-card {
+    justify-content: center !important;
+    padding: 8px !important;
+  }
+
+  .sidebar.collapsed .nav-item {
+    justify-content: center !important;
+    padding: 12px 8px !important;
+  }
+
+  .sidebar.collapsed .nav-item-left {
+    justify-content: center !important;
   }
 }
 
