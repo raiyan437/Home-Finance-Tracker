@@ -357,8 +357,13 @@
   * Moved data drivers to `src/services/`: `firebaseSync.ts`, `storage.ts`, and `mockAuthDatabase.ts`.
 * **Feature Business Engines (`src/features/`)**:
   * Moved business engines to `src/features/`: `settlementEngine.ts`, `ocrScanner.ts`, and `exportCsv.ts`.
-* **Imports & Bundle Code-Splitting (`App.tsx`, `AuthContext.tsx`)**:
-  * Updated all relative import paths and lazy-loading dynamic imports. Compiled with 0 TypeScript/Vite errors and deployed live to Vercel.
+### 2026-08-01: User Display Name Comment & Profile Attribution Fix
+* **Member Display Name Comment Attribution (`App.tsx`, `ExpenseListPage.tsx`, `settlementEngine.ts`, `AuthContext.tsx`)**:
+  * Updated `handleAddComment` in `App.tsx` to set `userId: dbUserProfile?.uid || activeUserId`.
+  * Updated `getHouseUsers` in `settlementEngine.ts` to resolve `currentUser.displayName` for active members.
+  * Updated commenter lookup in `ExpenseListPage.tsx` to match UIDs, IDs, and emails, falling back to `dbUserProfile.displayName`.
+  * Guarantees that member names set during Sign Up appear consistently across expense comments, house rosters, cards, and settlement views on both local and live production.
+
 
 
 
