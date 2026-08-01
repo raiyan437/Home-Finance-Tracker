@@ -380,7 +380,12 @@
   * Updated `AddExpenseModal.tsx` so regular house members (`role != 'leader'`) default to and lock onto their own account (`myUid`) in the "Who Paid Out-of-Pocket?" section.
   * Restricted selecting other members as the expense payer exclusively to the **House Leader** (`isLeader`).
   * Added visual locks (`opacity: 0.45`, `cursor: 'not-allowed'`) and helper badge `👑 Leader access required to attribute to others` for non-leaders.
-  * Verified with clean build and deployed to live production.
+### 2026-08-01: Rotating Liquid Rainbow Neon Border Button Hover Effect
+* **Continuous Rotating Color Border (`index.css`, `LiquidMetalButton.tsx`)**:
+  * Implemented `@property --rotating-border-angle` and `conic-gradient` animation spinning continuous rainbow liquid neon colors (`#3b82f6`, `#8b5cf6`, `#ec4899`, `#f43f5e`, `#f59e0b`, `#10b981`, `#06b6d4`) 360-degrees around button borders on hover.
+  * Added matching glowing box shadow and metallic shimmer sweep.
+  * Deployed live to Vercel production.
+
 
 
 
