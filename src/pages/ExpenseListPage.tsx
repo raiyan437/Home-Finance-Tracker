@@ -7,7 +7,7 @@ import { exportAuditReportCsv } from '../features/exportCsv';
 import { UserAvatar } from '../components/UserAvatar';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
-import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send, Receipt } from 'lucide-react';
+import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -110,10 +110,6 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [expenses, selectedMonth, searchQuery, selectedCategory, selectedUserFilter, selectedPaymentFilter, houseUsers]);
 
-  const filteredTotalCents = useMemo(() => {
-    return filteredExpenses.reduce((sum, exp) => sum + exp.amountCents, 0);
-  }, [filteredExpenses]);
-
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
   };
@@ -146,56 +142,6 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
             <Plus size={18} />
             <span>Log Household Expense</span>
           </button>
-        </div>
-      </div>
-
-      {/* Top Hero Summary Cards */}
-      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        <div className="glass-card summary-card animate-stagger-1">
-          <div className="summary-card-header">
-            <span className="summary-title">Filtered Total Spend</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
-              <Receipt size={22} />
-            </div>
-          </div>
-          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-primary)' }}>
-            {formatCurrency(filteredTotalCents, false, lang)}
-          </div>
-          <div className="summary-footer">
-            <span>Across {filteredExpenses.length} matching transaction records</span>
-          </div>
-        </div>
-
-        <div className="glass-card summary-card animate-stagger-2">
-          <div className="summary-card-header">
-            <span className="summary-title">Active Payer Filter</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
-              <FileText size={22} />
-            </div>
-          </div>
-          <div className="summary-amount font-display" style={{ fontSize: '1.25rem', color: 'var(--accent-emerald)' }}>
-            {selectedUserFilter === 'All'
-              ? 'All Housemates'
-              : houseUsers.find((u) => u.id === selectedUserFilter || u.uid === selectedUserFilter)?.name || selectedUserFilter}
-          </div>
-          <div className="summary-footer">
-            <span>{selectedUserFilter === 'All' ? 'Showing all out-of-pocket payers' : `Showing expenses paid by ${houseUsers.find((u) => u.id === selectedUserFilter || u.uid === selectedUserFilter)?.name || 'this member'}`}</span>
-          </div>
-        </div>
-
-        <div className="glass-card summary-card animate-stagger-3">
-          <div className="summary-card-header">
-            <span className="summary-title">Timeframe Period</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}>
-              <RefreshCw size={22} />
-            </div>
-          </div>
-          <div className="summary-amount font-display" style={{ fontSize: '1.25rem', color: 'var(--accent-purple)' }}>
-            {selectedMonth === 'All' ? 'All Time History' : selectedMonth}
-          </div>
-          <div className="summary-footer">
-            <span>{selectedMonth === 'All' ? `${availableMonths.length} active months available` : `Filtered to ${selectedMonth}`}</span>
-          </div>
         </div>
       </div>
 
