@@ -382,11 +382,14 @@
   * Added visual locks (`opacity: 0.45`, `cursor: 'not-allowed'`) and helper badge `👑 Leader access required to attribute to others` for non-leaders.
 ### 2026-08-01: Rotating Liquid Rainbow Neon Border Button Hover Effect
 * **Continuous Rotating Color Border (`index.css`, `LiquidMetalButton.tsx`)**:
-### 2026-08-01: Glass Reflection Glare Removal on Button Hover
-* **Clean Rotating Color Border (`index.css`)**:
-  * Removed `.btn::before` 200% diagonal white glass glare sweep layer from `index.css`.
-  * Preserved the crisp continuous rotating rainbow liquid neon border and ambient glow around all buttons on hover.
+### 2026-08-01: Mobile Responsiveness & Touch Optimization Engine
+* **Comprehensive Mobile Layout & Bottom Sheet Presentation (`index.css`)**:
+  * Updated `.main-content` padding (`14px 14px 108px 14px`) to guarantee zero content clipping above the fixed mobile bottom navigation bar.
+  * Configured `.modal-card` as a mobile bottom sheet (`max-width: 100vw`, `border-radius: var(--radius-xl) var(--radius-xl) 0 0`, `max-height: 88vh`).
+  * Optimized `.grid-summary` (collapses from 2-column to 1-column on < 480px), `.user-selector-grid`, `.page-header` flex direction, and `.cards-grid`.
+  * Added `touch-action: manipulation` and enforced WCAG 2.1 44px touch targets across all mobile inputs and buttons.
   * Verified with clean build and deployed to live production.
+
 
 
 
