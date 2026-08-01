@@ -382,14 +382,14 @@
   * Added visual locks (`opacity: 0.45`, `cursor: 'not-allowed'`) and helper badge `👑 Leader access required to attribute to others` for non-leaders.
 ### 2026-08-01: Rotating Liquid Rainbow Neon Border Button Hover Effect
 * **Continuous Rotating Color Border (`index.css`, `LiquidMetalButton.tsx`)**:
-### 2026-08-01: House Membership Auto-Healing & Stale Data Access Block
-* **Membership Auto-Healing Engine (`AuthContext.tsx`)**:
-  * Added 2-tier auto-healing lookup in `syncHouseForUser`: if a user's `houseId` becomes null/missing, it automatically scans local storage and Firestore `houses` roster to restore `profile.houseId` if the user is listed in any house.
-  * Real-time kick/leave detection automatically clears `currentHouse` when `amIMember` becomes false during live roster snapshots.
-* **Stale House Data Access Block (`firebaseSync.ts`, `App.tsx`)**:
-  * Updated `subscribeExpenses` and `subscribeSettlements` in `firebaseSync.ts` to require an active `houseId`. If `houseId` is null/empty, returns empty array (`[]`) instead of querying all expenses across all houses.
-  * Updated `householdExpenses` and `houseSettlements` in `App.tsx` to return `[]` when `!currentHouse?.id`, preventing former members from viewing old house data after leaving.
+### 2026-08-01: Household Leave Block for Unsettled Balances Rule
+* **Unsettled Settlement & Net Balance Guard (`AuthContext.tsx`)**:
+  * Updated `leaveHouse` in `AuthContext.tsx` to compute `calculateNetBalances(houseExpenses, houseSettlements, houseUsers)` before allowing a member to leave.
+  * Blocks any member from leaving if `Math.abs(netBalanceCents) > 0` (either owing money or owed money).
+  * Displays explanatory error messages detailing the exact outstanding amount (e.g., *"You cannot leave the household while you owe ৳500.00. Please pay your pending settlements before leaving."*).
+  * Only permits leaving after all house settlements are 100% completed and net balance is `৳0.00`.
   * Verified with clean build and deployed to live production.
+
 
 
 
