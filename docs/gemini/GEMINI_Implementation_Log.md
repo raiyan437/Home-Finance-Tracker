@@ -375,9 +375,13 @@
   * Updated `getHouseUsers` in `settlementEngine.ts` to map `rawAvatar` for active users and members.
 ### 2026-08-01: Liquid Metal WebGL Shader & Button Hover Shimmer Effect
 * **Liquid Metal Shader & Metallic Shimmer (`LiquidMetalButton.tsx`, `index.css`)**:
-  * Installed `@paper-design/shaders-react` and created reusable [LiquidMetalButton.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/ui/LiquidMetalButton.tsx) component wrapper with custom shader speed, wave distortion, and color tinting on hover.
-  * Added pure CSS metallic liquid chrome sweep animation for `.btn-primary` and `.btn` classes on hover.
-  * Deployed live to Vercel production.
+### 2026-08-01: Add Expense Modal Payer Selection Authorization Rule
+* **Leader-Only Payer Reattribution Rule (`AddExpenseModal.tsx`)**:
+  * Updated `AddExpenseModal.tsx` so regular house members (`role != 'leader'`) default to and lock onto their own account (`myUid`) in the "Who Paid Out-of-Pocket?" section.
+  * Restricted selecting other members as the expense payer exclusively to the **House Leader** (`isLeader`).
+  * Added visual locks (`opacity: 0.45`, `cursor: 'not-allowed'`) and helper badge `👑 Leader access required to attribute to others` for non-leaders.
+  * Verified with clean build and deployed to live production.
+
 
 
 
