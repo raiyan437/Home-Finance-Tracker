@@ -1596,17 +1596,36 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
-   Comprehensive Mobile Responsiveness Engine
+   Comprehensive Mobile Responsiveness Engine & Touch Optimization
    ========================================================================== */
 
+html, body, #root, .app-container {
+  max-width: 100vw;
+  overflow-x: hidden;
+  touch-action: manipulation;
+}
+
 @media (max-width: 767px) {
-  .glass-card {
-    padding: 18px;
-    border-radius: var(--radius-md);
+  .sidebar {
+    display: none !important;
+  }
+
+  .main-content {
+    padding: 14px 14px 108px 14px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 18px;
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.45rem;
   }
 
   .page-description {
@@ -1615,38 +1634,105 @@ button, input, select, textarea {
 
   .header-actions {
     width: 100%;
-    justify-content: space-between;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .header-actions .btn {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 120px;
+    justify-content: center;
     font-size: 0.82rem;
     padding: 8px 12px;
   }
 
+  .grid-summary {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .summary-card {
+    padding: 14px 16px;
+  }
+
   .summary-amount {
-    font-size: 1.55rem;
+    font-size: 1.35rem;
+  }
+
+  .user-selector-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .user-select-btn {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .expense-item-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .modal-overlay {
+    padding: 8px;
+    align-items: flex-end;
+  }
+
+  .modal-card {
+    max-width: 100vw !important;
+    width: 100% !important;
+    padding: 20px 16px !important;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
+    max-height: 88vh !important;
+    margin: 0 !important;
+  }
+
+  .transaction-card {
+    padding: 14px;
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .glass-card {
+    padding: 16px;
+    border-radius: var(--radius-md);
   }
 }
 
 @media (max-width: 480px) {
-  .main-content {
-    padding: 12px;
-    padding-bottom: 92px;
+  .grid-summary {
+    grid-template-columns: 1fr;
   }
 
-  .page-title {
-    font-size: 1.35rem;
+  .user-selector-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-amount {
+    font-size: 1.4rem;
+  }
+
+  .main-content {
+    padding: 10px 10px 104px 10px !important;
+  }
+
+  .mobile-nav {
+    height: 68px;
+  }
+
+  .mobile-add-fab {
+    width: 48px;
+    height: 48px;
+    margin-top: -20px;
   }
 
   .modal-card {
-    padding: 18px;
-    border-radius: var(--radius-lg);
-  }
-
-  .user-card-top {
-    flex-wrap: wrap;
-    gap: 10px;
+    padding: 16px 12px !important;
   }
 }
 
@@ -1667,9 +1753,4 @@ button, input, select, textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-html, body, #root, .app-container {
-  max-width: 100vw;
-  overflow-x: hidden;
 }
