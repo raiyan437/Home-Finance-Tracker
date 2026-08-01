@@ -40,17 +40,23 @@ export const getHouseUsers = (
 ): User[] => {
   if (house && house.members && house.members.length > 0) {
     return house.members.map((m) => {
-      const hasCustomPhoto =
-        typeof m.avatar === 'string' &&
-        (m.avatar.startsWith('data:') || m.avatar.startsWith('http') || m.avatar.includes('/'));
-
       const isCurrent = currentUser && (m.uid === (currentUser as any).uid || m.email === (currentUser as any).email);
       const resolvedName = (isCurrent && (currentUser as any).displayName) || m.displayName || m.email?.split('@')[0] || 'Member';
+      const rawAvatar = (isCurrent && (currentUser as any).avatar) || m.avatar;
+
+      const hasCustomPhoto =
+        typeof rawAvatar === 'string' &&
+        rawAvatar.trim().length > 0 &&
+        (rawAvatar.startsWith('data:') ||
+         rawAvatar.startsWith('http:') ||
+         rawAvatar.startsWith('https:') ||
+         rawAvatar.startsWith('blob:') ||
+         rawAvatar.includes('/'));
 
       return {
         id: m.uid,
         name: resolvedName,
-        avatar: hasCustomPhoto ? m.avatar : undefined,
+        avatar: hasCustomPhoto ? rawAvatar : undefined,
         color: '#3b82f6',
         email: m.email,
         uid: m.uid,

@@ -374,7 +374,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                           user={{
                             id: member.uid,
                             name: member.displayName,
-                            avatar: member.displayName.slice(0, 1).toUpperCase(),
+                            avatar: member.avatar || (dbUserProfile?.uid === member.uid ? dbUserProfile?.avatar : undefined),
                             color: '#3b82f6',
                           }}
                           size={40}

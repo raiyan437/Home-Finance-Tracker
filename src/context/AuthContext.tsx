@@ -287,6 +287,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setDbUserProfile(updatedProfile);
     syncSaveUser(updatedProfile);
 
+    // Also update house member roster avatar across local storage & Cloud Firestore
+    if (currentHouse && currentHouse.members) {
+      const updatedMembers = currentHouse.members.map((m) => {
+        if (m.uid === dbUserProfile.uid) {
+          return { ...m, avatar: avatarUrl };
+        }
+        return m;
+      });
+      const updatedHouse = { ...currentHouse, members: updatedMembers };
+      const houses = loadHousesDB();
+      const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
+      saveHousesDB(updatedHouses);
+      setCurrentHouse(updatedHouse);
+      syncSaveHouse(updatedHouse);
+    }
+
     if (auth?.currentUser) {
       try {
         await updateProfile(auth.currentUser, { photoURL: avatarUrl });

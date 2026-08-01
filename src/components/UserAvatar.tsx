@@ -12,7 +12,12 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, classNa
   const safeUser = user || { name: 'User', avatar: undefined, color: '#3b82f6' };
   const isImage =
     typeof safeUser.avatar === 'string' &&
-    (safeUser.avatar.startsWith('data:') || safeUser.avatar.startsWith('http'));
+    safeUser.avatar.trim().length > 0 &&
+    (safeUser.avatar.startsWith('data:') ||
+     safeUser.avatar.startsWith('http:') ||
+     safeUser.avatar.startsWith('https:') ||
+     safeUser.avatar.startsWith('blob:') ||
+     safeUser.avatar.includes('/'));
 
   const initial = (safeUser.name?.trim().charAt(0) || 'U').toUpperCase();
 
