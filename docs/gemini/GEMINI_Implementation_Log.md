@@ -373,8 +373,12 @@
   * Updated `UserAvatar.tsx` to detect Base64, HTTP/HTTPS, Blob, and relative image URLs.
   * Updated `updateUserProfilePhoto` in `AuthContext.tsx` to update `currentHouse.members` in local DB and Firestore `houses/{houseId}` so all housemates receive avatar updates in real-time.
   * Updated `getHouseUsers` in `settlementEngine.ts` to map `rawAvatar` for active users and members.
-  * Replaced hardcoded text initials fallback in `HousePage.tsx` with `member.avatar || dbUserProfile?.avatar`.
-  * Guarantees profile pictures render consistently across Navbar, House Roster, Expense Cards, Add Expense Modal, Settlement Views, and Cards Manager on both local and live apps.
+### 2026-08-01: Liquid Metal WebGL Shader & Button Hover Shimmer Effect
+* **Liquid Metal Shader & Metallic Shimmer (`LiquidMetalButton.tsx`, `index.css`)**:
+  * Installed `@paper-design/shaders-react` and created reusable [LiquidMetalButton.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/ui/LiquidMetalButton.tsx) component wrapper with custom shader speed, wave distortion, and color tinting on hover.
+  * Added pure CSS metallic liquid chrome sweep animation for `.btn-primary` and `.btn` classes on hover.
+  * Deployed live to Vercel production.
+
 
 
 
