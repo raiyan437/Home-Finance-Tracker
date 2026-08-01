@@ -969,6 +969,21 @@ button, input, select, textarea {
 .cat-Personal { background: var(--cat-personal); color: var(--cat-personal-text); }
 .cat-Other { background: var(--cat-other); color: var(--cat-other-text); }
 
+@property --rotating-border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes spinRotatingBorder {
+  0% {
+    --rotating-border-angle: 0deg;
+  }
+  100% {
+    --rotating-border-angle: 360deg;
+  }
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
@@ -982,12 +997,44 @@ button, input, select, textarea {
   cursor: pointer;
   border: none;
   position: relative;
-  overflow: hidden;
   z-index: 1;
+  isolation: isolate;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Liquid Metal Metallic Shimmer Sweep on Hover */
+/* Continuous Rotating Multicolor Liquid Border on Hover */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: calc(var(--radius-md) + 2px);
+  padding: 2px;
+  background: conic-gradient(
+    from var(--rotating-border-angle),
+    #3b82f6,
+    #8b5cf6,
+    #ec4899,
+    #f43f5e,
+    #f59e0b,
+    #10b981,
+    #06b6d4,
+    #3b82f6
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.btn:hover::after {
+  opacity: 1;
+  animation: spinRotatingBorder 2s linear infinite;
+}
+
+/* Metallic Shimmer Sweep Layer */
 .btn::before {
   content: '';
   position: absolute;
@@ -998,9 +1045,9 @@ button, input, select, textarea {
   background: linear-gradient(
     45deg,
     transparent 30%,
-    rgba(255, 255, 255, 0.4) 48%,
-    rgba(255, 255, 255, 0.8) 50%,
-    rgba(255, 255, 255, 0.4) 52%,
+    rgba(255, 255, 255, 0.3) 48%,
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0.3) 52%,
     transparent 70%
   );
   transform: rotate(25deg) translateY(-100%);
@@ -1013,6 +1060,11 @@ button, input, select, textarea {
 .btn:hover::before {
   opacity: 1;
   transform: rotate(25deg) translateY(100%);
+}
+
+.btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 10px 25px -4px rgba(139, 92, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.3);
 }
 
 .btn-primary {

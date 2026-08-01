@@ -71,6 +71,25 @@ export const LiquidMetalButton: React.FC<LiquidMetalButtonProps> = ({
       }}
       {...props}
     >
+      {/* Rotating Rainbow Neon Border Overlay on Hover */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: '9999px',
+          padding: `${borderWidth}px`,
+          background: 'conic-gradient(from var(--rotating-border-angle, 0deg), #3b82f6, #8b5cf6, #ec4899, #f43f5e, #f59e0b, #10b981, #06b6d4, #3b82f6)',
+          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          WebkitMaskComposite: 'xor',
+          maskComposite: 'exclude',
+          opacity: isHovered ? 1 : 0.4,
+          transition: 'opacity 0.35s ease',
+          pointerEvents: 'none',
+          zIndex: 1,
+          animation: isHovered ? 'spinRotatingBorder 2s linear infinite' : 'none',
+        }}
+      />
+
       {/* Liquid Metal Shader Canvas Background / Border */}
       <div
         style={{
