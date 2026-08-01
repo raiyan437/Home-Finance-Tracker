@@ -39,6 +39,21 @@ export const DashboardPage: React.FC<DashboardProps> = ({
 
   const totalSpentCents = expenses.reduce((sum, exp) => sum + exp.amountCents, 0);
 
+  // Calculate Current Month Spend
+  const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const currentMonthExpenses = useMemo(() => {
+    return expenses.filter((e) => e.date && e.date.startsWith(currentMonthStr));
+  }, [expenses, currentMonthStr]);
+  const currentMonthSpentCents = useMemo(() => {
+    return currentMonthExpenses.reduce((sum, exp) => sum + exp.amountCents, 0);
+  }, [currentMonthExpenses]);
+  const currentMonthLabel = useMemo(() => {
+    const d = new Date(currentMonthStr + '-01');
+    return isNaN(d.getTime())
+      ? currentMonthStr
+      : d.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' });
+  }, [currentMonthStr, lang]);
+
   // Calculate total pending debt in household
   const totalPendingDebtCents = simplifiedSettlements.reduce((sum, st) => sum + st.amountCents, 0);
 
@@ -94,25 +109,41 @@ export const DashboardPage: React.FC<DashboardProps> = ({
       </div>
 
       {/* Top Summary Metric Cards */}
-      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-        {/* Metric 1: Total Household Spend */}
+      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px' }}>
+        {/* Metric 1: Current Month Spend */}
         <div className="glass-card summary-card animate-stagger-1">
           <div className="summary-card-header">
-            <span className="summary-title">Total Household Spend</span>
+            <span className="summary-title">Current Month Spend</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
               <TrendingUp size={22} />
             </div>
           </div>
           <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-primary)' }}>
-            {formatCurrency(totalSpentCents, false, lang)}
+            {formatCurrency(currentMonthSpentCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Overall expenses logged across {expenses.length} records</span>
+            <span>Spent in {currentMonthLabel} ({currentMonthExpenses.length} items)</span>
           </div>
         </div>
 
-        {/* Metric 2: Total Outstanding Debt */}
+        {/* Metric 2: Cumulative Total Spend */}
         <div className="glass-card summary-card animate-stagger-2">
+          <div className="summary-card-header">
+            <span className="summary-title">Cumulative Total Spend</span>
+            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}>
+              <Receipt size={22} />
+            </div>
+          </div>
+          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-purple)' }}>
+            {formatCurrency(totalSpentCents, false, lang)}
+          </div>
+          <div className="summary-footer">
+            <span>Lifetime total across {expenses.length} records</span>
+          </div>
+        </div>
+
+        {/* Metric 3: Total Outstanding Debt */}
+        <div className="glass-card summary-card animate-stagger-3">
           <div className="summary-card-header">
             <span className="summary-title">Outstanding Debt</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
@@ -123,12 +154,12 @@ export const DashboardPage: React.FC<DashboardProps> = ({
             {formatCurrency(totalPendingDebtCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>{simplifiedSettlements.length} active settlement transactions required</span>
+            <span>{simplifiedSettlements.length} active settlement transfers needed</span>
           </div>
         </div>
 
-        {/* Metric 3: Average Per Member */}
-        <div className="glass-card summary-card animate-stagger-3">
+        {/* Metric 4: Average Per Member */}
+        <div className="glass-card summary-card animate-stagger-4">
           <div className="summary-card-header">
             <span className="summary-title">Average Per Member</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
@@ -139,7 +170,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
             {formatCurrency(averagePerMemberCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Fair share target for {memberCount} active housemates</span>
+            <span>Fair share target per active housemate</span>
           </div>
         </div>
       </div>

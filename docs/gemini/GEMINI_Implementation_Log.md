@@ -422,4 +422,13 @@
   * Enhanced 3D card elevation hover lifts (`translateY(-4px)` with ambient titanium/emerald glow highlights).
   * Implemented glowing input focus rings (`box-shadow: 0 0 0 4px var(--accent-primary-glow)`), active button press feedback, and animated live house status dot pulses.
   * Custom dark zinc scrollbar styling (`::-webkit-scrollbar`).
+### 2026-08-01: Household Expense Month Selector & Cumulative Debt Settlement Invariant
+* **Household Expense Month Selector (`ExpenseListPage.tsx`)**:
+  * Added `selectedMonth` state and `availableMonths` dynamic extraction from expenses sorted in reverse chronological order.
+  * Rendered Month/Year `<select>` dropdown in the filter bar allowing housemates to filter expenses by specific months or view `"All Months"`.
+* **Cumulative Debt Settlement Invariant (`App.tsx`, `SettlementPage.tsx`, `settlementEngine.ts`)**:
+  * Enforced invariant that `SettlementPage.tsx` and `DashboardPage.tsx` receive cumulative lifetime household expenses (`householdExpenses`) and settlements (`houseSettlements`), keeping un-cleared debts from prior months active in the solver until paid.
+* **Dashboard Hero Metrics Polish (`DashboardPage.tsx`)**:
+  * Displayed **Current Month Spend** alongside **Cumulative Total Spend**, **Outstanding Debt**, and **Average Per Member** across a 4-card hero summary grid.
+
 

@@ -42,12 +42,23 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   );
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [selectedUserFilter, setSelectedUserFilter] = useState<UserId | 'All'>('All');
   const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<'All' | 'cash' | 'card'>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
+
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    expenses.forEach((e) => {
+      if (e.date) {
+        set.add(e.date.slice(0, 7));
+      }
+    });
+    return Array.from(set).sort().reverse();
+  }, [expenses]);
 
   const cardsMap = useMemo(() => {
     const map: Record<string, PaymentCard> = {};
@@ -61,6 +72,10 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   const filteredExpenses = useMemo(() => {
     return expenses
       .filter((exp) => {
+        if (selectedMonth !== 'All' && !exp.date.startsWith(selectedMonth)) {
+          return false;
+        }
+
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchesTitle = exp.title.toLowerCase().includes(q);
@@ -90,7 +105,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
         return true;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, searchQuery, selectedCategory, selectedUserFilter, selectedPaymentFilter]);
+  }, [expenses, selectedMonth, searchQuery, selectedCategory, selectedUserFilter, selectedPaymentFilter]);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -142,6 +157,30 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
+          {/* Month/Year Filter */}
+          <select
+            className="form-select"
+            style={{ width: 'auto', minWidth: '150px' }}
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+          >
+            <option value="All">All Months</option>
+            {availableMonths.map((m) => {
+              const dateObj = new Date(m + '-01');
+              const monthLabel = isNaN(dateObj.getTime())
+                ? m
+                : dateObj.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', {
+                    month: 'long',
+                    year: 'numeric',
+                  });
+              return (
+                <option key={m} value={m}>
+                  {monthLabel}
+                </option>
+              );
+            })}
+          </select>
 
           {/* Category Filter */}
           <select
