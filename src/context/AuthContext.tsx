@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User, UserId, UserProfile, House, HouseMember } from '../types';
-import { USERS } from '../features/settlementEngine';
+import type { User, UserId, UserProfile, House, HouseMember, Expense, Settlement } from '../types';
+import { USERS, calculateNetBalances, getHouseUsers } from '../features/settlementEngine';
+import { loadExpenses, loadSettlements } from '../services/storage';
 import {
   loadUsersDB,
   saveUsersDB,
@@ -42,7 +43,7 @@ interface AuthContextType {
   joinHouse: (houseCode: string) => Promise<void>;
   updateHouseName: (newName: string) => Promise<void>;
   kickMember: (targetUid: string) => Promise<void>;
-  leaveHouse: () => Promise<void>;
+  leaveHouse: (expenses?: Expense[], settlements?: Settlement[]) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -607,13 +608,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveUsersDB(updatedUsers);
   };
 
-  // Leave House Handler
-  const leaveHouse = async () => {
+  // Leave House Handler (Enforces 0 settlement balance rule)
+  const leaveHouse = async (passedExpenses?: Expense[], passedSettlements?: Settlement[]) => {
     if (!dbUserProfile || !currentHouse) return;
     if (currentHouse.leaderUid === dbUserProfile.uid) {
       throw new Error('House Leaders cannot leave house. Delete or transfer ownership first.');
     }
 
+    const myUid = dbUserProfile.uid || activeUserId;
+
+    // Load active expenses & settlements for currentHouse
+    let houseExpenses: Expense[] = passedExpenses || [];
+    let houseSettlements: Settlement[] = passedSettlements || [];
+
+    if (!passedExpenses || passedExpenses.length === 0) {
+      const localExp = loadExpenses();
+      houseExpenses = localExp.filter((e) => !e.houseId || e.houseId === currentHouse.id);
+    }
+    if (!passedSettlements || passedSettlements.length === 0) {
+      const localSt = loadSettlements();
+      houseSettlements = localSt.filter((s) => !(s as any).houseId || (s as any).houseId === currentHouse.id);
+    }
+
+    // Also fetch latest Firestore expenses & settlements if Firestore is connected
+    if (isFirebaseConfigured && db) {
+      try {
+        const expSnap = await getDocs(query(collection(db, 'expenses'), where('houseId', '==', currentHouse.id)));
+        if (!expSnap.empty) {
+          const fsExpenses: Expense[] = [];
+          expSnap.forEach((docSnap) => fsExpenses.push(docSnap.data() as Expense));
+          houseExpenses = fsExpenses;
+        }
+
+        const stSnap = await getDocs(query(collection(db, 'settlements'), where('houseId', '==', currentHouse.id)));
+        if (!stSnap.empty) {
+          const fsSettlements: Settlement[] = [];
+          stSnap.forEach((docSnap) => fsSettlements.push(docSnap.data() as Settlement));
+          houseSettlements = fsSettlements;
+        }
+      } catch (err) {
+        console.warn('Firestore leaveHouse settlement balance check fallback notice:', err);
+      }
+    }
+
+    // Compute net balances for active users in currentHouse
+    const houseUsers = getHouseUsers(currentHouse, dbUserProfile);
+    const netBalancesMap = calculateNetBalances(houseExpenses, houseSettlements, houseUsers);
+
+    const myBalanceKey = Object.keys(netBalancesMap).find((k) => {
+      const u = netBalancesMap[k].user;
+      return k === myUid || (u && (u.uid === myUid || u.id === myUid));
+    });
+
+    const myNetBalanceCents = myBalanceKey ? netBalancesMap[myBalanceKey].netBalanceCents : 0;
+
+    // Enforce business rule: Block leaving if user has non-zero net balance
+    if (Math.abs(myNetBalanceCents) > 0) {
+      const formattedAmount = (Math.abs(myNetBalanceCents) / 100).toFixed(2);
+      if (myNetBalanceCents > 0) {
+        throw new Error(
+          `You cannot leave the household while you are owed ৳${formattedAmount}. Please settle all balances before leaving.`
+        );
+      } else {
+        throw new Error(
+          `You cannot leave the household while you owe ৳${formattedAmount}. Please pay your pending settlements before leaving.`
+        );
+      }
+    }
+
+    // If balance is zero and no pending settlements exist, process leaving
     const updatedMembers = currentHouse.members.filter((m) => m.uid !== dbUserProfile.uid);
     const updatedHouse = { ...currentHouse, members: updatedMembers };
 
@@ -634,8 +697,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse(null);
-    syncSaveHouse(updatedHouse);
-    syncSaveUser(updatedProfile);
+    await syncSaveHouse(updatedHouse);
+    await syncSaveUser(updatedProfile);
   };
 
   const userProfile: User = {
