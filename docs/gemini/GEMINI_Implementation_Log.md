@@ -449,8 +449,10 @@
   * Added `fixedScope` prop to `AddExpenseModal`. Household Expense page locks modal to `scope="household"`, while Personal Wallet page manages private outlays locally. Scope toggle tabs hide automatically when locked.
 * **Dual-Ring Titanium Loading Spinner (`LoadingSpinner.tsx`, `App.tsx`)**:
   * Created reusable `<LoadingSpinner>` component with dual-ring glowing keyframes and glassmorphic backdrop for page/view transitions.
-* **Dashboard Current Month Cumulative Spend Metric (`DashboardPage.tsx`)**:
-  * Updated **Cumulative Total Spend** and **Average Per Member** hero metric calculations on `DashboardPage.tsx` to compute current month's cumulative spend (`currentMonthSpentCents`) and current month's per-member fair share target (`Math.round(currentMonthSpentCents / memberCount)`).
+* **Payer-Scoped Bank Card Selector (`AddExpenseModal.tsx`)**:
+  * Updated `AddExpenseModal.tsx` card selection dropdown to filter available cards by the payer (`card.ownerId === paidBy`), allowing users to choose only their own registered bank cards when logging/editing an expense.
+  * Preserved full transaction card badge resolution in `ExpenseListPage.tsx` so all housemates can view which bank card was used for past shared outlays.
+
 
 
 

@@ -86,6 +86,32 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const payerUser = useMemo(
+    () => houseUsers.find((u) => u.id === paidBy || (u.uid && u.uid === paidBy)),
+    [houseUsers, paidBy]
+  );
+
+  const payerCards = useMemo(() => {
+    return cards.filter((c) => {
+      if (!c.ownerId) return true;
+      const targetUid = payerUser?.uid || payerUser?.id || paidBy;
+      return (
+        c.ownerId === paidBy ||
+        c.ownerId === targetUid ||
+        (payerUser && (c.ownerId === payerUser.id || c.ownerId === payerUser.uid))
+      );
+    });
+  }, [cards, paidBy, payerUser]);
+
+  // Sync selected card when payer changes or modal opens
+  useEffect(() => {
+    if (paymentType === 'card' && payerCards.length > 0) {
+      if (!selectedCardId || !payerCards.some((c) => c.id === selectedCardId)) {
+        setSelectedCardId(payerCards[0].id);
+      }
+    }
+  }, [paidBy, payerCards, paymentType, selectedCardId]);
+
   // Background body scroll lock when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -118,7 +144,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setSplitMethod(initialExpense.splitMethod || 'equal');
       setScope(fixedScope || initialExpense.scope || 'household');
       setPaymentType(initialExpense.paymentMethod?.type || 'cash');
-      setSelectedCardId(initialExpense.paymentMethod?.cardId || (cards[0]?.id || ''));
+      setSelectedCardId(initialExpense.paymentMethod?.cardId || (payerCards[0]?.id || cards[0]?.id || ''));
       setIsRecurring(Boolean(initialExpense.isRecurring));
       setRecurringFrequency(initialExpense.recurringFrequency || 'monthly');
       setReceiptUrl(initialExpense.receiptUrl || '');
@@ -336,9 +362,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         ownerId: activeUserId,
         paymentMethod: {
           type: paymentType,
-          cardId: paymentType === 'card' ? (selectedCardId || cards[0]?.id) : undefined,
-          cardName: paymentType === 'card' ? (cards.find((c) => c.id === (selectedCardId || cards[0]?.id))?.bankName || initialExpense?.paymentMethod?.cardName) : undefined,
-          cardType: paymentType === 'card' ? (cards.find((c) => c.id === (selectedCardId || cards[0]?.id))?.cardType || initialExpense?.paymentMethod?.cardType) : undefined,
+          cardId: paymentType === 'card' ? (selectedCardId || payerCards[0]?.id || cards[0]?.id) : undefined,
+          cardName: paymentType === 'card' ? (payerCards.find((c) => c.id === (selectedCardId || payerCards[0]?.id))?.bankName || cards.find((c) => c.id === selectedCardId)?.bankName || initialExpense?.paymentMethod?.cardName) : undefined,
+          cardType: paymentType === 'card' ? (payerCards.find((c) => c.id === (selectedCardId || payerCards[0]?.id))?.cardType || cards.find((c) => c.id === selectedCardId)?.cardType || initialExpense?.paymentMethod?.cardType) : undefined,
         },
         isRecurring,
         recurringFrequency: isRecurring ? recurringFrequency : undefined,
@@ -539,17 +565,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
             {paymentType === 'card' && (
               <div style={{ marginTop: '10px' }}>
-                {cards.length === 0 ? (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)', padding: '6px 10px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-sm)' }}>
-                    ⚠️ No bank cards added yet. Go to Payment Cards tab to add your credit/debit card.
+                {payerCards.length === 0 ? (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--accent-amber)', padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                    ⚠️ {payerUser?.name || 'This user'} has no bank cards registered. Please add a payment card in the Payment Cards tab.
                   </div>
                 ) : (
                   <select
                     className="form-select"
-                    value={selectedCardId || (cards[0]?.id || '')}
+                    value={selectedCardId || (payerCards[0]?.id || '')}
                     onChange={(e) => setSelectedCardId(e.target.value)}
                   >
-                    {cards.map((c) => (
+                    {payerCards.map((c) => (
                       <option key={c.id} value={c.id}>
                         💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit Card' : 'Credit Card'})
                       </option>
