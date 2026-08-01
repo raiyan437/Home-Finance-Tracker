@@ -361,8 +361,15 @@
 * **Member Display Name Comment Attribution (`App.tsx`, `ExpenseListPage.tsx`, `settlementEngine.ts`, `AuthContext.tsx`)**:
   * Updated `handleAddComment` in `App.tsx` to set `userId: dbUserProfile?.uid || activeUserId`.
   * Updated `getHouseUsers` in `settlementEngine.ts` to resolve `currentUser.displayName` for active members.
-  * Updated commenter lookup in `ExpenseListPage.tsx` to match UIDs, IDs, and emails, falling back to `dbUserProfile.displayName`.
-  * Guarantees that member names set during Sign Up appear consistently across expense comments, house rosters, cards, and settlement views on both local and live production.
+### 2026-08-01: Household Expense Card Item UI Restructure
+* **Vertical Sub-Row Metadata Stacking (`ExpenseListPage.tsx`)**:
+  * Updated expense card items in `ExpenseListPage.tsx` to stack metadata vertically in exact requested hierarchy:
+    1. `Paid by PayerName`
+    2. `Date: 2026-08-01` (under Paid by)
+    3. `Split: equal` (under Date)
+    4. `💬 X Comments` (under Split)
+  * Applied clean typography, flex direction, and badge styling for local and live production.
+
 
 
 
