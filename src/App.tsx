@@ -2,14 +2,14 @@ import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import type { TabType } from './components/Navbar';
-import { Dashboard } from './components/Dashboard';
-import { ExpenseList } from './components/ExpenseList';
-import { SettlementView } from './components/SettlementView';
+import { DashboardPage } from './pages/DashboardPage';
+import { ExpenseListPage } from './pages/ExpenseListPage';
+import { SettlementPage } from './pages/SettlementPage';
 import { AddExpenseModal } from './components/AddExpenseModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { LoginPage } from './components/LoginPage';
-import { SignUpPage } from './components/SignUpPage';
+import { LoginPage } from './pages/LoginPage';
+import { SignUpPage } from './pages/SignUpPage';
 
 import type { Expense, Settlement, SimplifiedTransaction, PaymentCard } from './types';
 import type { Language } from './utils/i18n';
@@ -23,8 +23,8 @@ import {
   loadCards,
   saveCards,
   clearAllFinancialData,
-} from './utils/storage';
-import { resetMockDBToDefault } from './utils/mockAuthDatabase';
+} from './services/storage';
+import { resetMockDBToDefault } from './services/mockAuthDatabase';
 import {
   subscribeExpenses,
   subscribeSettlements,
@@ -35,24 +35,24 @@ import {
   syncDeleteSettlement,
   syncSaveCard,
   syncDeleteCard,
-} from './utils/firebaseSync';
-import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from './utils/settlementEngine';
+} from './services/firebaseSync';
+import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from './features/settlementEngine';
 
 // Code-split heavy views for instant page loads
-const MonthlySummary = lazy(() =>
-  import('./components/MonthlySummary').then((m) => ({ default: m.MonthlySummary }))
+const MonthlyPage = lazy(() =>
+  import('./pages/MonthlyPage').then((m) => ({ default: m.MonthlyPage }))
 );
-const PersonalWallet = lazy(() =>
-  import('./components/PersonalWallet').then((m) => ({ default: m.PersonalWallet }))
+const PersonalWalletPage = lazy(() =>
+  import('./pages/PersonalWalletPage').then((m) => ({ default: m.PersonalWalletPage }))
 );
-const CardsManager = lazy(() =>
-  import('./components/CardsManager').then((m) => ({ default: m.CardsManager }))
+const CardsPage = lazy(() =>
+  import('./pages/CardsPage').then((m) => ({ default: m.CardsPage }))
 );
-const SettingsView = lazy(() =>
-  import('./components/SettingsView').then((m) => ({ default: m.SettingsView }))
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage }))
 );
-const HouseView = lazy(() =>
-  import('./components/HouseView').then((m) => ({ default: m.HouseView }))
+const HousePage = lazy(() =>
+  import('./pages/HousePage').then((m) => ({ default: m.HousePage }))
 );
 
 const VALID_TABS: TabType[] = ['dashboard', 'expenses', 'settlement', 'personal', 'cards', 'monthly', 'house', 'settings'];
@@ -550,7 +550,7 @@ const AppContent: React.FC = () => {
           }
         >
           {activeTab === 'dashboard' && (
-            <Dashboard
+            <DashboardPage
               expenses={householdExpenses}
               settlements={houseSettlements}
               onNavigateToExpenses={() => handleTabChange('expenses')}
@@ -560,7 +560,7 @@ const AppContent: React.FC = () => {
           )}
 
           {activeTab === 'expenses' && (
-            <ExpenseList
+            <ExpenseListPage
               expenses={householdExpenses}
               cards={cards}
               onOpenAddExpense={() => {
@@ -579,7 +579,7 @@ const AppContent: React.FC = () => {
           )}
 
           {activeTab === 'settlement' && (
-            <SettlementView
+            <SettlementPage
               expenses={householdExpenses}
               settlements={houseSettlements}
               onMarkSettled={(tx: SimplifiedTransaction) => setPendingSettlementTx(tx)}
@@ -589,10 +589,10 @@ const AppContent: React.FC = () => {
             />
           )}
 
-          {activeTab === 'house' && <HouseView lang={lang} />}
+          {activeTab === 'house' && <HousePage lang={lang} />}
 
           {activeTab === 'personal' && (
-            <PersonalWallet
+            <PersonalWalletPage
               expenses={expenses}
               cards={cards}
               onSaveExpense={handleSaveExpense}
@@ -602,7 +602,7 @@ const AppContent: React.FC = () => {
           )}
 
           {activeTab === 'cards' && (
-            <CardsManager
+            <CardsPage
               cards={cards}
               expenses={expenses}
               onAddCard={handleSaveCard}
@@ -612,10 +612,10 @@ const AppContent: React.FC = () => {
           )}
 
           {activeTab === 'monthly' && (
-            <MonthlySummary expenses={householdExpenses} settlements={houseSettlements} lang={lang} />
+            <MonthlyPage expenses={householdExpenses} settlements={houseSettlements} lang={lang} />
           )}
 
-          {activeTab === 'settings' && <SettingsView lang={lang} />}
+          {activeTab === 'settings' && <SettingsPage lang={lang} />}
         </Suspense>
       </main>
 

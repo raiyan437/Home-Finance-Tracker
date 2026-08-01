@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import type { Expense, Settlement } from '../types';
-import { calculateNetBalances, getHouseUsers } from '../utils/settlementEngine';
+import { calculateNetBalances, getHouseUsers } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
-import { exportAuditReportCsv } from '../utils/exportCsv';
+import { exportAuditReportCsv } from '../features/exportCsv';
 import { useAuth } from '../context/AuthContext';
-import { CategoryChart } from './CategoryChart';
-import { UserAvatar } from './UserAvatar';
+import { CategoryChart } from '../components/CategoryChart';
+import { UserAvatar } from '../components/UserAvatar';
 import { Calendar, Users, Download, Printer } from 'lucide-react';
 
 import type { Language } from '../utils/i18n';
@@ -16,7 +16,7 @@ interface MonthlySummaryProps {
   lang?: Language;
 }
 
-export const MonthlySummary: React.FC<MonthlySummaryProps> = ({ expenses, settlements, lang = 'en' }) => {
+export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlements, lang = 'en' }) => {
   const { currentHouse, dbUserProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 

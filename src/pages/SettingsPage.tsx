@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserAvatar } from './UserAvatar';
+import { UserAvatar } from '../components/UserAvatar';
 import { isFirebaseConfigured } from '../config/firebase';
-import { exportBackupJSON, importBackupJSON } from '../utils/storage';
+import { exportBackupJSON, importBackupJSON } from '../services/storage';
 import { requestNotificationPermission, getNotificationPermissionState, isNotificationSupported } from '../utils/notifications';
 import {
   LogOut,
@@ -24,7 +24,7 @@ interface SettingsViewProps {
   lang?: Language;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = () => {
+export const SettingsPage: React.FC<SettingsViewProps> = () => {
   const {
     firebaseUser,
     dbUserProfile,

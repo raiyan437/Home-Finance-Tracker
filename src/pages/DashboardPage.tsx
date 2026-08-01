@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import type { Expense, Settlement } from '../types';
-import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from '../utils/settlementEngine';
+import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
-import { CategoryChart, PayerContributionCard } from './CategoryChart';
-import { CategoryPieChart } from './CategoryPieChart';
-import { UserAvatar } from './UserAvatar';
+import { CategoryChart, PayerContributionCard } from '../components/CategoryChart';
+import { CategoryPieChart } from '../components/CategoryPieChart';
+import { UserAvatar } from '../components/UserAvatar';
 import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote } from 'lucide-react';
 import type { Language } from '../utils/i18n';
 
@@ -17,7 +17,7 @@ interface DashboardProps {
   lang?: Language;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({
+export const DashboardPage: React.FC<DashboardProps> = ({
   expenses,
   settlements,
   onNavigateToSettlement,

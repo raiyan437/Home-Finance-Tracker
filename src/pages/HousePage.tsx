@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserAvatar } from './UserAvatar';
+import { UserAvatar } from '../components/UserAvatar';
 import { shareHouseCode } from '../utils/share';
 import {
   Home,
@@ -22,7 +22,7 @@ interface HouseViewProps {
   lang?: Language;
 }
 
-export const HouseView: React.FC<HouseViewProps> = () => {
+export const HousePage: React.FC<HouseViewProps> = () => {
   const {
     firebaseUser,
     dbUserProfile,

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserId, UserProfile, House, HouseMember } from '../types';
-import { USERS } from '../utils/settlementEngine';
+import { USERS } from '../features/settlementEngine';
 import {
   loadUsersDB,
   saveUsersDB,
@@ -8,10 +8,10 @@ import {
   saveHousesDB,
   getActiveSession,
   setActiveSession,
-} from '../utils/mockAuthDatabase';
+} from '../services/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { syncSaveUser, syncSaveHouse, subscribeHouse } from '../utils/firebaseSync';
+import { syncSaveUser, syncSaveHouse, subscribeHouse } from '../services/firebaseSync';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,

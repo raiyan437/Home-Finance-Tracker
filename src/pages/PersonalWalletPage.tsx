@@ -18,7 +18,7 @@ const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', '
 const BUDGET_STORAGE_KEY = 'home_finance_personal_budget_v1';
 const CAT_BUDGET_STORAGE_KEY = 'home_finance_category_budgets_v1';
 
-export const PersonalWallet: React.FC<PersonalWalletProps> = ({
+export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   expenses,
   cards = [],
   onSaveExpense,

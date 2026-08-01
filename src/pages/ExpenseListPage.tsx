@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import type { Expense, UserId, Category, PaymentCard } from '../types';
-import { USERS, getHouseUsers } from '../utils/settlementEngine';
+import { USERS, getHouseUsers } from '../features/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
-import { exportAuditReportCsv } from '../utils/exportCsv';
-import { UserAvatar } from './UserAvatar';
+import { exportAuditReportCsv } from '../features/exportCsv';
+import { UserAvatar } from '../components/UserAvatar';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
@@ -22,7 +22,7 @@ interface ExpenseListProps {
 
 const ALL_CATEGORIES: (Category | 'All')[] = ['All', 'Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
 
-export const ExpenseList: React.FC<ExpenseListProps> = ({
+export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   expenses,
   cards = [],
   onOpenAddExpense,

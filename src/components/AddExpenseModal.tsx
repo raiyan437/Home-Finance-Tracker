@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Expense, UserId, Category, SplitMethod, Share, ExpenseScope, PaymentCard, PaymentMethodType, RecurringFrequency, User } from '../types';
-import { getHouseUsers } from '../utils/settlementEngine';
+import { getHouseUsers } from '../features/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import {
   dollarsToCents,
@@ -10,7 +10,7 @@ import {
   calculatePercentageSplits,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
-import { scanReceiptImage } from '../utils/ocrScanner';
+import { scanReceiptImage } from '../features/ocrScanner';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { X, Check, AlertCircle, Sparkles, Users, Wallet, CreditCard, Banknote, Image as ImageIcon } from 'lucide-react';

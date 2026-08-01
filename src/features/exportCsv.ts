@@ -1,6 +1,6 @@
 import type { Expense, Settlement } from '../types';
-import { USERS } from '../utils/settlementEngine';
-import { loadUsersDB } from '../utils/mockAuthDatabase';
+import { USERS } from './settlementEngine';
+import { loadUsersDB } from '../services/mockAuthDatabase';
 
 /**
  * Converts expenses and settlements to a formatted CSV file and triggers a browser download.

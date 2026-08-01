@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ALL_USERS } from '../utils/settlementEngine';
+import { ALL_USERS } from '../features/settlementEngine';
 import type { UserId } from '../types';
 import { UserAvatar } from './UserAvatar';
 import { X, Lock, User, KeyRound, ShieldCheck, Check, AlertCircle, LogOut } from 'lucide-react';

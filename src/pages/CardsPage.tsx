@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { PaymentCard, Expense } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { USERS, getHouseUsers } from '../utils/settlementEngine';
+import { USERS, getHouseUsers } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
-import { UserAvatar } from './UserAvatar';
-import { ConfirmModal } from './ConfirmModal';
+import { UserAvatar } from '../components/UserAvatar';
+import { ConfirmModal } from '../components/ConfirmModal';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { CreditCard, Plus, Trash2, Edit, X, ShieldCheck, Wallet, Landmark } from 'lucide-react';
@@ -29,7 +29,7 @@ export const CARD_COLOR_PRESETS = [
   { name: 'Gold Bronze', value: 'linear-gradient(135deg, #854d0e, #ca8a04)' },
 ];
 
-export const CardsManager: React.FC<CardsManagerProps> = ({
+export const CardsPage: React.FC<CardsManagerProps> = ({
   cards,
   expenses,
   onAddCard,

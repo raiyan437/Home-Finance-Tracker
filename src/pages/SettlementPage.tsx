@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import type { Expense, Settlement, SimplifiedTransaction, User as UserType } from '../types';
-import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers, USERS } from '../utils/settlementEngine';
+import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers, USERS } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
-import { UserAvatar } from './UserAvatar';
+import { UserAvatar } from '../components/UserAvatar';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { shareSettlementInstructions } from '../utils/share';
@@ -18,7 +18,7 @@ interface SettlementViewProps {
   lang?: Language;
 }
 
-export const SettlementView: React.FC<SettlementViewProps> = ({
+export const SettlementPage: React.FC<SettlementViewProps> = ({
   expenses,
   settlements,
   onMarkSettled,

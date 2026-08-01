@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { Expense, Category, User as UserType } from '../types';
 import { formatCurrency } from '../utils/currency';
-import { getHouseUsers } from '../utils/settlementEngine';
+import { getHouseUsers } from '../features/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import { ShoppingCart, Home, Zap, Utensils, User, HelpCircle, PieChart } from 'lucide-react';
