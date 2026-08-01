@@ -259,7 +259,15 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                           {pm?.type === 'card' ? (
                             <>
                               <CreditCard size={12} style={{ color: 'var(--accent-primary)' }} />
-                              <span>{cardObj ? `${cardObj.bankName} (${cardObj.cardType === 'debit' ? 'Debit' : 'Credit'})` : pm.cardId ? getTranslation('deletedCardBadge', lang) : getTranslation('bankCard', lang)}</span>
+                              <span>
+                                {cardObj
+                                  ? `${cardObj.bankName} (${cardObj.cardType === 'debit' ? 'Debit' : 'Credit'})`
+                                  : pm?.cardName
+                                  ? `${pm.cardName}${pm.cardType ? ` (${pm.cardType === 'debit' ? 'Debit' : 'Credit'})` : ''}`
+                                  : pm?.cardId
+                                  ? getTranslation('deletedCardBadge', lang)
+                                  : getTranslation('bankCard', lang)}
+                              </span>
                             </>
                           ) : (
                             <>

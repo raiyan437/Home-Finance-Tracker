@@ -120,10 +120,14 @@ const AppContent: React.FC = () => {
     }, houseId);
 
     const cardOwnerId = dbUserProfile?.uid || activeUserId;
-    const unsubCards = subscribeCards((fbCards) => {
-      setCards(fbCards);
-      saveCards(fbCards);
-    }, cardOwnerId);
+    const unsubCards = subscribeCards(
+      (fbCards) => {
+        setCards(fbCards);
+        saveCards(fbCards);
+      },
+      houseId,
+      cardOwnerId
+    );
 
     return () => {
       unsubExp();

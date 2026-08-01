@@ -187,14 +187,25 @@ export const syncDeleteSettlement = async (settlementId: string) => {
 };
 
 /**
- * Listens for realtime changes to the Firestore `cards` collection (strictly owner/user-scoped).
+ * Listens for realtime changes to the Firestore `cards` collection (household or owner-scoped).
  */
-export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void, ownerId?: string | null) => {
+export const subscribeCards = (
+  onUpdate: (cards: PaymentCard[]) => void,
+  houseId?: string | null,
+  ownerId?: string | null
+) => {
   if (!isFirebaseConfigured || !db) return () => {};
 
   try {
     const colRef = collection(db, 'cards');
-    const q = ownerId ? query(colRef, where('ownerId', '==', ownerId)) : colRef;
+    let q;
+    if (houseId) {
+      q = query(colRef, where('houseId', '==', houseId));
+    } else if (ownerId) {
+      q = query(colRef, where('ownerId', '==', ownerId));
+    } else {
+      q = colRef;
+    }
 
     return onSnapshot(
       q,
@@ -203,6 +214,15 @@ export const subscribeCards = (onUpdate: (cards: PaymentCard[]) => void, ownerId
         snapshot.forEach((doc) => {
           list.push(doc.data() as PaymentCard);
         });
+        // If houseId query returns no cards, fallback to listening to all cards collection
+        if (houseId && list.length === 0) {
+          const unsubFallback = onSnapshot(colRef, (fullSnap) => {
+            const fullList: PaymentCard[] = [];
+            fullSnap.forEach((d) => fullList.push(d.data() as PaymentCard));
+            onUpdate(fullList);
+          });
+          return () => unsubFallback();
+        }
         onUpdate(list);
       },
       (err) => console.warn('Firestore Cards Sync Warning:', err)

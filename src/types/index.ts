@@ -63,6 +63,8 @@ export interface PaymentCard {
 export interface PaymentMethodInfo {
   type: PaymentMethodType;
   cardId?: string; // ID of PaymentCard if type === 'card'
+  cardName?: string; // Cached bank name snapshot (e.g. 'City Bank')
+  cardType?: 'debit' | 'credit'; // Cached card type snapshot
 }
 
 export interface Share {

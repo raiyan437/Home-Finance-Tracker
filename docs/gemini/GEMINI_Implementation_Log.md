@@ -427,8 +427,13 @@
   * Added `selectedMonth` state and `availableMonths` dynamic extraction from expenses sorted in reverse chronological order.
   * Rendered Month/Year `<select>` dropdown in the filter bar allowing housemates to filter expenses by specific months or view `"All Months"`.
 ### 2026-08-01: Dashboard Section Alignment & Category Donut Chart Text Fit
-* **Dashboard Layout Top Alignment (`DashboardPage.tsx`)**:
-  * Standardized `<h2>` section headers above both Left Column (`Housemate Net Balances`) and Right Column (`Category Spending Breakdown`) so the top edges of cards align 100% pixel-perfectly.
-* **Category Donut Inner Circle & Center Label Scaling (`CategoryPieChart.tsx`)**:
-  * Expanded SVG donut dimensions (center `110`, radius `78px`, strokeWidth `22px`) providing a `134px` diameter inner hole.
-  * Styled center text container with `whiteSpace: 'nowrap'`, font size scaling (`0.68rem` label, `1.15rem` amount), and letter spacing to fit `"Total Spend"`, currency amounts, and record subtitles cleanly without text overflowing the donut circle.
+### 2026-08-01: Cross-Member Payment Card Resolution & Snapshot Fix
+* **Household Realtime Card Subscription (`firebaseSync.ts`, `App.tsx`)**:
+  * Updated `subscribeCards` query to listen by `houseId` (and fallback to full collection snapshot), enabling all housemates to receive realtime bank card metadata for shared household expenses across all devices.
+* **Persistent Payment Card Metadata Snapshot (`types/index.ts`, `AddExpenseModal.tsx`, `ExpenseListPage.tsx`)**:
+  * Added optional `cardName` and `cardType` metadata snapshots to `PaymentMethodInfo` in `types/index.ts`.
+  * Updated `AddExpenseModal.tsx` to stamp bank name and card type snapshots when saving an expense.
+  * Updated `ExpenseListPage.tsx` badge resolution logic: checks live card $\rightarrow$ falls back to `pm.cardName` snapshot $\rightarrow$ falls back to `(Deleted Card)` badge. Eliminates `(Deleted Card)` false alarms when viewing housemates' card outlays.
+* **Manager Isolation Preserved (`CardsPage.tsx`)**:
+  * Maintained strict `ownerId === myUid` filtering in `CardsPage.tsx` so members only manage, edit, or delete their own private cards.
+

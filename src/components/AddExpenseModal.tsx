@@ -335,6 +335,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         paymentMethod: {
           type: paymentType,
           cardId: paymentType === 'card' ? (selectedCardId || cards[0]?.id) : undefined,
+          cardName: paymentType === 'card' ? (cards.find((c) => c.id === (selectedCardId || cards[0]?.id))?.bankName || initialExpense?.paymentMethod?.cardName) : undefined,
+          cardType: paymentType === 'card' ? (cards.find((c) => c.id === (selectedCardId || cards[0]?.id))?.cardType || initialExpense?.paymentMethod?.cardType) : undefined,
         },
         isRecurring,
         recurringFrequency: isRecurring ? recurringFrequency : undefined,
