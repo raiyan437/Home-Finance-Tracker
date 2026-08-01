@@ -246,21 +246,14 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                         )}
                       </div>
 
-                      <div className="expense-sub-row">
-                        <span>Paid by <strong>{payer.name}</strong></span>
-                        <span>•</span>
-                        <span>{exp.date}</span>
-                        <span>•</span>
-                        <span>Split: {exp.splitMethod}</span>
-                        {commentCount > 0 && (
-                          <>
-                            <span>•</span>
-                            <span style={{ color: 'var(--accent-primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <MessageSquare size={12} />
-                              {commentCount}
-                            </span>
-                          </>
-                        )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '6px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        <div>Paid by <strong style={{ color: 'var(--text-primary)' }}>{payer.name}</strong></div>
+                        <div>Date: <strong style={{ color: 'var(--text-primary)' }}>{exp.date}</strong></div>
+                        <div>Split: <strong style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>{exp.splitMethod}</strong></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: commentCount > 0 ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: commentCount > 0 ? 700 : 500, marginTop: '1px' }}>
+                          <MessageSquare size={13} />
+                          <span>{commentCount} {commentCount === 1 ? 'Comment' : 'Comments'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
