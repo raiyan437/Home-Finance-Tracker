@@ -382,9 +382,12 @@
   * Added visual locks (`opacity: 0.45`, `cursor: 'not-allowed'`) and helper badge `👑 Leader access required to attribute to others` for non-leaders.
 ### 2026-08-01: Rotating Liquid Rainbow Neon Border Button Hover Effect
 * **Continuous Rotating Color Border (`index.css`, `LiquidMetalButton.tsx`)**:
-  * Implemented `@property --rotating-border-angle` and `conic-gradient` animation spinning continuous rainbow liquid neon colors (`#3b82f6`, `#8b5cf6`, `#ec4899`, `#f43f5e`, `#f59e0b`, `#10b981`, `#06b6d4`) 360-degrees around button borders on hover.
-  * Added matching glowing box shadow and metallic shimmer sweep.
-  * Deployed live to Vercel production.
+### 2026-08-01: Glass Reflection Glare Removal on Button Hover
+* **Clean Rotating Color Border (`index.css`)**:
+  * Removed `.btn::before` 200% diagonal white glass glare sweep layer from `index.css`.
+  * Preserved the crisp continuous rotating rainbow liquid neon border and ambient glow around all buttons on hover.
+  * Verified with clean build and deployed to live production.
+
 
 
 
