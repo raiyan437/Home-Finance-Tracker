@@ -382,13 +382,15 @@
   * Added visual locks (`opacity: 0.45`, `cursor: 'not-allowed'`) and helper badge `👑 Leader access required to attribute to others` for non-leaders.
 ### 2026-08-01: Rotating Liquid Rainbow Neon Border Button Hover Effect
 * **Continuous Rotating Color Border (`index.css`, `LiquidMetalButton.tsx`)**:
-### 2026-08-01: Mobile Responsiveness & Touch Optimization Engine
-* **Comprehensive Mobile Layout & Bottom Sheet Presentation (`index.css`)**:
-  * Updated `.main-content` padding (`14px 14px 108px 14px`) to guarantee zero content clipping above the fixed mobile bottom navigation bar.
-  * Configured `.modal-card` as a mobile bottom sheet (`max-width: 100vw`, `border-radius: var(--radius-xl) var(--radius-xl) 0 0`, `max-height: 88vh`).
-  * Optimized `.grid-summary` (collapses from 2-column to 1-column on < 480px), `.user-selector-grid`, `.page-header` flex direction, and `.cards-grid`.
-  * Added `touch-action: manipulation` and enforced WCAG 2.1 44px touch targets across all mobile inputs and buttons.
+### 2026-08-01: House Membership Auto-Healing & Stale Data Access Block
+* **Membership Auto-Healing Engine (`AuthContext.tsx`)**:
+  * Added 2-tier auto-healing lookup in `syncHouseForUser`: if a user's `houseId` becomes null/missing, it automatically scans local storage and Firestore `houses` roster to restore `profile.houseId` if the user is listed in any house.
+  * Real-time kick/leave detection automatically clears `currentHouse` when `amIMember` becomes false during live roster snapshots.
+* **Stale House Data Access Block (`firebaseSync.ts`, `App.tsx`)**:
+  * Updated `subscribeExpenses` and `subscribeSettlements` in `firebaseSync.ts` to require an active `houseId`. If `houseId` is null/empty, returns empty array (`[]`) instead of querying all expenses across all houses.
+  * Updated `householdExpenses` and `houseSettlements` in `App.tsx` to return `[]` when `!currentHouse?.id`, preventing former members from viewing old house data after leaving.
   * Verified with clean build and deployed to live production.
+
 
 
 
