@@ -60,11 +60,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [dbUserProfile, setDbUserProfile] = useState<UserProfile | null>(() => getActiveSession());
   const [currentHouse, setCurrentHouse] = useState<House | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Connect Firebase Auth Listener & Realtime Profile Sync from Firestore
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
     let unsubUserDoc: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -86,12 +89,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setActiveSession(fbProfile);
                 syncHouseForUser(fbProfile);
               }
+              setLoading(false);
             },
-            (err) => console.warn('Firestore User Profile Sync Warning:', err)
+            (err) => {
+              console.warn('Firestore User Profile Sync Warning:', err);
+              setLoading(false);
+            }
           );
         } catch (e) {
           console.warn('Firestore auth listener sync notice:', e);
+          setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     });
 

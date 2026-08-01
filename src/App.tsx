@@ -82,7 +82,7 @@ const getTabFromPath = (): TabType | 'notfound' => {
 };
 
 const AppContent: React.FC = () => {
-  const { activeUserId, currentHouse, isAuthenticated, dbUserProfile } = useAuth();
+  const { activeUserId, currentHouse, isAuthenticated, dbUserProfile, loading } = useAuth();
 
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [activeTab, setActiveTabState] = useState<TabType | 'notfound'>(getTabFromPath);
@@ -515,6 +515,10 @@ const AppContent: React.FC = () => {
 
     setIsResetConfirmOpen(false);
   };
+
+  if (loading) {
+    return <LoadingSpinner message="Authenticating session..." fullScreen />;
+  }
 
   // Standalone Authentication Flow (Renders full LoginPage or SignUpPage when logged out)
   if (!isAuthenticated) {
