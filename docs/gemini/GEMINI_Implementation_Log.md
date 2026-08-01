@@ -350,9 +350,16 @@
   * Updated `subscribeCards` in `firebaseSync.ts` to query Cloud Firestore `cards` strictly by `ownerId == cardOwnerId` (`dbUserProfile?.uid || activeUserId`).
   * Updated `userCards` in `App.tsx` to filter cards strictly by `ownerId === myUid`.
 ### 2026-08-01: Cards Manager Undefined Owner Resolver Crash Fix
-* **Safe Card Owner Resolver (`CardsManager.tsx`)**:
-  * Implemented `getCardOwner(cardOwnerId)` in `CardsManager.tsx` to search `houseUsers`, `dbUserProfile`, `userProfile`, `USERS`, or construct a fallback user object.
-  * Completely eliminates the `Cannot read properties of undefined (reading 'name')` crash when viewing user cards on live production.
+### 2026-08-01: Page-Object Model (POM) & Feature-Based Modular Architecture Refactoring
+* **Page-Object Pattern (`src/pages/`)**:
+  * Moved view components to `src/pages/`: `DashboardPage.tsx`, `ExpenseListPage.tsx`, `SettlementPage.tsx`, `PersonalWalletPage.tsx`, `CardsPage.tsx`, `MonthlyPage.tsx`, `HousePage.tsx`, `SettingsPage.tsx`, `LoginPage.tsx`, and `SignUpPage.tsx`.
+* **Services Layer (`src/services/`)**:
+  * Moved data drivers to `src/services/`: `firebaseSync.ts`, `storage.ts`, and `mockAuthDatabase.ts`.
+* **Feature Business Engines (`src/features/`)**:
+  * Moved business engines to `src/features/`: `settlementEngine.ts`, `ocrScanner.ts`, and `exportCsv.ts`.
+* **Imports & Bundle Code-Splitting (`App.tsx`, `AuthContext.tsx`)**:
+  * Updated all relative import paths and lazy-loading dynamic imports. Compiled with 0 TypeScript/Vite errors and deployed live to Vercel.
+
 
 
 
