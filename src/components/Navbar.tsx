@@ -79,34 +79,51 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Desktop Sidebar */}
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
         {/* Brand Header */}
-        <div className="brand-header" style={{ justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
-            <div className="brand-icon" style={{ flexShrink: 0 }}>
-              <Home size={22} />
-            </div>
-            {!isCollapsed && (
-              <div className="brand-title-box">
-                <div className="brand-title">{currentHouse?.name || t('appTitle')}</div>
-                <div className="brand-subtitle">
-                  <span className="status-dot animate-pulse-glow" style={{ backgroundColor: currentHouse ? 'var(--accent-emerald)' : 'var(--text-muted)' }} />
-                  <span>
-                    {currentHouse
-                      ? `${currentHouse.members?.length || 1} Member${(currentHouse.members?.length || 1) === 1 ? '' : 's'} • ${currentHouse.code}`
-                      : t('housematesCount')}
-                  </span>
-                </div>
+        <div className="brand-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'space-between', width: '100%' }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden', cursor: isCollapsed ? 'pointer' : 'default' }}
+              onClick={isCollapsed ? toggleCollapse : undefined}
+              title={isCollapsed ? 'Expand Sidebar' : undefined}
+            >
+              <div className="brand-icon" style={{ flexShrink: 0 }}>
+                <Home size={22} />
               </div>
+              {!isCollapsed && (
+                <div className="brand-title-box">
+                  <div className="brand-title">{currentHouse?.name || t('appTitle')}</div>
+                  <div className="brand-subtitle">
+                    <span className="status-dot animate-pulse-glow" style={{ backgroundColor: currentHouse ? 'var(--accent-emerald)' : 'var(--text-muted)' }} />
+                    <span>
+                      {currentHouse
+                        ? `${currentHouse.members?.length || 1} Member${(currentHouse.members?.length || 1) === 1 ? '' : 's'} • ${currentHouse.code}`
+                        : t('housematesCount')}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {!isCollapsed && toggleCollapse && (
+              <button
+                className="btn btn-secondary btn-icon"
+                style={{ padding: '6px', minWidth: '30px', height: '30px', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
+                onClick={toggleCollapse}
+                title="Collapse Sidebar"
+              >
+                <ChevronLeft size={16} />
+              </button>
             )}
           </div>
 
-          {toggleCollapse && (
+          {isCollapsed && toggleCollapse && (
             <button
               className="btn btn-secondary btn-icon"
-              style={{ padding: '6px', minWidth: '30px', height: '30px', borderRadius: 'var(--radius-sm)' }}
+              style={{ width: '100%', padding: '4px', height: '26px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               onClick={toggleCollapse}
-              title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              title="Expand Sidebar"
             >
-              {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+              <ChevronRight size={15} />
             </button>
           )}
         </div>

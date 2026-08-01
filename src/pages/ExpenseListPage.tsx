@@ -68,7 +68,9 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
     return map;
   }, [cards]);
 
-  // Filter logic
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  // Filter logic & dynamic sorting
   const filteredExpenses = useMemo(() => {
     return expenses
       .filter((exp) => {
@@ -107,8 +109,24 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
 
         return true;
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, selectedMonth, searchQuery, selectedCategory, selectedUserFilter, selectedPaymentFilter, houseUsers]);
+      .sort((a, b) => {
+        const timeA = new Date(a.date).getTime();
+        const timeB = new Date(b.date).getTime();
+        if (timeA !== timeB) {
+          return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
+        }
+
+        // Secondary tie-breaker by createdAt timestamp for same-day expenses
+        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (createdA !== createdB) {
+          return sortOrder === 'newest' ? createdB - createdA : createdA - createdB;
+        }
+
+        // Tertiary tie-breaker by ID
+        return sortOrder === 'newest' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id);
+      });
+  }, [expenses, selectedMonth, searchQuery, selectedCategory, selectedUserFilter, selectedPaymentFilter, sortOrder, houseUsers]);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -224,6 +242,18 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
             <option value="All">{getTranslation('allPayments', lang)}</option>
             <option value="cash">{getTranslation('cash', lang)}</option>
             <option value="card">{getTranslation('bankCard', lang)}</option>
+          </select>
+
+          {/* Sort Order Selector (New to Old [Default] / Old to New) */}
+          <select
+            className="form-select"
+            style={{ width: 'auto', minWidth: '160px', fontWeight: 700, borderColor: 'var(--border-medium)' }}
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+            title="Sort Expense List Order"
+          >
+            <option value="newest">📅 New to Old (Default)</option>
+            <option value="oldest">⏳ Old to New</option>
           </select>
         </div>
       </div>
