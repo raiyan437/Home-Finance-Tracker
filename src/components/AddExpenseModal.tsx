@@ -24,6 +24,7 @@ interface AddExpenseModalProps {
   houseUsers?: User[];
   activeUserId?: UserId;
   lang?: Language;
+  fixedScope?: 'household' | 'personal';
 }
 
 const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
@@ -45,6 +46,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   houseUsers: propsHouseUsers,
   activeUserId: propsActiveUserId,
   lang = 'en',
+  fixedScope,
 }) => {
   const { currentHouse, activeUserId, dbUserProfile } = useAuth();
   const houseUsers = useMemo(
@@ -114,7 +116,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setCategory(initialExpense.category || 'Groceries');
       setDate(initialExpense.date || new Date().toISOString().split('T')[0]);
       setSplitMethod(initialExpense.splitMethod || 'equal');
-      setScope(initialExpense.scope || 'household');
+      setScope(fixedScope || initialExpense.scope || 'household');
       setPaymentType(initialExpense.paymentMethod?.type || 'cash');
       setSelectedCardId(initialExpense.paymentMethod?.cardId || (cards[0]?.id || ''));
       setIsRecurring(Boolean(initialExpense.isRecurring));
@@ -361,10 +363,20 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
             <div>
               <h2 className="modal-title font-display">
-                {initialExpense ? 'Edit Expense Record' : getTranslation('newExpense', lang)}
+                {initialExpense
+                  ? 'Edit Expense Record'
+                  : fixedScope === 'household'
+                  ? 'Log Household Expense'
+                  : fixedScope === 'personal'
+                  ? 'Log Personal Expense'
+                  : getTranslation('newExpense', lang)}
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Log shared household purchases or private personal outlays
+                {fixedScope === 'household'
+                  ? 'Log shared household purchases split among active members'
+                  : fixedScope === 'personal'
+                  ? 'Log private outlays for your personal wallet'
+                  : 'Log shared household purchases or private personal outlays'}
               </p>
             </div>
           </div>
@@ -373,32 +385,34 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           </button>
         </div>
 
-        {/* Scope Selector: Shared Household vs Private Personal */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
-          <button
-            type="button"
-            className={`btn ${scope === 'household' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ justifyContent: 'center', padding: '10px', fontSize: '0.88rem' }}
-            onClick={() => setScope('household')}
-          >
-            <Users size={18} />
-            <span>Shared Household Expense</span>
-          </button>
+        {/* Scope Selector: Shared Household vs Private Personal (Hidden when fixedScope is specified) */}
+        {!fixedScope && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+            <button
+              type="button"
+              className={`btn ${scope === 'household' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ justifyContent: 'center', padding: '10px', fontSize: '0.88rem' }}
+              onClick={() => setScope('household')}
+            >
+              <Users size={18} />
+              <span>Shared Household Expense</span>
+            </button>
 
-          <button
-            type="button"
-            className={`btn ${scope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ justifyContent: 'center', padding: '10px', fontSize: '0.88rem' }}
-            onClick={() => {
-              setScope('personal');
-              setSelectedParticipants([paidBy || activeUserId]);
-              setSplitMethod('equal');
-            }}
-          >
-            <Wallet size={18} />
-            <span>Private Personal Expense</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              className={`btn ${scope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ justifyContent: 'center', padding: '10px', fontSize: '0.88rem' }}
+              onClick={() => {
+                setScope('personal');
+                setSelectedParticipants([paidBy || activeUserId]);
+                setSplitMethod('equal');
+              }}
+            >
+              <Wallet size={18} />
+              <span>Private Personal Expense</span>
+            </button>
+          </div>
+        )}
 
         {/* Quick Template Presets Bar */}
         {!initialExpense && scope === 'household' && (

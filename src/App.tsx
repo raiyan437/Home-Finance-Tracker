@@ -8,6 +8,8 @@ import { SettlementPage } from './pages/SettlementPage';
 import { AddExpenseModal } from './components/AddExpenseModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignUpPage } from './pages/SignUpPage';
 
@@ -88,6 +90,18 @@ const AppContent: React.FC = () => {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('home_finance_sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('home_finance_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -500,10 +514,19 @@ const AppContent: React.FC = () => {
         settlementCount={simplifiedSettlements.length}
         personalCount={personalExpenses.length}
         cardsCount={userCards.length}
+        isCollapsed={isSidebarCollapsed}
+        toggleCollapse={toggleSidebarCollapse}
       />
 
       {/* Main Content Viewport */}
-      <main className="main-content">
+      <main
+        className="main-content"
+        style={{
+          marginLeft: isSidebarCollapsed ? '76px' : '260px',
+          width: `calc(100% - ${isSidebarCollapsed ? '76px' : '260px'})`,
+          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
         {/* First-Time User House Onboarding Banner */}
         {!currentHouse && (
           <div
@@ -540,13 +563,7 @@ const AppContent: React.FC = () => {
           </div>
         )}
 
-        <Suspense
-          fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--accent-primary)' }}>
-              Loading view...
-            </div>
-          }
-        >
+        <Suspense fallback={<LoadingSpinner message="Loading application view..." />}>
           {activeTab === 'dashboard' && (
             <DashboardPage
               expenses={householdExpenses}
@@ -614,6 +631,10 @@ const AppContent: React.FC = () => {
           )}
 
           {activeTab === 'settings' && <SettingsPage lang={lang} />}
+
+          {!VALID_TABS.includes(activeTab) && (
+            <NotFoundPage onGoHome={() => handleTabChange('dashboard')} lang={lang} />
+          )}
         </Suspense>
       </main>
 
@@ -630,6 +651,7 @@ const AppContent: React.FC = () => {
         houseUsers={houseUsers}
         activeUserId={dbUserProfile?.uid || activeUserId}
         lang={lang}
+        fixedScope="household"
       />
 
       {/* Delete Expense Confirm Modal */}

@@ -434,12 +434,23 @@
   * Added optional `cardName` and `cardType` metadata snapshots to `PaymentMethodInfo` in `types/index.ts`.
   * Updated `AddExpenseModal.tsx` to stamp bank name and card type snapshots when saving an expense.
   * Updated `ExpenseListPage.tsx` badge resolution logic: checks live card $\rightarrow$ falls back to `pm.cardName` snapshot $\rightarrow$ falls back to `(Deleted Card)` badge. Eliminates `(Deleted Card)` false alarms when viewing housemates' card outlays.
-### 2026-08-01: House Leadership Transfer Feature
-* **House Leadership Engine (`AuthContext.tsx`)**:
-  * Added `transferLeadership(targetUid)` method to `AuthContext`. Swaps Leader and Member roles (`'leader'` $\leftrightarrow$ `'member'`), updates `currentHouse.leaderUid`, and syncs changes to Cloud Firestore (`houses` and `users` collections) and local storage databases in real time.
-* **Member Roster Leadership Action (`HousePage.tsx`)**:
-  * Added **"👑 Pass Leadership"** button for each non-leader member when the logged-in user is the House Leader.
-  * Added confirmation prompt (`window.confirm`) and success feedback notifications.
-  * Preserved full authorization guards ensuring only the active leader can reassign leadership.
+### 2026-08-01: 8 Core UI/UX & Navigation Feature Enhancements Suite
+* **Collapsible Desktop Sidebar (`Navbar.tsx`, `App.tsx`, `index.css`)**:
+  * Implemented `isSidebarCollapsed` state with persistent `localStorage` saving. Sidebar smoothly collapses to `76px` icon strip or expands to `260px` with dynamic main layout width transitions.
+* **Household Leader Crown 👑 Badge in Sidebar (`Navbar.tsx`)**:
+  * Rendered a glowing Gold Crown 👑 badge directly beside the House Leader's name in the sidebar profile card.
+* **Sidebar CTA Cleanup (`Navbar.tsx`)**:
+  * Removed the redundant "+ Log Expense" quick action button from the sidebar.
+* **Household Expense Page UI Overhaul (`ExpenseListPage.tsx`)**:
+  * Added 3 Hero Summary cards (**Filtered Total Spend**, **Active Member Filter**, **Timeframe Period**) and redesigned transaction cards with staggered entry animations (`.animate-stagger-*`).
+* **Member Payer Filter Behavior Fix (`ExpenseListPage.tsx`)**:
+  * Updated `filteredExpenses` to strictly show expenses paid out-of-pocket by the selected housemate (`exp.paidBy === selectedPayerFilter`).
+* **Strict Scope Modal Locking (`AddExpenseModal.tsx`, `PersonalWalletPage.tsx`, `ExpenseListPage.tsx`)**:
+  * Added `fixedScope` prop to `AddExpenseModal`. Household Expense page locks modal to `scope="household"`, while Personal Wallet page manages private outlays locally. Scope toggle tabs hide automatically when locked.
+* **Dual-Ring Titanium Loading Spinner (`LoadingSpinner.tsx`, `App.tsx`)**:
+  * Created reusable `<LoadingSpinner>` component with dual-ring glowing keyframes and glassmorphic backdrop for page/view transitions.
+* **404 Error Page (`NotFoundPage.tsx`, `App.tsx`)**:
+  * Built `<NotFoundPage>` component featuring 404 illustration, descriptive fallback, and "Return to Dashboard" action for un-matched URL hashes.
+
 
 

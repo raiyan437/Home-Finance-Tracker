@@ -21,6 +21,8 @@ import {
   Crown,
   LogOut,
   Building,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'house' | 'settings';
@@ -39,6 +41,8 @@ interface NavbarProps {
   settlementCount?: number;
   personalCount?: number;
   cardsCount?: number;
+  isCollapsed?: boolean;
+  toggleCollapse?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -53,6 +57,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   settlementCount,
   personalCount,
   cardsCount,
+  isCollapsed = false,
+  toggleCollapse,
 }) => {
   const { userProfile, dbUserProfile, firebaseUser, currentHouse, logout } = useAuth();
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
@@ -63,26 +69,46 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const displayName = dbUserProfile?.displayName || userProfile.name || 'User';
 
+  const isLeader = Boolean(
+    dbUserProfile?.role === 'leader' ||
+    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === firebaseUser?.uid))
+  );
+
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
         {/* Brand Header */}
-        <div className="brand-header">
-          <div className="brand-icon">
-            <Home size={22} />
-          </div>
-          <div className="brand-title-box">
-            <div className="brand-title">{currentHouse?.name || t('appTitle')}</div>
-            <div className="brand-subtitle">
-              <span className="status-dot animate-pulse-glow" style={{ backgroundColor: currentHouse ? 'var(--accent-emerald)' : 'var(--text-muted)' }} />
-              <span>
-                {currentHouse
-                  ? `${currentHouse.members?.length || 1} Member${(currentHouse.members?.length || 1) === 1 ? '' : 's'} • ${currentHouse.code}`
-                  : t('housematesCount')}
-              </span>
+        <div className="brand-header" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
+            <div className="brand-icon" style={{ flexShrink: 0 }}>
+              <Home size={22} />
             </div>
+            {!isCollapsed && (
+              <div className="brand-title-box">
+                <div className="brand-title">{currentHouse?.name || t('appTitle')}</div>
+                <div className="brand-subtitle">
+                  <span className="status-dot animate-pulse-glow" style={{ backgroundColor: currentHouse ? 'var(--accent-emerald)' : 'var(--text-muted)' }} />
+                  <span>
+                    {currentHouse
+                      ? `${currentHouse.members?.length || 1} Member${(currentHouse.members?.length || 1) === 1 ? '' : 's'} • ${currentHouse.code}`
+                      : t('housematesCount')}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
+
+          {toggleCollapse && (
+            <button
+              className="btn btn-secondary btn-icon"
+              style={{ padding: '6px', minWidth: '30px', height: '30px', borderRadius: 'var(--radius-sm)' }}
+              onClick={toggleCollapse}
+              title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            >
+              {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
+          )}
         </div>
 
         {/* User Account / Profile Box */}
@@ -101,25 +127,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             }}
             size={38}
           />
-          <div className="user-profile-info" style={{ flex: 1 }}>
-            <div className="user-name-row">
-              <span className="user-name">{displayName}</span>
-              {dbUserProfile?.role === 'leader' && (
-                <Crown size={13} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
-              )}
+          {!isCollapsed && (
+            <div className="user-profile-info" style={{ flex: 1 }}>
+              <div className="user-name-row" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="user-name">{displayName}</span>
+                {isLeader && (
+                  <span title="House Leader 👑" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <Crown size={14} style={{ color: 'var(--accent-amber)', filter: 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.4))', flexShrink: 0 }} />
+                  </span>
+                )}
+              </div>
+              <span className="user-role-badge">
+                <UserCheck size={11} />
+                <span>{isLeader ? 'Leader' : 'Member'}</span>
+              </span>
             </div>
-            <span className="user-role-badge">
-              <UserCheck size={11} />
-              <span>{dbUserProfile?.role === 'leader' ? 'Leader' : 'Member'}</span>
-            </span>
-          </div>
+          )}
         </div>
-
-        {/* Quick Add Expense CTA Button */}
-        <button className="sidebar-quick-add-btn" onClick={onOpenAddExpense}>
-          <Plus size={18} />
-          <span>{t('addExpense')}</span>
-        </button>
 
         {/* Navigation Section */}
         <div className="nav-container">
