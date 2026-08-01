@@ -15,6 +15,7 @@ import {
   Users,
   Edit3,
   Share2,
+  Crown,
 } from 'lucide-react';
 import type { Language } from '../utils/i18n';
 
@@ -31,6 +32,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
     joinHouse,
     updateHouseName,
     kickMember,
+    transferLeadership,
     leaveHouse,
   } = useAuth();
 
@@ -42,6 +44,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [kickingUid, setKickingUid] = useState<string | null>(null);
+  const [transferringUid, setTransferringUid] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   // House Name Edit States
@@ -130,6 +133,22 @@ export const HousePage: React.FC<HouseViewProps> = () => {
       setErrorMsg(err.message || 'Failed to remove member.');
     } finally {
       setKickingUid(null);
+    }
+  };
+
+  const handleTransferLeadershipConfirm = async (targetUid: string, targetName: string) => {
+    if (!window.confirm(`Are you sure you want to transfer House Leadership to ${targetName}? You will become a regular member.`)) return;
+    setTransferringUid(targetUid);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      await transferLeadership(targetUid);
+      setSuccessMsg(`House Leadership successfully transferred to ${targetName}!`);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to transfer leadership.');
+    } finally {
+      setTransferringUid(null);
     }
   };
 
@@ -392,7 +411,20 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        {isLeader && !memberIsLeader && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ color: 'var(--accent-amber)', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+                            onClick={() => handleTransferLeadershipConfirm(member.uid, member.displayName)}
+                            disabled={transferringUid === member.uid}
+                            title="Transfer House Leadership to this member"
+                          >
+                            <Crown size={14} />
+                            <span>{transferringUid === member.uid ? 'Transferring...' : 'Pass Leadership'}</span>
+                          </button>
+                        )}
+
                         {canKick && (
                           <button
                             className="btn btn-danger btn-sm"

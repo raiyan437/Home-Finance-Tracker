@@ -43,6 +43,7 @@ interface AuthContextType {
   joinHouse: (houseCode: string) => Promise<void>;
   updateHouseName: (newName: string) => Promise<void>;
   kickMember: (targetUid: string) => Promise<void>;
+  transferLeadership: (targetUid: string) => Promise<void>;
   leaveHouse: (expenses?: Expense[], settlements?: Settlement[]) => Promise<void>;
 }
 
@@ -658,6 +659,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveUsersDB(updatedUsers);
   };
 
+  // Transfer Leadership Handler (Allows leader to pass ownership to any active member)
+  const transferLeadership = async (targetUid: string) => {
+    if (!currentHouse) throw new Error('No active house found');
+    if (!dbUserProfile) throw new Error('You must be logged in to transfer leadership');
+
+    const myUid = dbUserProfile.uid || activeUserId;
+    const isCurrentLeader = currentHouse.leaderUid === myUid || dbUserProfile.role === 'leader';
+    if (!isCurrentLeader) {
+      throw new Error('Only the current House Leader can transfer leadership.');
+    }
+    if (currentHouse.leaderUid === targetUid) {
+      throw new Error('You are already the House Leader.');
+    }
+
+    const targetMember = currentHouse.members.find((m) => m.uid === targetUid);
+    if (!targetMember) {
+      throw new Error('Target member is not part of this household.');
+    }
+
+    const updatedMembers: HouseMember[] = currentHouse.members.map((m) => {
+      if (m.uid === myUid) {
+        return { ...m, role: 'member' as const };
+      }
+      if (m.uid === targetUid) {
+        return { ...m, role: 'leader' as const };
+      }
+      return m;
+    });
+
+    const updatedHouse: House = {
+      ...currentHouse,
+      leaderUid: targetUid,
+      members: updatedMembers,
+    };
+
+    const houses = loadHousesDB();
+    const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
+    saveHousesDB(updatedHouses);
+
+    const users = loadUsersDB();
+    const updatedUsers = users.map((u) => {
+      if (u.uid === myUid) {
+        return { ...u, role: 'member' as const };
+      }
+      if (u.uid === targetUid) {
+        return { ...u, role: 'leader' as const };
+      }
+      return u;
+    });
+    saveUsersDB(updatedUsers);
+
+    const updatedMyProfile = { ...dbUserProfile, role: 'member' as const };
+    setActiveSession(updatedMyProfile);
+    setDbUserProfile(updatedMyProfile);
+    setCurrentHouse(updatedHouse);
+
+    await syncSaveHouse(updatedHouse);
+    await syncSaveUser(updatedMyProfile);
+
+    const targetUserRecord = updatedUsers.find((u) => u.uid === targetUid);
+    if (targetUserRecord) {
+      await syncSaveUser(targetUserRecord);
+    }
+  };
+
   // Leave House Handler (Enforces 0 settlement balance rule)
   const leaveHouse = async (passedExpenses?: Expense[], passedSettlements?: Settlement[]) => {
     if (!dbUserProfile || !currentHouse) return;
@@ -778,6 +844,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         joinHouse,
         updateHouseName,
         kickMember,
+        transferLeadership,
         leaveHouse,
       }}
     >

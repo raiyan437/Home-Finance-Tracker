@@ -434,6 +434,12 @@
   * Added optional `cardName` and `cardType` metadata snapshots to `PaymentMethodInfo` in `types/index.ts`.
   * Updated `AddExpenseModal.tsx` to stamp bank name and card type snapshots when saving an expense.
   * Updated `ExpenseListPage.tsx` badge resolution logic: checks live card $\rightarrow$ falls back to `pm.cardName` snapshot $\rightarrow$ falls back to `(Deleted Card)` badge. Eliminates `(Deleted Card)` false alarms when viewing housemates' card outlays.
-* **Manager Isolation Preserved (`CardsPage.tsx`)**:
-  * Maintained strict `ownerId === myUid` filtering in `CardsPage.tsx` so members only manage, edit, or delete their own private cards.
+### 2026-08-01: House Leadership Transfer Feature
+* **House Leadership Engine (`AuthContext.tsx`)**:
+  * Added `transferLeadership(targetUid)` method to `AuthContext`. Swaps Leader and Member roles (`'leader'` $\leftrightarrow$ `'member'`), updates `currentHouse.leaderUid`, and syncs changes to Cloud Firestore (`houses` and `users` collections) and local storage databases in real time.
+* **Member Roster Leadership Action (`HousePage.tsx`)**:
+  * Added **"👑 Pass Leadership"** button for each non-leader member when the logged-in user is the House Leader.
+  * Added confirmation prompt (`window.confirm`) and success feedback notifications.
+  * Preserved full authorization guards ensuring only the active leader can reassign leadership.
+
 
