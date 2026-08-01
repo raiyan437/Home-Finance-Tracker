@@ -426,9 +426,9 @@
 * **Household Expense Month Selector (`ExpenseListPage.tsx`)**:
   * Added `selectedMonth` state and `availableMonths` dynamic extraction from expenses sorted in reverse chronological order.
   * Rendered Month/Year `<select>` dropdown in the filter bar allowing housemates to filter expenses by specific months or view `"All Months"`.
-* **Cumulative Debt Settlement Invariant (`App.tsx`, `SettlementPage.tsx`, `settlementEngine.ts`)**:
-  * Enforced invariant that `SettlementPage.tsx` and `DashboardPage.tsx` receive cumulative lifetime household expenses (`householdExpenses`) and settlements (`houseSettlements`), keeping un-cleared debts from prior months active in the solver until paid.
-* **Dashboard Hero Metrics Polish (`DashboardPage.tsx`)**:
-  * Displayed **Current Month Spend** alongside **Cumulative Total Spend**, **Outstanding Debt**, and **Average Per Member** across a 4-card hero summary grid.
-
-
+### 2026-08-01: Dashboard Section Alignment & Category Donut Chart Text Fit
+* **Dashboard Layout Top Alignment (`DashboardPage.tsx`)**:
+  * Standardized `<h2>` section headers above both Left Column (`Housemate Net Balances`) and Right Column (`Category Spending Breakdown`) so the top edges of cards align 100% pixel-perfectly.
+* **Category Donut Inner Circle & Center Label Scaling (`CategoryPieChart.tsx`)**:
+  * Expanded SVG donut dimensions (center `110`, radius `78px`, strokeWidth `22px`) providing a `134px` diameter inner hole.
+  * Styled center text container with `whiteSpace: 'nowrap'`, font size scaling (`0.68rem` label, `1.15rem` amount), and letter spacing to fit `"Total Spend"`, currency amounts, and record subtitles cleanly without text overflowing the donut circle.

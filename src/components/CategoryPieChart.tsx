@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Expense, Category } from '../types';
 import { formatCurrency } from '../utils/currency';
 import type { Language } from '../utils/i18n';
-import { PieChart as PieIcon, ShoppingCart, Home, Zap, Utensils, User, HelpCircle } from 'lucide-react';
+import { ShoppingCart, Home, Zap, Utensils, User, HelpCircle } from 'lucide-react';
 
 interface CategoryPieChartProps {
   expenses: Expense[];
@@ -45,9 +45,9 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ expenses, la
 
   // Calculate SVG Donut Arcs
   let cumulativeAngle = 0;
-  const radius = 70;
-  const strokeWidth = 24;
-  const center = 100;
+  const radius = 78;
+  const strokeWidth = 22;
+  const center = 110;
   const circumference = 2 * Math.PI * radius;
 
   const slices = CATEGORY_META.map((cat) => {
@@ -72,18 +72,6 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ expenses, la
 
   return (
     <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PieIcon size={18} style={{ color: 'var(--accent-primary)' }} />
-            <span>Category Spending Breakdown</span>
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Proportional financial outlay across categories
-          </p>
-        </div>
-      </div>
-
       {totalCents === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
           No transaction data recorded yet to display category charts.
@@ -91,8 +79,8 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ expenses, la
       ) : (
         <>
           {/* SVG Donut Chart with Center Display */}
-          <div style={{ position: 'relative', width: '200px', height: '200px', margin: '0 auto' }}>
-            <svg width="200" height="200" viewBox="0 0 200 200">
+          <div style={{ position: 'relative', width: '220px', height: '220px', margin: '0 auto' }}>
+            <svg width="220" height="220" viewBox="0 0 220 220">
               <circle
                 cx={center}
                 cy={center}
@@ -142,18 +130,46 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ expenses, la
                 justifyContent: 'center',
                 pointerEvents: 'none',
                 textAlign: 'center',
-                padding: '10px',
+                padding: '8px',
               }}
             >
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {activeSlice ? activeSlice.name : 'Total Household'}
+              <div
+                style={{
+                  fontSize: '0.68rem',
+                  color: 'var(--text-muted)',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  maxWidth: '125px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {activeSlice ? activeSlice.name : 'Total Spend'}
               </div>
-              <div className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+              <div
+                className="tabular-nums font-display"
+                style={{
+                  fontSize: '1.15rem',
+                  fontWeight: 900,
+                  color: 'var(--text-primary)',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.25,
+                }}
+              >
                 {activeSlice
                   ? formatCurrency(activeSlice.amount, false, lang)
                   : formatCurrency(totalCents, false, lang)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: activeSlice ? activeSlice.color : 'var(--accent-emerald)', fontWeight: 700 }}>
+              <div
+                style={{
+                  fontSize: '0.68rem',
+                  color: activeSlice ? activeSlice.color : 'var(--accent-emerald)',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {activeSlice ? `${activeSlice.percentage.toFixed(1)}% of total` : `${expenses.length} Records`}
               </div>
             </div>

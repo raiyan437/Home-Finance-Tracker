@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { CategoryChart, PayerContributionCard } from '../components/CategoryChart';
 import { CategoryPieChart } from '../components/CategoryPieChart';
 import { UserAvatar } from '../components/UserAvatar';
-import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote } from 'lucide-react';
+import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote, Users, PieChart } from 'lucide-react';
 import type { Language } from '../utils/i18n';
 
 interface DashboardProps {
@@ -183,8 +183,9 @@ export const DashboardPage: React.FC<DashboardProps> = ({
           
           {/* 1. Housemate Net Balances Grid */}
           <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em' }}>
-              Housemate Net Balances ({houseUsers.length})
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={18} style={{ color: 'var(--accent-primary)' }} />
+              <span>Housemate Net Balances ({houseUsers.length})</span>
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
               {houseUsers.map((user) => {
@@ -473,7 +474,13 @@ export const DashboardPage: React.FC<DashboardProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           {/* 1. Category Donut Pie Chart */}
-          <CategoryPieChart expenses={expenses} lang={lang} />
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <PieChart size={18} style={{ color: 'var(--accent-primary)' }} />
+              <span>Category Spending Breakdown</span>
+            </h2>
+            <CategoryPieChart expenses={expenses} lang={lang} />
+          </div>
 
           {/* 2. Category Progress Bars */}
           <CategoryChart expenses={expenses} />
