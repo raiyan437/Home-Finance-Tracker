@@ -532,7 +532,7 @@ const AppContent: React.FC = () => {
     <div className="app-container">
       {/* Navigation Sidebar / Mobile Nav */}
       <Navbar
-        activeTab={activeTab}
+        activeTab={activeTab === 'notfound' ? 'dashboard' : activeTab}
         setActiveTab={handleTabChange}
         onOpenAddExpense={() => {
           setEditingExpense(null);
@@ -668,7 +668,7 @@ const AppContent: React.FC = () => {
 
           {activeTab === 'settings' && <SettingsPage lang={lang} />}
 
-          {!VALID_TABS.includes(activeTab) && (
+          {!VALID_TABS.includes(activeTab as TabType) && (
             <NotFoundPage onGoHome={() => handleTabChange('dashboard')} lang={lang} />
           )}
         </Suspense>
