@@ -47,6 +47,11 @@ export const DashboardPage: React.FC<DashboardProps> = ({
     return currentMonthExpenses.reduce((sum, exp) => sum + exp.amountCents, 0);
   }, [currentMonthExpenses]);
 
+  // All-time cumulative spend across all months
+  const allTimeTotalCents = useMemo(() => {
+    return expenses.reduce((sum, exp) => sum + exp.amountCents, 0);
+  }, [expenses]);
+
   const currentMonthLabel = useMemo(() => {
     const d = new Date(currentMonthStr + '-01');
     return isNaN(d.getTime())
@@ -126,19 +131,19 @@ export const DashboardPage: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Metric 2: Cumulative Total Spend (Current Month) */}
+        {/* Metric 2: All-Time Cumulative Total Spend */}
         <div className="glass-card summary-card animate-stagger-2">
           <div className="summary-card-header">
-            <span className="summary-title">Cumulative Total Spend</span>
+            <span className="summary-title">All-Time Total Spend</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}>
               <Receipt size={22} />
             </div>
           </div>
           <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-purple)' }}>
-            {formatCurrency(currentMonthSpentCents, false, lang)}
+            {formatCurrency(allTimeTotalCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Cumulative total for {currentMonthLabel}</span>
+            <span>Cumulative across all months ({expenses.length} total items)</span>
           </div>
         </div>
 

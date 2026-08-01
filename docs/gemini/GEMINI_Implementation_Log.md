@@ -453,8 +453,40 @@
   * Updated `AddExpenseModal.tsx` card selection dropdown to filter available cards by the payer (`card.ownerId === paidBy`), allowing users to choose only their own registered bank cards when logging/editing an expense.
   * Preserved full transaction card badge resolution in `ExpenseListPage.tsx` so all housemates can view which bank card was used for past shared outlays.
 
+### 2026-08-01: Comprehensive UI/UX Global Audit & Fix Suite
 
+#### Identified & Resolved Issues
 
+1. **`main-content` Layout Conflict (Critical)**: CSS `@media (min-width: 768px)` had static `margin-left` conflicting with App.tsx inline style. Removed the CSS version; App.tsx now fully controls layout.
 
+2. **Mobile Sidebar Margin Bug (Critical)**: Inline `marginLeft: 260px` was always applied even on mobile. Added reactive `isDesktop` state with resize listener; mobile gets `marginLeft: 0`.
 
+3. **`glass-card:hover` Transform on Static Cards (UI)**: Removed `transform: translateY(-4px)` from the base `.glass-card` rule. Created `.glass-card-interactive` and `.balance-card` for intentional hover lifts only.
+
+4. **Missing `spinner-ring` CSS (Functional)**: Added `@keyframes spinnerRotate`, `@keyframes spinnerPulse`, `.spinner-ring`, `.spinner-core` CSS.
+
+5. **Missing `React` Import in `NotFoundPage.tsx` (Build)**: Added `import React from 'react'`.
+
+6. **Duplicate Dashboard Metric Cards (UX)**: Changed "Cumulative Total Spend" to "All-Time Total Spend" using full `expenses.reduce()` (not current month).
+
+7. **CategoryPieChart Center Text Overflow (Visual)**: Added proper padding (`12px 24px`), smaller fonts, `overflow: hidden` + `textOverflow: ellipsis` on all three center text layers.
+
+8. **`btn-sm` Min-Height Override (UX)**: Added `min-height: 36px !important` on `.btn-sm` to allow smaller action buttons.
+
+9. **Missing CSS Utility Classes**: Added 20+ new utility classes including `.expense-expand-pane`, `.balance-card`, `.category-chip`, `.tooltip-text`, `.skeleton`, `.alert-*`, `.input-group`, etc.
+
+#### Files Changed
+- `src/index.css`, `src/App.tsx`, `src/pages/DashboardPage.tsx`, `src/pages/NotFoundPage.tsx`, `src/components/CategoryPieChart.tsx`
+
+#### Verification
+- `tsc --noEmit` passed with **0 errors** after all changes.
+
+### 2026-08-01: HTML5 History API Clean URLs & Vercel Single Page Application Rewrites
+* **Single Page Application Vercel Configuration (`vercel.json`)**:
+  * Created `vercel.json` with `/{.*}` rewrite rules targeting `/index.html` to guarantee direct URLs (like `/expenses` or `/settlement`) never 404 on live Vercel deployments.
+* **HTML5 History API Routing Engine (`src/App.tsx`)**:
+  * Converted routing logic from hash listening (`window.location.hash`) to clean HTML5 `window.location.pathname` and `window.history.pushState`.
+  * Added `popstate` event listener for browser back/forward buttons.
+  * Added automatic hash URL cleaner (`/#/expenses` $\rightarrow$ `/expenses`) for backward compatibility with older bookmarks.
+* **Verification**: `npx tsc --noEmit` passed with **0 errors**.
 

@@ -1,3 +1,4 @@
+import React from 'react';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import type { Language } from '../utils/i18n';
 

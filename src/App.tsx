@@ -58,16 +58,34 @@ const HousePage = lazy(() =>
 
 const VALID_TABS: TabType[] = ['dashboard', 'expenses', 'settlement', 'personal', 'cards', 'monthly', 'house', 'settings'];
 
-const getInitialTabFromHash = (): TabType => {
-  const hash = window.location.hash.replace('#', '').trim().toLowerCase() as TabType;
-  return VALID_TABS.includes(hash) ? hash : 'dashboard';
+const getTabFromPath = (): TabType | 'notfound' => {
+  // Backward compatibility: If user visits an old hash link (e.g. /#/expenses), clean it to /expenses
+  if (typeof window !== 'undefined' && window.location.hash) {
+    const rawHash = window.location.hash.replace('#', '').replace('/', '').trim().toLowerCase() as TabType;
+    if (VALID_TABS.includes(rawHash)) {
+      const cleanPath = rawHash === 'dashboard' ? '/' : `/${rawHash}`;
+      window.history.replaceState({}, '', cleanPath);
+      return rawHash;
+    }
+  }
+
+  if (typeof window === 'undefined') return 'dashboard';
+
+  const pathname = window.location.pathname.replace(/^\/+/, '').trim().toLowerCase();
+  if (!pathname || pathname === 'dashboard' || pathname === 'index.html') {
+    return 'dashboard';
+  }
+  if (VALID_TABS.includes(pathname as TabType)) {
+    return pathname as TabType;
+  }
+  return 'notfound';
 };
 
 const AppContent: React.FC = () => {
   const { activeUserId, currentHouse, isAuthenticated, dbUserProfile } = useAuth();
 
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
-  const [activeTab, setActiveTabState] = useState<TabType>(getInitialTabFromHash);
+  const [activeTab, setActiveTabState] = useState<TabType | 'notfound'>(getTabFromPath);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
@@ -76,24 +94,34 @@ const AppContent: React.FC = () => {
 
   const handleTabChange = (nextTab: TabType) => {
     setActiveTabState(nextTab);
-    if (window.location.hash !== `#${nextTab}`) {
-      window.location.hash = nextTab;
+    const targetPath = nextTab === 'dashboard' ? '/' : `/${nextTab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
     }
   };
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const currentHashTab = getInitialTabFromHash();
-      setActiveTabState(currentHashTab);
+    const handlePopState = () => {
+      const currentTab = getTabFromPath();
+      setActiveTabState(currentTab);
     };
 
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('home_finance_sidebar_collapsed') === 'true';
   });
+
+  // Track viewport width to conditionally apply sidebar margin (desktop only)
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const toggleSidebarCollapse = () => {
     setIsSidebarCollapsed((prev) => {
@@ -518,14 +546,18 @@ const AppContent: React.FC = () => {
         toggleCollapse={toggleSidebarCollapse}
       />
 
-      {/* Main Content Viewport */}
+      {/* Main Content Viewport — sidebar is desktop-only; on mobile no offset needed */}
       <main
         className="main-content"
-        style={{
-          marginLeft: isSidebarCollapsed ? '76px' : '260px',
-          width: `calc(100% - ${isSidebarCollapsed ? '76px' : '260px'})`,
-          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
+        style={
+          isDesktop
+            ? {
+                marginLeft: isSidebarCollapsed ? '76px' : '260px',
+                width: `calc(100% - ${isSidebarCollapsed ? '76px' : '260px'})`,
+                transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              }
+            : { marginLeft: 0, width: '100%' }
+        }
       >
         {/* First-Time User House Onboarding Banner */}
         {!currentHouse && (

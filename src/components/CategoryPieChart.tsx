@@ -130,20 +130,20 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ expenses, la
                 justifyContent: 'center',
                 pointerEvents: 'none',
                 textAlign: 'center',
-                padding: '8px',
+                padding: '12px 24px', /* Padding respects the donut stroke width */
               }}
             >
               <div
                 style={{
-                  fontSize: '0.68rem',
+                  fontSize: '0.65rem',
                   color: 'var(--text-muted)',
                   fontWeight: 800,
                   textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  maxWidth: '125px',
-                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.04em',
+                  width: '100%',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {activeSlice ? activeSlice.name : 'Total Spend'}
@@ -151,11 +151,14 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ expenses, la
               <div
                 className="tabular-nums font-display"
                 style={{
-                  fontSize: '1.15rem',
+                  fontSize: activeSlice ? '0.95rem' : '1.05rem',
                   fontWeight: 900,
                   color: 'var(--text-primary)',
                   whiteSpace: 'nowrap',
-                  lineHeight: 1.25,
+                  lineHeight: 1.2,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  width: '100%',
                 }}
               >
                 {activeSlice
@@ -164,13 +167,16 @@ export const CategoryPieChart: React.FC<CategoryPieChartProps> = ({ expenses, la
               </div>
               <div
                 style={{
-                  fontSize: '0.68rem',
+                  fontSize: '0.65rem',
                   color: activeSlice ? activeSlice.color : 'var(--accent-emerald)',
                   fontWeight: 700,
                   whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  width: '100%',
                 }}
               >
-                {activeSlice ? `${activeSlice.percentage.toFixed(1)}% of total` : `${expenses.length} Records`}
+                {activeSlice ? `${activeSlice.percentage.toFixed(1)}%` : `${expenses.length} records`}
               </div>
             </div>
           </div>
