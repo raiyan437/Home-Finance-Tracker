@@ -156,7 +156,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
             </div>
           ) : (
             simplifiedTransactions.map((tx) => (
-              <div key={tx.id} className="glass-card transaction-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div key={tx.id} className="glass-card transaction-card animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
                   {/* From User */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>

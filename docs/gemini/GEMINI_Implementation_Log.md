@@ -412,3 +412,14 @@
   * Configured immutable HTTP `Cache-Control` header caching rules (`max-age=31536000, immutable`) for compiled `/assets/` bundles.
 * **POM Architectural Alignment (`docs/gemini/GEMINI_Project_Analysis.md`)**:
   * Updated complete full-stack architectural document detailing live Vercel and GitHub Pages deployment workflow, Page-Object Model directory structure, authorization rules, and live-app-first balance synchronization.
+### 2026-08-01: Modern UI Aesthetics Overhaul & Micro-Animations Engine
+* **Typography Upgrade (`index.html`, `index.css`)**:
+  * Imported Google Fonts `Plus Jakarta Sans` for main UI body, `Outfit` (`font-display`) for headlines and hero metrics, and `JetBrains Mono` (`font-mono`) for tabular currency amounts and house codes.
+* **Keyframes & Micro-Animations Suite (`index.css`)**:
+  * Built complete CSS animation engine: `@keyframes fadeInUp`, `@keyframes modalSlideUp`, `@keyframes pulseGlow`, `@keyframes shimmerGlow`, `@keyframes floatSubtle`, and `@keyframes badgePop`.
+  * Added staggered entrance animation utilities (`.animate-stagger-1` through `.animate-stagger-5`, `.animate-fade-in`) for dashboard cards, expense ledgers, and settlement recommendations.
+* **Glassmorphism & Interactive Feedback (`index.css`, components, pages)**:
+  * Enhanced 3D card elevation hover lifts (`translateY(-4px)` with ambient titanium/emerald glow highlights).
+  * Implemented glowing input focus rings (`box-shadow: 0 0 0 4px var(--accent-primary-glow)`), active button press feedback, and animated live house status dot pulses.
+  * Custom dark zinc scrollbar styling (`::-webkit-scrollbar`).
+

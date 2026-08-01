@@ -191,6 +191,7 @@ export const CardsPage: React.FC<CardsManagerProps> = ({
               return (
                 <div
                   key={card.id}
+                  className="animate-fade-in"
                   style={{
                     background: card.color,
                     borderRadius: 'var(--radius-lg)',
@@ -205,6 +206,7 @@ export const CardsPage: React.FC<CardsManagerProps> = ({
                     width: '100%',
                     position: 'relative',
                     overflow: 'hidden',
+                    transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 >
                   {/* Subtle Card Chip & Logo */}

@@ -96,14 +96,14 @@ export const DashboardPage: React.FC<DashboardProps> = ({
       {/* Top Summary Metric Cards */}
       <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
         {/* Metric 1: Total Household Spend */}
-        <div className="glass-card summary-card">
+        <div className="glass-card summary-card animate-stagger-1">
           <div className="summary-card-header">
             <span className="summary-title">Total Household Spend</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
               <TrendingUp size={22} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-primary)' }}>
             {formatCurrency(totalSpentCents, false, lang)}
           </div>
           <div className="summary-footer">
@@ -112,14 +112,14 @@ export const DashboardPage: React.FC<DashboardProps> = ({
         </div>
 
         {/* Metric 2: Total Outstanding Debt */}
-        <div className="glass-card summary-card">
+        <div className="glass-card summary-card animate-stagger-2">
           <div className="summary-card-header">
             <span className="summary-title">Outstanding Debt</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
               <Activity size={22} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-amber)' }}>
+          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-amber)' }}>
             {formatCurrency(totalPendingDebtCents, false, lang)}
           </div>
           <div className="summary-footer">
@@ -128,14 +128,14 @@ export const DashboardPage: React.FC<DashboardProps> = ({
         </div>
 
         {/* Metric 3: Average Per Member */}
-        <div className="glass-card summary-card">
+        <div className="glass-card summary-card animate-stagger-3">
           <div className="summary-card-header">
             <span className="summary-title">Average Per Member</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
               <CheckCircle2 size={22} />
             </div>
           </div>
-          <div className="summary-amount tabular-nums" style={{ color: 'var(--accent-emerald)' }}>
+          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-emerald)' }}>
             {formatCurrency(averagePerMemberCents, false, lang)}
           </div>
           <div className="summary-footer">

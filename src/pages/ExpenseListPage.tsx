@@ -205,14 +205,14 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
             const commentCount = exp.comments?.length || 0;
 
             return (
-              <div key={exp.id} className="expense-item-card" onClick={() => toggleExpand(exp.id)}>
+              <div key={exp.id} className="expense-item-card animate-fade-in" onClick={() => toggleExpand(exp.id)}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     <UserAvatar user={payer} size={42} />
 
                     <div>
                       <div className="expense-title-row">
-                        <span className="expense-title">{exp.title}</span>
+                        <span className="expense-title font-display">{exp.title}</span>
                         <span className={`cat-pill cat-${exp.category}`}>{exp.category}</span>
 
                         {/* Payment Channel Badge */}

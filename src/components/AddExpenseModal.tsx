@@ -358,7 +358,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <Sparkles size={20} />
             </div>
             <div>
-              <h2 className="modal-title">
+              <h2 className="modal-title font-display">
                 {initialExpense ? 'Edit Expense Record' : getTranslation('newExpense', lang)}
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
