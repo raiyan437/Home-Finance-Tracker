@@ -368,7 +368,14 @@
     2. `Date: 2026-08-01` (under Paid by)
     3. `Split: equal` (under Date)
     4. `💬 X Comments` (under Split)
-  * Applied clean typography, flex direction, and badge styling for local and live production.
+### 2026-08-01: Profile Picture Global Sync & Multi-Component Rendering Fix
+* **Global Avatar Propagation (`UserAvatar.tsx`, `AuthContext.tsx`, `settlementEngine.ts`, `HousePage.tsx`, `SettingsPage.tsx`, `CardsPage.tsx`)**:
+  * Updated `UserAvatar.tsx` to detect Base64, HTTP/HTTPS, Blob, and relative image URLs.
+  * Updated `updateUserProfilePhoto` in `AuthContext.tsx` to update `currentHouse.members` in local DB and Firestore `houses/{houseId}` so all housemates receive avatar updates in real-time.
+  * Updated `getHouseUsers` in `settlementEngine.ts` to map `rawAvatar` for active users and members.
+  * Replaced hardcoded text initials fallback in `HousePage.tsx` with `member.avatar || dbUserProfile?.avatar`.
+  * Guarantees profile pictures render consistently across Navbar, House Roster, Expense Cards, Add Expense Modal, Settlement Views, and Cards Manager on both local and live apps.
+
 
 
 
