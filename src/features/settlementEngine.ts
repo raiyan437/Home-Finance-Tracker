@@ -44,9 +44,12 @@ export const getHouseUsers = (
         typeof m.avatar === 'string' &&
         (m.avatar.startsWith('data:') || m.avatar.startsWith('http') || m.avatar.includes('/'));
 
+      const isCurrent = currentUser && (m.uid === (currentUser as any).uid || m.email === (currentUser as any).email);
+      const resolvedName = (isCurrent && (currentUser as any).displayName) || m.displayName || m.email?.split('@')[0] || 'Member';
+
       return {
         id: m.uid,
-        name: m.displayName || m.email?.split('@')[0] || 'Member',
+        name: resolvedName,
         avatar: hasCustomPhoto ? m.avatar : undefined,
         color: '#3b82f6',
         email: m.email,

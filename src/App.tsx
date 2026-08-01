@@ -301,9 +301,10 @@ const AppContent: React.FC = () => {
   // Add Comment Handler
   const handleAddComment = (expenseId: string, text: string) => {
     const now = new Date().toISOString();
+    const commentAuthorId = dbUserProfile?.uid || activeUserId;
     const newComment = {
       id: `comment-${Date.now()}`,
-      userId: activeUserId,
+      userId: commentAuthorId,
       text: text.trim(),
       createdAt: now,
     };

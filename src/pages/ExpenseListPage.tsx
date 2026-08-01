@@ -32,7 +32,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   onDeleteComment,
   lang = 'en',
 }) => {
-  const { currentHouse, activeUserId, dbUserProfile } = useAuth();
+  const { currentHouse, activeUserId, dbUserProfile, userProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -344,7 +344,20 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                       {exp.comments && exp.comments.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                           {exp.comments.map((c) => {
-                            const commenter = houseUsers.find((u) => u.id === c.userId || u.name.toLowerCase() === c.userId.toLowerCase()) || USERS[c.userId] || { id: c.userId, name: c.userId, avatar: c.userId?.charAt(0) || 'U', color: '#3b82f6' };
+                            const commenter = houseUsers.find(
+                              (u) =>
+                                u.id === c.userId ||
+                                (u.uid && u.uid === c.userId) ||
+                                u.name.toLowerCase() === c.userId.toLowerCase() ||
+                                (u.email && u.email.toLowerCase() === c.userId.toLowerCase())
+                            ) || USERS[c.userId] || {
+                              id: c.userId,
+                              name: (dbUserProfile?.uid === c.userId || activeUserId === c.userId)
+                                ? (dbUserProfile?.displayName || userProfile.name)
+                                : c.userId,
+                              avatar: c.userId?.charAt(0) || 'U',
+                              color: '#3b82f6',
+                            };
                             const isMyComment = c.userId === activeUserId || c.userId === dbUserProfile?.uid;
 
                             return (

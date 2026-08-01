@@ -555,7 +555,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const userProfile: User = {
-    id: activeUserId,
+    id: dbUserProfile?.uid || activeUserId,
     name: dbUserProfile?.displayName || USERS[activeUserId]?.name || 'User',
     avatar: dbUserProfile?.avatar || USERS[activeUserId]?.avatar || activeUserId,
     color: USERS[activeUserId]?.color || '#3b82f6',
