@@ -338,7 +338,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const users = loadUsersDB();
     const existing = users.find((u) => u.email.toLowerCase() === cleanEmail);
 
-    if (existing) {
+    // In Firebase mode, this browser cache is not the authority for whether an
+    // email can sign up. An Auth account may have been deleted from Firebase
+    // while its old local profile remains on this device. We only remove that
+    // stale cache entry after Firebase successfully creates the new account.
+    if (existing && !auth) {
       setLoading(false);
       throw new Error('Email is already registered. Please log in.');
     }
@@ -368,7 +372,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
     };
 
-    saveUsersDB([...users, newUser]);
+    // Reconcile a stale browser profile for this email without touching its old
+    // UID's Firestore records, household history, or ledger data. The new Auth
+    // user gets its own canonical Firebase UID and can join a household afresh.
+    saveUsersDB([
+      ...users.filter((user) => user.email.toLowerCase() !== cleanEmail),
+      newUser,
+    ]);
     if (!auth) await saveLocalCredential(newUser.uid, cleanEmail, pass);
     setActiveSession(newUser);
     setDbUserProfile(newUser);
