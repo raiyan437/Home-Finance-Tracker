@@ -216,7 +216,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
                 id: dbUserProfile?.uid || 'user',
                 name: dbUserProfile?.displayName || 'User',
                 avatar: dbUserProfile?.avatar || firebaseUser?.photoURL || undefined,
-                color: '#3b82f6',
+                color: '#6750a4',
               }}
               size={72}
             />
@@ -419,7 +419,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
               id: dbUserProfile?.uid || 'user',
               name: dbUserProfile?.displayName || 'User',
               avatar: dbUserProfile?.avatar || (dbUserProfile?.displayName || 'U').slice(0, 1).toUpperCase(),
-              color: '#3b82f6',
+              color: '#6750a4',
             }}
             size={42}
           />

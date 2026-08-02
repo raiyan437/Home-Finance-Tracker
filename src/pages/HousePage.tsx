@@ -381,7 +381,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '14px 18px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                        backgroundColor: 'var(--md-sys-color-surface-container-high)',
                         borderRadius: 'var(--radius-md)',
                         border: '1px solid var(--border-subtle)',
                         flexWrap: 'wrap',
@@ -394,7 +394,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                             id: member.uid,
                             name: member.displayName,
                             avatar: member.avatar || (dbUserProfile?.uid === member.uid ? dbUserProfile?.avatar : undefined),
-                            color: '#3b82f6',
+                            color: '#6750a4',
                           }}
                           size={40}
                         />

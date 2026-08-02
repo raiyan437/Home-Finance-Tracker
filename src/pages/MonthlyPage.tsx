@@ -120,11 +120,7 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
 
       {/* Hero Monthly Total Card */}
       <div
-        className="glass-card"
-        style={{
-          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15))',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-        }}
+        className="glass-card monthly-hero-card"
       >
         <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Total Spending — {formattedMonthLabel}

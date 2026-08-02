@@ -9,7 +9,7 @@ interface UserAvatarProps {
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, className = '', style = {} }) => {
-  const safeUser = user || { name: 'User', avatar: undefined, color: '#3b82f6' };
+  const safeUser = user || { name: 'User', avatar: undefined, color: '#6750a4' };
   const isImage =
     typeof safeUser.avatar === 'string' &&
     safeUser.avatar.trim().length > 0 &&
@@ -28,7 +28,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, size = 42, classNa
         width: `${size}px`,
         height: `${size}px`,
         borderRadius: '50%',
-        backgroundColor: safeUser.color || '#3b82f6',
+        backgroundColor: safeUser.color || '#6750a4',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

@@ -10,28 +10,12 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   fullScreen = false,
 }) => {
   const content = (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '16px',
-        padding: '32px',
-      }}
-    >
+    <div className="loading-content" role="status" aria-live="polite">
       <div className="spinner-ring">
         <div className="spinner-core" />
       </div>
       {message && (
-        <span
-          style={{
-            fontSize: '0.88rem',
-            color: 'var(--text-secondary)',
-            fontWeight: 600,
-            letterSpacing: '0.02em',
-          }}
-        >
+        <span className="loading-message">
           {message}
         </span>
       )}
@@ -40,21 +24,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (fullScreen) {
     return (
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          backgroundColor: 'rgba(18, 18, 20, 0.85)',
-          backdropFilter: 'blur(12px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      <div className="loading-fullscreen">
         {content}
       </div>
     );

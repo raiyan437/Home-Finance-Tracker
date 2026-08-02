@@ -9,34 +9,11 @@ interface NotFoundPageProps {
 
 export const NotFoundPage: React.FC<NotFoundPageProps> = ({ onGoHome }) => {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '70vh',
-        textAlign: 'center',
-        padding: '32px 16px',
-      }}
-    >
-      <div className="glass-card animate-fade-in" style={{ maxWidth: '480px', width: '100%', padding: '40px 28px' }}>
-        <div
-          style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(244, 63, 94, 0.15)',
-            color: 'var(--accent-rose)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px auto',
-            boxShadow: '0 0 25px rgba(244, 63, 94, 0.2)',
-          }}
-        >
+    <main className="system-state-shell system-state-inline">
+      <section className="system-state-card animate-fade-in">
+        <span className="system-state-icon system-state-icon-error">
           <AlertCircle size={36} />
-        </div>
+        </span>
 
         <div className="font-display" style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>
           404
@@ -54,7 +31,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({ onGoHome }) => {
           <ArrowLeft size={16} />
           <span>Return to Dashboard</span>
         </button>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };

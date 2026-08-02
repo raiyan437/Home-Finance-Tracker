@@ -21,11 +21,11 @@ interface CategoryItem {
 }
 
 const CATEGORIES: CategoryItem[] = [
-  { name: 'Groceries', icon: ShoppingCart, color: '#3b82f6' },
+  { name: 'Groceries', icon: ShoppingCart, color: '#6750a4' },
   { name: 'Household', icon: Home, color: '#10b981' },
   { name: 'Utilities', icon: Zap, color: '#f59e0b' },
   { name: 'Food', icon: Utensils, color: '#f43f5e' },
-  { name: 'Personal', icon: User, color: '#8b5cf6' },
+  { name: 'Personal', icon: User, color: '#7d5260' },
   { name: 'Other', icon: HelpCircle, color: '#06b6d4' },
 ];
 
@@ -155,7 +155,7 @@ export const PayerContributionCard: React.FC<CategoryChartProps> = ({ expenses }
           borderRadius: 'var(--radius-full)',
           overflow: 'hidden',
           display: 'flex',
-          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+          backgroundColor: 'var(--md-sys-color-surface-container-highest)',
           marginBottom: '20px',
         }}
       >

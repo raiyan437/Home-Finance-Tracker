@@ -136,7 +136,7 @@ const AppContent: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [lang, setLang] = useState<Language>('en');
 
   useEffect(() => {
@@ -266,7 +266,7 @@ const AppContent: React.FC = () => {
     setSettlements(cachedSettlements);
     setCards(cachedCards);
 
-    const savedTheme = (localStorage.getItem('home_finance_theme') as 'dark' | 'light') || 'dark';
+    const savedTheme = (localStorage.getItem('home_finance_theme') as 'dark' | 'light') || 'light';
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
 
@@ -631,7 +631,7 @@ const AppContent: React.FC = () => {
         {/* First-Time User House Onboarding Banner */}
         {!currentHouse && (
           <div
-            className="glass-card"
+            className="glass-card onboarding-banner"
             style={{
               borderLeft: '4px solid var(--accent-primary)',
               marginBottom: '24px',
@@ -641,7 +641,6 @@ const AppContent: React.FC = () => {
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: '16px',
-              backgroundColor: 'rgba(59, 130, 246, 0.08)',
             }}
           >
             <div>

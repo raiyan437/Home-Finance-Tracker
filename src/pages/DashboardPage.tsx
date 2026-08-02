@@ -349,7 +349,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
                     id: exp.paidBy,
                     name: exp.paidBy,
                     avatar: exp.paidBy,
-                    color: '#3b82f6',
+                    color: '#6750a4',
                   };
 
                   return (

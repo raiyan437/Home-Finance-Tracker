@@ -162,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : firebaseUser?.photoURL && firebaseUser.photoURL.startsWith('http')
                   ? firebaseUser.photoURL
                   : undefined,
-              color: userProfile.color || '#3b82f6',
+              color: userProfile.color || '#6750a4',
             }}
             size={38}
           />

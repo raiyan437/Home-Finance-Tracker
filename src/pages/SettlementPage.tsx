@@ -70,7 +70,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   const getUser = (userId: string): UserType => {
     const found = houseUsers.find((u) => u.id === userId || u.uid === userId);
     if (found) return found;
-    return USERS[userId] || { id: userId, name: userId, avatar: userId, color: '#3b82f6' };
+    return USERS[userId] || { id: userId, name: userId, avatar: userId, color: '#6750a4' };
   };
 
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,7 +223,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
                         gap: '6px',
                         fontSize: '0.78rem',
                         color: 'var(--text-muted)',
-                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        backgroundColor: 'var(--md-sys-color-surface-container-high)',
                         padding: '6px 12px',
                         borderRadius: 'var(--radius-sm)',
                         border: '1px solid var(--border-subtle)',

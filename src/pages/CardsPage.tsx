@@ -57,7 +57,7 @@ export const CardsPage: React.FC<CardsManagerProps> = ({
       id: targetId || 'owner',
       name: fallbackName,
       avatar: dbUserProfile?.avatar || userProfile?.avatar,
-      color: '#3b82f6',
+      color: '#6750a4',
     };
   };
 

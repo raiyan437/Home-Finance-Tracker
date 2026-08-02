@@ -117,7 +117,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       padding: '14px 18px',
                       cursor: 'pointer',
                       borderColor: isActive ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                      background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-input)',
+                      background: isActive ? 'var(--md-sys-color-primary-container)' : 'var(--bg-input)',
                     }}
                     onClick={() => handleSelectProfile(user.id)}
                   >

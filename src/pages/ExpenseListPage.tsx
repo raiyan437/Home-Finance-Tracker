@@ -271,7 +271,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
         ) : (
           filteredExpenses.map((exp) => {
             const isExpanded = expandedId === exp.id;
-            const payer = houseUsers.find((u) => u.id === exp.paidBy) || USERS[exp.paidBy] || { id: exp.paidBy, name: exp.paidBy, avatar: exp.paidBy?.charAt(0) || 'U', color: '#3b82f6' };
+            const payer = houseUsers.find((u) => u.id === exp.paidBy) || USERS[exp.paidBy] || { id: exp.paidBy, name: exp.paidBy, avatar: exp.paidBy?.charAt(0) || 'U', color: '#6750a4' };
             const pm = exp.paymentMethod;
             const cardObj = pm?.type === 'card' && pm.cardId ? cardsMap[pm.cardId] : null;
             const commentCount = exp.comments?.length || 0;
@@ -313,7 +313,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                         {exp.receiptUrl && (
                           <span
                             className="share-mini-tag"
-                            style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', background: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', background: 'var(--md-sys-color-primary-container)', color: 'var(--md-sys-color-on-primary-container)' }}
                             onClick={(e) => {
                               e.stopPropagation();
                               setPreviewReceiptUrl(exp.receiptUrl || null);
@@ -390,7 +390,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '14px' }}>
                       {exp.shares.map((share) => {
-                        const user = houseUsers.find((u) => u.id === share.userId) || USERS[share.userId] || { id: share.userId, name: share.userId, avatar: share.userId?.charAt(0) || 'U', color: '#3b82f6' };
+                        const user = houseUsers.find((u) => u.id === share.userId) || USERS[share.userId] || { id: share.userId, name: share.userId, avatar: share.userId?.charAt(0) || 'U', color: '#6750a4' };
                         return (
                           <div
                             key={share.userId}
@@ -439,12 +439,12 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                                 ? (dbUserProfile?.displayName || userProfile.name)
                                 : c.userId,
                               avatar: c.userId?.charAt(0) || 'U',
-                              color: '#3b82f6',
+                              color: '#6750a4',
                             };
                             const isMyComment = c.userId === activeUserId || c.userId === dbUserProfile?.uid || isLeader;
 
                             return (
-                              <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
+                              <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'var(--md-sys-color-surface-container-high)', padding: '10px 12px', borderRadius: 'var(--radius-sm)' }}>
                                 <UserAvatar user={commenter} size={22} />
                                 <div style={{ flex: 1, fontSize: '0.82rem' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
