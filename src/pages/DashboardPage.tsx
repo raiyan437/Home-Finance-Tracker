@@ -3,6 +3,7 @@ import type { Expense, Settlement } from '../types';
 import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers, LEGACY_USER } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
+import { toLocalMonthKey } from '../utils/localDate';
 import { CategoryChart, PayerContributionCard } from '../components/CategoryChart';
 import { CategoryPieChart } from '../components/CategoryPieChart';
 import { UserAvatar } from '../components/UserAvatar';
@@ -38,7 +39,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
   );
 
   // Calculate Current Month Spend & Cumulative Month Spend
-  const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const currentMonthStr = useMemo(() => toLocalMonthKey(), []);
   const currentMonthExpenses = useMemo(() => {
     return expenses.filter((e) => e.date && e.date.startsWith(currentMonthStr));
   }, [expenses, currentMonthStr]);

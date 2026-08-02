@@ -7,6 +7,7 @@ import { UserAvatar } from '../components/UserAvatar';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { shareSettlementInstructions } from '../utils/share';
+import { saveAttachment } from '../services/attachments';
 import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Image as ImageIcon, X, Trash2, Share2, Paperclip } from 'lucide-react';
 
 interface SettlementViewProps {
@@ -40,16 +41,14 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
     const toUser = tx.toUser;
     return Boolean(
       (toUser.id && toUser.id.toLowerCase().trim() === cleanMyUid) ||
-      (toUser.uid && toUser.uid.toLowerCase().trim() === cleanMyUid) ||
-      (toUser.name && toUser.name.toLowerCase().trim() === cleanMyUid) ||
-      (toUser.email && toUser.email.toLowerCase().trim() === cleanMyUid) ||
-      (toUser.email && toUser.email.toLowerCase().split('@')[0] === cleanMyUid)
+      (toUser.uid && toUser.uid.toLowerCase().trim() === cleanMyUid)
     );
   };
 
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
   const [confirmingTx, setConfirmingTx] = useState<SimplifiedTransaction | null>(null);
   const [proofUrl, setProofUrl] = useState<string>('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
   const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
@@ -69,7 +68,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   );
 
   const getUser = (userId: string): UserType => {
-    const found = houseUsers.find((u) => u.id === userId || u.name.toLowerCase() === userId.toLowerCase());
+    const found = houseUsers.find((u) => u.id === userId || u.uid === userId);
     if (found) return found;
     return USERS[userId] || { id: userId, name: userId, avatar: userId, color: '#3b82f6' };
   };
@@ -77,6 +76,11 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+        setShareFeedback('Proof must be an image no larger than 5 MB.');
+        return;
+      }
+      setProofFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setProofUrl(event.target?.result as string);
@@ -370,7 +374,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-input)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
                   <img src={proofUrl} alt="Proof" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px' }} />
                   <span style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)', flex: 1 }}>✓ Proof attached</span>
-                  <button type="button" className="btn btn-danger btn-sm" onClick={() => setProofUrl('')}>
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => { setProofUrl(''); setProofFile(null); }}>
                     Remove
                   </button>
                 </div>
@@ -389,9 +393,16 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
               </button>
               <button
                 className="btn btn-primary"
-                onClick={() => {
-                  onMarkSettled(confirmingTx, proofUrl || undefined);
-                  setConfirmingTx(null);
+                onClick={async () => {
+                  try {
+                    const persistedProof = proofFile ? await saveAttachment(proofFile, 'settlement-proofs', currentHouse?.id) : (proofUrl || undefined);
+                    onMarkSettled(confirmingTx, persistedProof);
+                    setConfirmingTx(null);
+                    setProofFile(null);
+                    setProofUrl('');
+                  } catch (error) {
+                    setShareFeedback(error instanceof Error ? error.message : 'Unable to upload payment proof.');
+                  }
                 }}
               >
                 Confirm Payment

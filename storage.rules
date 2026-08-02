@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{kind}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && kind in ['avatars', 'receipts', 'settlement-proofs']
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    match /houses/{houseId}/{kind}/{fileName} {
+      function isMember() {
+        return request.auth != null
+               && request.auth.uid in firestore.get(/databases/(default)/documents/houses/$(houseId)).data.memberUids;
+      }
+      allow read: if isMember();
+      allow write: if isMember()
+                   && kind in ['receipts', 'settlement-proofs']
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

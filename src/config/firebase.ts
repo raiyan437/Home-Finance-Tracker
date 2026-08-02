@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 export const isFirebaseConfigured = Boolean(
   import.meta.env.VITE_FIREBASE_API_KEY &&
@@ -34,3 +35,4 @@ try {
 export const app = appInstance;
 export const auth = appInstance ? getAuth(appInstance) : null;
 export const db = appInstance ? getFirestore(appInstance) : null;
+export const fileStorage = appInstance ? getStorage(appInstance) : null;

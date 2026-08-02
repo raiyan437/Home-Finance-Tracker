@@ -48,12 +48,7 @@ export const CardsPage: React.FC<CardsManagerProps> = ({
 
   const getCardOwner = (cardOwnerId?: string) => {
     const targetId = cardOwnerId || dbUserProfile?.uid || activeUserId;
-    const found = houseUsers.find(
-      (u) =>
-        u.id === targetId ||
-        (u.uid && u.uid === targetId) ||
-        u.name.toLowerCase() === targetId?.toLowerCase()
-    );
+    const found = houseUsers.find((user) => user.id === targetId || user.uid === targetId);
     if (found) return found;
     if (USERS[targetId]) return USERS[targetId];
 
@@ -81,8 +76,8 @@ export const CardsPage: React.FC<CardsManagerProps> = ({
   // Enforce strict card ownership filtering per member (prevent card leakage)
   const userCards = useMemo(() => {
     const myUid = dbUserProfile?.uid || activeUserId;
-    return cards.filter((c) => c.ownerId === myUid || c.ownerId === activeUserId || c.ownerId === dbUserProfile?.uid);
-  }, [cards, activeUserId, dbUserProfile]);
+    return cards.filter((card) => card.ownerId === myUid);
+  }, [cards, activeUserId, dbUserProfile?.uid]);
 
   // Calculate spent total per card
   const cardSpentTotals = useMemo(() => {

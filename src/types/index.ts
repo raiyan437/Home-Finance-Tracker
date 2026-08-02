@@ -28,7 +28,9 @@ export interface House {
   leaderUid: string;
   members: HouseMember[];
   memberUids?: string[]; // Denormalized membership index used by Firestore rules
+  memberMap?: Record<string, HouseMember>; // Rule-verifiable canonical roster keyed by UID
   publicJoin?: boolean;
+  ledgerRevision?: number; // Monotonic conflict guard for membership changes
   createdAt: string;
 }
 
@@ -90,6 +92,8 @@ export interface Expense {
   date: string; // YYYY-MM-DD format
   splitMethod: SplitMethod;
   shares: Share[];
+  sharesTotalCents?: number; // Denormalized invariant checked by security rules
+  participantUids?: string[]; // Ordered share identities used by security rules
   scope?: ExpenseScope; // 'household' (shared) vs 'personal' (private wallet)
   ownerId?: UserId;     // Owner ID for personal private expenses
   houseId?: string;     // House ID for scoping household expenses

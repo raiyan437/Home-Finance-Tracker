@@ -11,6 +11,8 @@ import {
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
 import { scanReceiptImage } from '../features/ocrScanner';
+import { saveAttachment } from '../services/attachments';
+import { toLocalDateKey } from '../utils/localDate';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { X, Check, AlertCircle, Sparkles, Users, Wallet, CreditCard, Banknote, Image as ImageIcon } from 'lucide-react';
@@ -70,7 +72,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [amountStr, setAmountStr] = useState('');
   const [paidBy, setPaidBy] = useState<UserId>(myUidInUsers || activeUserKey || 'raiyan');
   const [category, setCategory] = useState<Category>('Groceries');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(toLocalDateKey());
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
   const [scope, setScope] = useState<ExpenseScope>('household');
   const [paymentType, setPaymentType] = useState<PaymentMethodType>('cash');
@@ -78,6 +80,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('monthly');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isScanningOcr, setIsScanningOcr] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<UserId[]>([]);
   const [customSharesStr, setCustomSharesStr] = useState<Record<UserId, string>>({});
@@ -116,13 +119,21 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') onClose();
+      };
+      window.addEventListener('keydown', handleEscape);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleEscape);
+      };
     } else {
       document.body.style.overflow = '';
     }
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   // Initialize form when opening or editing
   useEffect(() => {
@@ -140,7 +151,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setAmountStr((initialExpense.amountCents / 100).toFixed(2));
       setPaidBy(isLeader ? (initialExpense.paidBy || defaultPaidBy) : myUidInUsers);
       setCategory(initialExpense.category || 'Groceries');
-      setDate(initialExpense.date || new Date().toISOString().split('T')[0]);
+      setDate(initialExpense.date || toLocalDateKey());
       setSplitMethod(initialExpense.splitMethod || 'equal');
       setScope(fixedScope || initialExpense.scope || 'household');
       setPaymentType(initialExpense.paymentMethod?.type || 'cash');
@@ -148,6 +159,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setIsRecurring(Boolean(initialExpense.isRecurring));
       setRecurringFrequency(initialExpense.recurringFrequency || 'monthly');
       setReceiptUrl(initialExpense.receiptUrl || '');
+      setReceiptFile(null);
       setNotes(initialExpense.notes || '');
 
       const partIds: UserId[] = initialExpense.shares && initialExpense.shares.length > 0
@@ -179,7 +191,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setAmountStr('');
       setPaidBy(isLeader ? defaultPaidBy : myUidInUsers);
       setCategory('Groceries');
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(toLocalDateKey());
       setSplitMethod('equal');
       setScope('household');
       setPaymentType('cash');
@@ -187,6 +199,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setIsRecurring(false);
       setRecurringFrequency('monthly');
       setReceiptUrl('');
+      setReceiptFile(null);
       setNotes('');
       setSelectedParticipants(allUserIds);
 
@@ -235,8 +248,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         setErrorMessage('Invalid file format. Please upload an image file (JPEG, PNG, WebP).');
         return;
       }
-      if (file.size > 3 * 1024 * 1024) {
-        setErrorMessage('File size exceeds 3MB limit. Please select a smaller receipt image.');
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage('File size exceeds 5MB limit. Please select a smaller receipt image.');
         return;
       }
 
@@ -246,6 +259,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       reader.onload = async (event) => {
         const base64 = event.target?.result as string;
         setReceiptUrl(base64);
+        setReceiptFile(file);
         const parsed = await scanReceiptImage(base64);
         setIsScanningOcr(false);
         if (parsed.success) {
@@ -260,7 +274,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -278,14 +292,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     let finalShares: Share[] = [];
 
     if (scope === 'personal') {
-      if (paidBy !== activeUserId) {
-        finalShares = [
-          { userId: paidBy, amountCents: 0 },
-          { userId: activeUserId, amountCents: totalCents },
-        ];
-      } else {
-        finalShares = [{ userId: activeUserId, amountCents: totalCents }];
-      }
+      finalShares = [{ userId: activeUserId, amountCents: totalCents }];
     } else {
       if (selectedParticipants.length === 0) {
         setErrorMessage('Please select at least one participant.');
@@ -360,11 +367,22 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
     }
 
+    let persistedReceiptUrl = receiptUrl || undefined;
+    if (receiptFile) {
+      try {
+        persistedReceiptUrl = await saveAttachment(receiptFile, 'receipts', scope === 'household' ? currentHouse?.id : undefined);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to upload receipt.');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     onSaveExpense(
       {
         title: title.trim(),
         amountCents: totalCents,
-        paidBy,
+        paidBy: scope === 'personal' ? activeUserId : paidBy,
         category,
         date,
         splitMethod: scope === 'personal' ? 'equal' : splitMethod,
@@ -379,7 +397,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         },
         isRecurring,
         recurringFrequency: isRecurring ? recurringFrequency : undefined,
-        receiptUrl: receiptUrl || undefined,
+        lastGeneratedDate: initialExpense?.lastGeneratedDate,
+        recurringSourceId: initialExpense?.recurringSourceId,
+        receiptUrl: persistedReceiptUrl,
         notes: notes.trim() || undefined,
       },
       initialExpense ? initialExpense.id : undefined
@@ -392,14 +412,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
               <Sparkles size={20} />
             </div>
             <div>
-              <h2 className="modal-title font-display">
+              <h2 id="expense-modal-title" className="modal-title font-display">
                 {initialExpense
                   ? 'Edit Expense Record'
                   : fixedScope === 'household'
@@ -417,7 +437,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </p>
             </div>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={onClose} aria-label="Close expense form">
             <X size={20} />
           </button>
         </div>
@@ -609,7 +629,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     {isScanningOcr ? getTranslation('scanReceipt', lang) : getTranslation('ocrSuccess', lang)}
                   </div>
                 </div>
-                <button type="button" className="btn btn-danger btn-sm" onClick={() => setReceiptUrl('')}>
+                <button type="button" className="btn btn-danger btn-sm" onClick={() => { setReceiptUrl(''); setReceiptFile(null); }}>
                   Remove
                 </button>
               </div>
@@ -768,8 +788,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           {/* Automated Recurring Bill Toggle */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', backgroundColor: 'var(--bg-input)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
             <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>Automated Recurring Expense</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Automatically generate this bill every week or month</div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>Recurring Expense</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Creates every missed weekly or monthly occurrence when the app next syncs</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {isRecurring && (

@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus, AlertCircle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import {
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Home,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  Users,
+  WalletCards,
+} from 'lucide-react';
 
 interface SignUpPageProps {
   onSwitchToLogin: () => void;
@@ -8,7 +18,6 @@ interface SignUpPageProps {
 
 export const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
   const { signUpWithEmail } = useAuth();
-
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,239 +27,83 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setErrorMsg(null);
-
-    if (!displayName.trim()) {
-      setErrorMsg('Please enter your Display Name.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setErrorMsg('Passwords do not match. Please verify and try again.');
-      return;
-    }
-    if (password.length < 6) {
-      setErrorMsg('Password should be at least 6 characters long.');
-      return;
-    }
-
+    if (!displayName.trim()) return setErrorMsg('Please enter your display name.');
+    if (password !== confirmPassword) return setErrorMsg('Passwords do not match. Please verify and try again.');
+    if (password.length < 6) return setErrorMsg('Password should be at least 6 characters long.');
     setIsSubmitting(true);
-
     try {
       await signUpWithEmail(email.trim(), password, displayName.trim());
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Sign up failed. Please try again.');
+    } catch (error: unknown) {
+      setErrorMsg(error instanceof Error ? error.message : 'Sign up failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#090d16',
-        color: '#f8fafc',
-        padding: '24px',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Background Decorative Glow */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-150px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '600px',
-          height: '600px',
-          background: 'radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, rgba(9, 13, 22, 0) 70%)',
-          pointerEvents: 'none',
-        }}
-      />
-
-      <div
-        className="glass-card"
-        style={{
-          maxWidth: '460px',
-          width: '100%',
-          padding: '36px',
-          borderRadius: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
-          zIndex: 1,
-        }}
-      >
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              boxShadow: '0 8px 24px rgba(139, 92, 246, 0.4)',
-            }}
-          >
-            <UserPlus size={28} color="white" />
+    <main className="auth-shell">
+      <div className="auth-ambient auth-ambient-signup" aria-hidden="true"><span /><span /><span /></div>
+      <section className="auth-showcase">
+        <div className="auth-brand"><span><Home size={22} /></span> Home Finance</div>
+        <div className="auth-showcase-copy">
+          <div className="auth-eyebrow"><Sparkles size={14} /> One home. One shared view.</div>
+          <h1>Make money feel<br /><em>effortless together.</em></h1>
+          <p>Create a private financial space for your household, with transparent splits and personal spending that stays personal.</p>
+          <div className="auth-feature-row">
+            <span><Users size={17} /> Invite your household</span>
+            <span><WalletCards size={17} /> Track every channel</span>
+            <span><ShieldCheck size={17} /> Your data, protected</span>
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 900, marginBottom: '6px' }}>Create New Account</h1>
-          <p style={{ fontSize: '0.88rem', color: '#94a3b8' }}>
-            Join Home Finance Tracker to create or join household finance groups
-          </p>
         </div>
+        <p className="auth-footnote">Set up in a minute. Stay organized every day.</p>
+      </section>
 
-        {/* Sign Up Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {errorMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: '#f43f5e',
-                backgroundColor: 'rgba(244, 63, 94, 0.15)',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-              }}
-            >
-              <AlertCircle size={18} />
-              <span>{errorMsg}</span>
+      <section className="auth-panel-wrap">
+        <div className="auth-panel auth-panel-signup">
+          <div className="auth-panel-header">
+            <div className="auth-mobile-brand"><UserPlus size={20} /></div>
+            <span className="auth-kicker">Get started</span>
+            <h2>Create your account</h2>
+            <p>Your household space comes next.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="auth-form">
+            {errorMsg && <div className="auth-error" role="alert"><AlertCircle size={18} /><span>{errorMsg}</span></div>}
+            <div className="form-group">
+              <label className="form-label" htmlFor="signup-name">Display name</label>
+              <input id="signup-name" type="text" className="form-input" placeholder="How others will see you" value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" required />
             </div>
-          )}
-
-          <div className="form-group">
-            <label className="form-label" style={{ color: '#cbd5e1' }}>Display Name</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. Raiyan, Himel, Lazim"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ color: '#cbd5e1' }}>Email Address</label>
-            <input
-              type="email"
-              className="form-input"
-              placeholder="raiyan@gmail.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ color: '#cbd5e1' }}>Password</label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="form-input"
-                placeholder="At least 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{ paddingRight: '42px' }}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '4px',
-                }}
-                title={showPassword ? 'Hide Password' : 'Show Password'}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+            <div className="form-group">
+              <label className="form-label" htmlFor="signup-email">Email address</label>
+              <input id="signup-email" type="email" className="form-input" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
             </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ color: '#cbd5e1' }}>Confirm Password</label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                className="form-input"
-                placeholder="Re-enter password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                style={{ paddingRight: '42px' }}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '4px',
-                }}
-                title={showConfirmPassword ? 'Hide Password' : 'Show Password'}
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+            <div className="auth-form-row">
+              <div className="form-group">
+                <label className="form-label" htmlFor="signup-password">Password</label>
+                <div className="password-field">
+                  <input id="signup-password" type={showPassword ? 'text' : 'password'} className="form-input" placeholder="6+ characters" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
+                  <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="signup-confirm">Confirm</label>
+                <div className="password-field">
+                  <input id="signup-confirm" type={showConfirmPassword ? 'text' : 'password'} className="form-input" placeholder="Repeat password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" required />
+                  <button type="button" className="password-toggle" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>{showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </div>
+              </div>
             </div>
-          </div>
+            <button type="submit" className="btn btn-primary auth-submit" disabled={isSubmitting}>
+              <ShieldCheck size={18} /><span>{isSubmitting ? 'Creating your space…' : 'Create account'}</span>
+            </button>
+          </form>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '12px', fontSize: '1rem', marginTop: '8px' }}
-            disabled={isSubmitting}
-          >
-            <ShieldCheck size={18} />
-            <span>{isSubmitting ? 'Creating Account...' : 'Create Account & Sign In'}</span>
-          </button>
-        </form>
-
-        {/* Link to Standalone Login Page */}
-        <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '18px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          <span style={{ fontSize: '0.88rem', color: '#94a3b8' }}>Already have an account? </span>
-          <button
-            type="button"
-            onClick={onSwitchToLogin}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#8b5cf6',
-              fontWeight: 800,
-              fontSize: '0.88rem',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-            }}
-          >
-            Log In Here
-          </button>
+          <div className="auth-switch">Already have an account? <button type="button" onClick={onSwitchToLogin}>Sign in</button></div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Expense, Settlement, User } from '../types';
+import type { Expense, House, Settlement, User } from '../types';
 import {
   calculateEqualSplits,
   calculatePercentageSplits,
@@ -7,9 +7,12 @@ import {
 } from '../utils/currency';
 import { extractTotalFromOcrText, isPhoneNumberOrYear } from './ocrScanner';
 import { generateDueRecurringExpenses } from './recurringEngine';
-import { calculateNetBalances, calculateSimplifiedSettlements, LEGACY_USER } from './settlementEngine';
+import { calculateNetBalances, calculateSimplifiedSettlements } from './settlementEngine';
+import { assertValidExpense, assertValidSettlement, hasConsistentRoster } from './ledgerValidation';
 import { saveLocalCredential, verifyLocalCredential } from '../services/mockAuthDatabase';
-import { houseStorageScope, loadExpenses, personalStorageScope, saveExpenses } from '../services/storage';
+import { houseStorageScope, importBackupJSON, loadExpenses, personalStorageScope, saveExpenses } from '../services/storage';
+import { toLocalDateKey, toLocalMonthKey } from '../utils/localDate';
+import { createId } from '../utils/ids';
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
@@ -104,9 +107,38 @@ describe('settlement accounting', () => {
       ],
     });
     const balances = calculateNetBalances([withDepartedShare], [], users);
-    expect(balances[LEGACY_USER.id].netBalanceCents).toBe(-5000);
+    expect(balances['departed:departed-user'].netBalanceCents).toBe(-5000);
     const transfers = calculateSimplifiedSettlements(balances, users);
-    expect(transfers.some((transfer) => transfer.fromUser.id === LEGACY_USER.id)).toBe(true);
+    expect(transfers.some((transfer) => transfer.fromUser.id === 'departed:departed-user')).toBe(true);
+  });
+
+  it('never cancels obligations belonging to different departed members', () => {
+    const records = [
+      expense({ id: 'one', paidBy: 'former-a', shares: [{ userId: 'a', amountCents: 10_000 }] }),
+      expense({ id: 'two', paidBy: 'a', shares: [{ userId: 'former-b', amountCents: 10_000 }] }),
+    ];
+    const balances = calculateNetBalances(records, [], users);
+    expect(balances['departed:former-a'].netBalanceCents).toBe(10_000);
+    expect(balances['departed:former-b'].netBalanceCents).toBe(-10_000);
+  });
+});
+
+describe('ledger invariants', () => {
+  const house: House = {
+    id: 'house-1', code: 'HM-1000', name: 'Home', leaderUid: 'a', createdAt: '2026-01-01T00:00:00.000Z',
+    members: users.map((user, index) => ({ uid: user.id, displayName: user.name, email: `${user.id}@example.com`, role: index === 0 ? 'leader' : 'member', joinedAt: '2026-01-01T00:00:00.000Z' })),
+    memberUids: users.map((user) => user.id),
+  };
+
+  it('rejects a split that loses a cent and accepts a consistent roster', () => {
+    expect(() => assertValidExpense(expense({ shares: [{ userId: 'a', amountCents: 9999 }] }), house)).toThrow(/exactly equal/);
+    house.memberMap = Object.fromEntries(house.members.map((member) => [member.uid, member]));
+    expect(hasConsistentRoster(house)).toBe(true);
+  });
+
+  it('rejects settlements involving non-members', () => {
+    const settlement: Settlement = { id: 's', fromUserId: 'outside', toUserId: 'a', amountCents: 1, status: 'completed', houseId: house.id, createdAt: '', settledAt: '' };
+    expect(() => assertValidSettlement(settlement, house)).toThrow(/current house members/);
   });
 });
 
@@ -152,5 +184,18 @@ describe('offline security and isolation', () => {
     saveExpenses([personalExpense], personalStorageScope('a'));
     expect(loadExpenses(houseStorageScope('house-1')).map((item) => item.id)).toEqual(['expense-1']);
     expect(loadExpenses(personalStorageScope('a')).map((item) => item.id)).toEqual(['personal-1']);
+  });
+
+  it('rejects malformed or unbalanced backup records without writing them', () => {
+    const malformed = JSON.stringify({ version: '1.0.0', expenses: [expense({ shares: [{ userId: 'a', amountCents: 1 }] })], settlements: [], cards: [] });
+    expect(importBackupJSON(malformed, 'house-1', 'a').ok).toBe(false);
+    expect(loadExpenses(houseStorageScope('house-1'))).toEqual([]);
+  });
+
+  it('uses local calendar keys and collision-resistant IDs', () => {
+    const date = new Date(2026, 0, 2, 0, 30);
+    expect(toLocalDateKey(date)).toBe('2026-01-02');
+    expect(toLocalMonthKey(date)).toBe('2026-01');
+    expect(createId('expense')).not.toBe(createId('expense'));
   });
 });

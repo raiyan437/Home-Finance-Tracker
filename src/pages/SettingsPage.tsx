@@ -4,6 +4,8 @@ import { UserAvatar } from '../components/UserAvatar';
 import { isFirebaseConfigured } from '../config/firebase';
 import { exportBackupJSON, importBackupJSON } from '../services/storage';
 import { requestNotificationPermission, getNotificationPermissionState, isNotificationSupported } from '../utils/notifications';
+import { saveAttachment } from '../services/attachments';
+import { syncSaveCard, syncSaveExpense, syncSaveSettlement } from '../services/firebaseSync';
 import {
   LogOut,
   ShieldCheck,
@@ -37,6 +39,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [notifState, setNotifState] = useState<NotificationPermission>(getNotificationPermissionState());
+  const cloudConnected = isFirebaseConfigured && Boolean(firebaseUser);
 
   // Password Change Form States
   const [currentPassword, setCurrentPassword] = useState('');
@@ -51,12 +54,12 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setErrorMsg('Image file size must be smaller than 2MB.');
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Image file size must be 5MB or smaller.');
       return;
     }
 
@@ -64,19 +67,15 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64Str = event.target?.result as string;
-      try {
-        await updateUserProfilePhoto(base64Str);
-        setSuccessMsg('Profile photo updated successfully!');
-      } catch (err: any) {
-        setErrorMsg(err.message || 'Failed to update profile photo.');
-      } finally {
-        setIsUploadingPhoto(false);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const photoUrl = await saveAttachment(file, 'avatars');
+      await updateUserProfilePhoto(photoUrl);
+      setSuccessMsg('Profile photo updated successfully!');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to update profile photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
@@ -125,14 +124,21 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target?.result as string;
-      const ok = importBackupJSON(content, currentHouse?.id, dbUserProfile?.uid);
-      if (ok) {
-        setSuccessMsg('Backup restored successfully! Reloading session...');
+      const result = importBackupJSON(content, currentHouse?.id, dbUserProfile?.uid);
+      if (result.ok && result.data) {
+        const writes = [
+          ...result.data.expenses.map((expense) => syncSaveExpense(expense, expense.scope === 'personal' ? undefined : currentHouse?.id)),
+          ...result.data.settlements.map((settlement) => syncSaveSettlement(settlement, currentHouse?.id)),
+          ...result.data.cards.map((card) => syncSaveCard(card)),
+        ];
+        const syncResults = await Promise.all(writes);
+        const queued = syncResults.some((item) => item?.queued);
+        setSuccessMsg(queued ? 'Backup restored locally; cloud updates are queued for retry.' : 'Backup restored locally and to the cloud. Reloading session...');
         setTimeout(() => window.location.reload(), 1200);
       } else {
-        setErrorMsg('Invalid backup JSON format. Please select a valid Home Finance backup file.');
+        setErrorMsg(result.error || 'Invalid Home Finance backup file.');
       }
     };
     reader.readAsText(file);
@@ -142,7 +148,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
     const granted = await requestNotificationPermission();
     setNotifState(getNotificationPermissionState());
     if (granted) {
-      setSuccessMsg('Push notifications enabled for expense updates & debt reminders!');
+      setSuccessMsg('Foreground browser notifications enabled.');
     } else {
       setErrorMsg('Notification permission was blocked or denied by browser settings.');
     }
@@ -155,7 +161,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
         <div className="page-title-group">
           <h1 className="page-title">Account & Security Settings</h1>
           <p className="page-description">
-            Manage profile photo, change password, security backups, push alerts, and cloud sync mode
+            Manage profile photo, change password, security backups, browser alerts, and cloud sync mode
           </p>
         </div>
 
@@ -167,8 +173,8 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
             gap: '8px',
             padding: '8px 16px',
             borderRadius: 'var(--radius-full)',
-            background: isFirebaseConfigured ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-            border: `1px solid ${isFirebaseConfigured ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+            background: cloudConnected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+            border: `1px solid ${cloudConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
           }}
         >
           <span
@@ -176,12 +182,12 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
               width: '9px',
               height: '9px',
               borderRadius: '50%',
-              backgroundColor: isFirebaseConfigured ? '#10b981' : '#f59e0b',
-              boxShadow: `0 0 8px ${isFirebaseConfigured ? '#10b981' : '#f59e0b'}`,
+              backgroundColor: cloudConnected ? '#10b981' : '#f59e0b',
+              boxShadow: `0 0 8px ${cloudConnected ? '#10b981' : '#f59e0b'}`,
             }}
           />
-          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: isFirebaseConfigured ? '#34d399' : '#fbbf24' }}>
-            {isFirebaseConfigured ? '🟢 Cloud Sync Active' : '🟡 Offline Local Storage Mode'}
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: cloudConnected ? '#34d399' : '#fbbf24' }}>
+            {cloudConnected ? 'Cloud account connected' : isFirebaseConfigured ? 'Cloud configured — sign in required' : 'Offline local storage mode'}
           </span>
         </div>
       </div>
@@ -379,10 +385,10 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
         <div style={{ marginBottom: '16px' }}>
           <h3 style={{ fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Bell size={18} style={{ color: 'var(--accent-amber)' }} />
-            <span>Push Notifications</span>
+            <span>Browser Notifications</span>
           </h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Browser alerts for new shared expenses and pending debt settlement reminders
+            Foreground alerts while this app is open; background push is not enabled
           </p>
         </div>
 
@@ -399,7 +405,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
           {isNotificationSupported() && notifState !== 'granted' && (
             <button className="btn btn-primary btn-sm" onClick={handleEnableNotifications}>
               <Bell size={14} />
-              <span>Enable Push Alerts</span>
+              <span>Enable Browser Alerts</span>
             </button>
           )}
         </div>

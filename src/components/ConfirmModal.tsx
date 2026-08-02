@@ -25,27 +25,35 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') onClose();
+      };
+      window.addEventListener('keydown', handleEscape);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleEscape);
+      };
     } else {
       document.body.style.overflow = '';
     }
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {variant === 'danger' && <AlertTriangle size={22} color="var(--accent-rose)" />}
-            <h3 className="modal-title" style={{ fontSize: '1.2rem' }}>
+            <h3 id="confirm-modal-title" className="modal-title" style={{ fontSize: '1.2rem' }}>
               {title}
             </h3>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={onClose} aria-label="Close confirmation">
             <X size={18} />
           </button>
         </div>

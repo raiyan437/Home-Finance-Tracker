@@ -5,6 +5,7 @@ import { formatCurrency, dollarsToCents } from '../utils/currency';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, CreditCard, Banknote, Calendar, AlertTriangle } from 'lucide-react';
+import { toLocalDateKey, toLocalMonthKey } from '../utils/localDate';
 
 interface PersonalWalletProps {
   expenses: Expense[];
@@ -28,7 +29,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   const { activeUserId, dbUserProfile } = useAuth();
   const myUid = dbUserProfile?.uid || activeUserId;
 
-  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const currentMonthKey = toLocalMonthKey();
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingExp, setEditingExp] = useState<Expense | null>(null);
@@ -37,7 +38,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [category, setCategory] = useState<Category>('Personal');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(toLocalDateKey());
   const [paymentType, setPaymentType] = useState<PaymentMethodType>('cash');
   const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [notes, setNotes] = useState('');
@@ -46,15 +47,13 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   const [monthlyBudgetTaka, setMonthlyBudgetTaka] = useState<string>(() => {
     return (
       localStorage.getItem(`${BUDGET_STORAGE_KEY}_${myUid}`) ||
-      localStorage.getItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`) ||
-      localStorage.getItem('home_finance_personal_budget_v1') ||
       '15000.00'
     );
   });
 
   // Persistent category monthly budget limits (in Taka strings)
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${myUid}`) || localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${activeUserId}`);
+    const saved = localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${myUid}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -75,18 +74,15 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   // Save budget targets to localStorage
   useEffect(() => {
     localStorage.setItem(`${BUDGET_STORAGE_KEY}_${myUid}`, monthlyBudgetTaka);
-    localStorage.setItem(`${BUDGET_STORAGE_KEY}_${activeUserId}`, monthlyBudgetTaka);
-    localStorage.setItem('home_finance_personal_budget_v1', monthlyBudgetTaka);
-  }, [monthlyBudgetTaka, myUid, activeUserId]);
+  }, [monthlyBudgetTaka, myUid]);
 
   useEffect(() => {
     localStorage.setItem(`${CAT_BUDGET_STORAGE_KEY}_${myUid}`, JSON.stringify(categoryBudgets));
-    localStorage.setItem(`${CAT_BUDGET_STORAGE_KEY}_${activeUserId}`, JSON.stringify(categoryBudgets));
-  }, [categoryBudgets, myUid, activeUserId]);
+  }, [categoryBudgets, myUid]);
 
   const userCards = useMemo(() => {
-    return cards.filter((c) => !c.ownerId || c.ownerId === myUid || c.ownerId === activeUserId);
-  }, [cards, myUid, activeUserId]);
+    return cards.filter((c) => c.ownerId === myUid);
+  }, [cards, myUid]);
 
   const cardsMap = useMemo(() => {
     const map: Record<string, PaymentCard> = {};
@@ -99,9 +95,9 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   // Filter personal expenses belonging strictly to the active user
   const personalExpenses = useMemo(() => {
     return expenses
-      .filter((e) => e.scope === 'personal' && (e.ownerId === myUid || e.paidBy === myUid || e.ownerId === activeUserId || e.paidBy === activeUserId))
+      .filter((e) => e.scope === 'personal' && e.ownerId === myUid && e.paidBy === myUid)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [expenses, myUid, activeUserId]);
+  }, [expenses, myUid]);
 
   // Available months list for month selector
   const availableMonths = useMemo(() => {
@@ -124,7 +120,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   const totalPersonalSpentCents = monthPersonalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
   const monthlyBudgetCents = dollarsToCents(monthlyBudgetTaka);
-  const budgetRatioPercent = monthlyBudgetCents > 0 ? Math.min(100, (totalPersonalSpentCents / monthlyBudgetCents) * 100) : 0;
+  const budgetRatioPercent = monthlyBudgetCents > 0 ? (totalPersonalSpentCents / monthlyBudgetCents) * 100 : 0;
 
   // Category breakdown
   const categoryTotals = useMemo(() => {
@@ -150,7 +146,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
       setTitle('');
       setAmountStr('');
       setCategory('Personal');
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(toLocalDateKey());
       setPaymentType('cash');
       setSelectedCardId(userCards[0]?.id || '');
       setNotes('');
@@ -291,7 +287,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
               <div
                 className="progress-bar-fill"
                 style={{
-                  width: `${budgetRatioPercent}%`,
+                  width: `${Math.min(100, budgetRatioPercent)}%`,
                   backgroundColor:
                     budgetRatioPercent >= 100
                       ? 'var(--accent-rose)'
@@ -323,7 +319,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
             const spentCents = categoryTotals[cat] || 0;
             const limitStr = categoryBudgets[cat] || '5000';
             const limitCents = dollarsToCents(limitStr);
-            const ratio = limitCents > 0 ? Math.min(100, (spentCents / limitCents) * 100) : 0;
+            const ratio = limitCents > 0 ? (spentCents / limitCents) * 100 : 0;
 
             return (
               <div
@@ -361,7 +357,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
                   <div
                     className="progress-bar-fill"
                     style={{
-                      width: `${ratio}%`,
+                      width: `${Math.min(100, ratio)}%`,
                       backgroundColor:
                         ratio >= 100
                           ? 'var(--accent-rose)'

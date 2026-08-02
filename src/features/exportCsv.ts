@@ -9,7 +9,7 @@ export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlemen
   const usersDB = loadUsersDB();
   const getName = (id: string) => {
     if (USERS[id]?.name) return USERS[id].name;
-    const u = usersDB.find((usr) => usr.uid === id || usr.displayName.toLowerCase() === id.toLowerCase());
+    const u = usersDB.find((usr) => usr.uid === id);
     if (u?.displayName) return u.displayName;
     return id;
   };
@@ -24,6 +24,13 @@ export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlemen
     'Amount (৳)',
     'Split Method',
     'Payment Channel',
+    'Card ID',
+    'Card Snapshot',
+    'Shares',
+    'Status',
+    'Reversed At',
+    'Reversed By',
+    'Attachment',
     'Scope',
     'Notes',
   ];
@@ -41,14 +48,21 @@ export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlemen
       'Expense',
       e.id,
       e.date,
-      `"${e.title.replace(/"/g, '""')}"`,
+      e.title,
       e.category,
       payerName,
       amountDollars,
       e.splitMethod,
       channel,
+      e.paymentMethod?.cardId || '',
+      e.paymentMethod?.cardName || '',
+      e.shares.map((share) => `${getName(share.userId)}:${(share.amountCents / 100).toFixed(2)}${share.percentage === undefined ? '' : ` (${share.percentage}%)`}`).join(' | '),
+      'posted',
+      '',
+      '',
+      e.receiptUrl || '',
       scopeLabel,
-      `"${(e.notes || '').replace(/"/g, '""')}"`,
+      e.notes || '',
     ]);
   });
 
@@ -63,19 +77,27 @@ export const exportAuditReportCsv = (expenses: Expense[], settlements: Settlemen
       'Settlement Transfer',
       s.id,
       dateStr,
-      `"${fromName} paid ${toName}"`,
+      `${fromName} paid ${toName}`,
       'Settlement',
       fromName,
       amountDollars,
       'Direct',
-      'Bank Transfer',
+      'Unspecified peer transfer',
+      '',
+      '',
+      '',
+      s.status,
+      s.reversedAt || '',
+      s.reversedBy ? getName(s.reversedBy) : '',
+      s.proofUrl || '',
       'Household',
-      `"${(s.notes || '').replace(/"/g, '""')}"`,
+      s.notes || '',
     ]);
   });
 
   // Construct CSV content
-  const csvString = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const escapeCsv = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+  const csvString = [headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n');
 
   // Trigger download
   const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });

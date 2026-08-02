@@ -9,6 +9,7 @@ import { UserAvatar } from '../components/UserAvatar';
 import { Calendar, Users, Download, Printer } from 'lucide-react';
 
 import type { Language } from '../utils/i18n';
+import { toLocalMonthKey } from '../utils/localDate';
 
 interface MonthlySummaryProps {
   expenses: Expense[];
@@ -20,7 +21,7 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
   const { currentHouse, dbUserProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
-  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  const currentMonthKey = toLocalMonthKey();
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthKey);
 
   const availableMonths = useMemo(() => {
@@ -45,9 +46,11 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
     });
   }, [settlements, selectedMonth]);
 
+  // Accrual performance is based on expenses incurred in the selected month.
+  // Cash settlements remain in the audit export but do not distort that month's spend split.
   const monthBalances = useMemo(() => {
-    return calculateNetBalances(monthExpenses, monthSettlements, houseUsers);
-  }, [monthExpenses, monthSettlements, houseUsers]);
+    return calculateNetBalances(monthExpenses, [], houseUsers);
+  }, [monthExpenses, houseUsers]);
 
   const totalMonthSpentCents = monthExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 

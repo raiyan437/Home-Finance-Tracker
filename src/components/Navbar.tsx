@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import { getTranslation } from '../utils/i18n';
@@ -23,6 +23,8 @@ import {
   Building,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
+  X,
 } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'house' | 'settings';
@@ -61,10 +63,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   toggleCollapse,
 }) => {
   const { userProfile, dbUserProfile, firebaseUser, currentHouse, logout } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
 
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobileMenuOpen]);
+
   const handleLogoutClick = async () => {
+    setIsMobileMenuOpen(false);
     await logout();
+  };
+
+  const navigateMobile = (tab: TabType) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
   };
 
   const displayName = dbUserProfile?.displayName || userProfile.name || 'User';
@@ -324,10 +346,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       </aside>
 
       {/* Mobile Navigation Bar */}
-      <nav className="mobile-nav">
+      <nav className="mobile-nav" aria-label="Primary navigation">
         <button
           className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => navigateMobile('dashboard')}
+          aria-current={activeTab === 'dashboard' ? 'page' : undefined}
         >
           <LayoutDashboard size={20} />
           <span>{t('dashboard')}</span>
@@ -335,32 +358,97 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           className={`mobile-nav-item ${activeTab === 'expenses' ? 'active' : ''}`}
-          onClick={() => setActiveTab('expenses')}
+          onClick={() => navigateMobile('expenses')}
+          aria-current={activeTab === 'expenses' ? 'page' : undefined}
         >
           <Receipt size={20} />
           <span>{t('householdExpenses')}</span>
         </button>
 
-        <button className="mobile-add-fab" onClick={onOpenAddExpense} title="Add Expense">
+        <button className="mobile-add-fab" onClick={onOpenAddExpense} title="Add Expense" aria-label="Add expense">
           <Plus size={26} />
         </button>
 
         <button
-          className={`mobile-nav-item ${activeTab === 'house' ? 'active' : ''}`}
-          onClick={() => setActiveTab('house')}
+          className={`mobile-nav-item ${activeTab === 'personal' ? 'active' : ''}`}
+          onClick={() => navigateMobile('personal')}
+          aria-current={activeTab === 'personal' ? 'page' : undefined}
         >
-          <Building size={20} />
-          <span>House</span>
+          <Wallet size={20} />
+          <span>Wallet</span>
         </button>
 
         <button
-          className={`mobile-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}
+          className={`mobile-nav-item ${['settlement', 'monthly', 'cards', 'house', 'settings'].includes(activeTab) ? 'active' : ''}`}
+          onClick={() => setIsMobileMenuOpen(true)}
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="mobile-more-menu"
         >
-          <Settings size={20} />
-          <span>Settings</span>
+          <MoreHorizontal size={20} />
+          <span>More</span>
         </button>
       </nav>
+
+      {isMobileMenuOpen && (
+        <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)}>
+          <section
+            id="mobile-more-menu"
+            className="mobile-menu-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More navigation options"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mobile-menu-handle" />
+            <div className="mobile-menu-header">
+              <div className="mobile-menu-profile">
+                <UserAvatar
+                  user={{
+                    id: dbUserProfile?.uid || userProfile.id,
+                    name: displayName,
+                    avatar: dbUserProfile?.avatar || firebaseUser?.photoURL || undefined,
+                    color: userProfile.color || '#0a84ff',
+                  }}
+                  size={42}
+                />
+                <div>
+                  <strong>{displayName}</strong>
+                  <span>{currentHouse?.name || 'Personal workspace'}</span>
+                </div>
+              </div>
+              <button className="close-btn" onClick={() => setIsMobileMenuOpen(false)} aria-label="Close menu">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mobile-menu-grid">
+              {[
+                { tab: 'settlement' as const, label: t('settlements'), icon: ArrowLeftRight, count: settlementCount },
+                { tab: 'cards' as const, label: t('paymentCards'), icon: CreditCard, count: cardsCount },
+                { tab: 'monthly' as const, label: t('monthlyReport'), icon: Calendar },
+                { tab: 'house' as const, label: 'Household', icon: Building },
+                { tab: 'settings' as const, label: 'Settings', icon: Settings },
+              ].map(({ tab, label, icon: Icon, count }) => (
+                <button
+                  key={tab}
+                  className={`mobile-menu-item ${activeTab === tab ? 'active' : ''}`}
+                  onClick={() => navigateMobile(tab)}
+                >
+                  <span className="mobile-menu-icon"><Icon size={20} /></span>
+                  <span>{label}</span>
+                  {count !== undefined && count > 0 && <small>{count}</small>}
+                </button>
+              ))}
+            </div>
+
+            <div className="mobile-menu-actions">
+              <button onClick={toggleTheme}>{theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />} {theme === 'dark' ? t('light') : t('dark')}</button>
+              <button onClick={toggleLang}><Languages size={17} /> {lang === 'en' ? 'বাংলা' : 'English'}</button>
+              <button className="danger" onClick={handleLogoutClick}><LogOut size={17} /> Log out</button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 };

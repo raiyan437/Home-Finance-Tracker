@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
-    "deploy:rules": "npx firebase-tools deploy --only firestore:rules",
+    "deploy:rules": "npx firebase-tools deploy --only firestore:rules,storage",
     "preview": "vite preview"
   },
   "dependencies": {

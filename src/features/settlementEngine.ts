@@ -39,7 +39,10 @@ export const getHouseUsers = (
   currentUser?: UserProfile | User | null
 ): User[] => {
   if (house && house.members && house.members.length > 0) {
-    return house.members.map((m) => {
+    const canonicalMembers = house.memberMap && house.memberUids
+      ? house.memberUids.map((uid) => house.memberMap?.[uid]).filter((member): member is NonNullable<typeof member> => Boolean(member))
+      : house.members;
+    return canonicalMembers.map((m) => {
       const isCurrent = currentUser && (m.uid === (currentUser as any).uid || m.email === (currentUser as any).email);
       const resolvedName = (isCurrent && (currentUser as any).displayName) || m.displayName || m.email?.split('@')[0] || 'Member';
       const rawAvatar = (isCurrent && (currentUser as any).avatar) || m.avatar;
@@ -89,7 +92,7 @@ export const getHouseUsers = (
 
 /**
  * Computes net balances for house members dynamically.
- * Isolates departed / legacy members under LEGACY_USER so sum(Net) = 0.
+ * Keeps every departed identity separate so unrelated obligations can never cancel.
  */
 export const calculateNetBalances = (
   expenses: Expense[],
@@ -105,26 +108,21 @@ export const calculateNetBalances = (
     totals[key] = { paid: 0, share: 0, settlementDelta: 0 };
   });
 
-  totals[LEGACY_USER.id] = { paid: 0, share: 0, settlementDelta: 0 };
-  usersMap[LEGACY_USER.id] = LEGACY_USER;
-
-  // Helper for strict UID / ID lookup
+  // UID/ID is the only accounting identity. Display names and email prefixes are
+  // intentionally not aliases because they are mutable and may not be unique.
   const findUserKey = (targetIdStr: string): string => {
-    if (!targetIdStr) return LEGACY_USER.id;
+    const rawIdentity = targetIdStr?.trim() || 'unknown';
+    const legacyKey = `departed:${rawIdentity}`;
     if (totals[targetIdStr]) return targetIdStr;
-    const targetClean = targetIdStr.toLowerCase().trim();
-    const found = Object.keys(totals).find((k) => {
-      const u = usersMap[k];
-      if (!u) return false;
-      return (
-        k.toLowerCase() === targetClean ||
-        (u.uid && u.uid.toLowerCase() === targetClean) ||
-        (u.id && u.id.toLowerCase() === targetClean) ||
-        u.name.toLowerCase().trim() === targetClean ||
-        (u.email && u.email.toLowerCase().startsWith(targetClean))
-      );
-    });
-    return found || LEGACY_USER.id;
+    if (!totals[legacyKey]) {
+      totals[legacyKey] = { paid: 0, share: 0, settlementDelta: 0 };
+      usersMap[legacyKey] = {
+        ...LEGACY_USER,
+        id: legacyKey,
+        name: rawIdentity === 'unknown' ? 'Unknown departed member' : `Departed: ${rawIdentity}`,
+      };
+    }
+    return legacyKey;
   };
 
   // 1. Process active expenses strictly by UID / ID
@@ -164,17 +162,18 @@ export const calculateNetBalances = (
     };
   });
 
-  // Include Legacy/Departed member pool if there are transactions attached to former members
-  const legacyTotals = totals[LEGACY_USER.id];
-  if (legacyTotals && (legacyTotals.paid > 0 || legacyTotals.share > 0 || legacyTotals.settlementDelta !== 0)) {
-    const net = legacyTotals.paid - legacyTotals.share + legacyTotals.settlementDelta;
-    result[LEGACY_USER.id] = {
-      user: LEGACY_USER,
-      totalPaidCents: legacyTotals.paid,
-      totalShareCents: legacyTotals.share,
-      netBalanceCents: net,
-    };
-  }
+  Object.entries(totals)
+    .filter(([key]) => key.startsWith('departed:'))
+    .forEach(([key, value]) => {
+      if (value.paid || value.share || value.settlementDelta) {
+        result[key] = {
+          user: usersMap[key],
+          totalPaidCents: value.paid,
+          totalShareCents: value.share,
+          netBalanceCents: value.paid - value.share + value.settlementDelta,
+        };
+      }
+    });
 
   return result;
 };

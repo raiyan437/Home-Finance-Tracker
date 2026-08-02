@@ -15,7 +15,7 @@ import {
 } from '../services/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, runTransaction } from 'firebase/firestore';
-import { syncSaveUser, syncSaveHouse, subscribeHouse } from '../services/firebaseSync';
+import { syncSaveUser, syncSaveHouse, subscribeHouse, hasPendingLedgerMutations, sanitizeForFirestore } from '../services/firebaseSync';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -27,6 +27,7 @@ import {
   onAuthStateChanged,
   type User as FirebaseUser,
 } from 'firebase/auth';
+import { createId } from '../utils/ids';
 
 interface AuthContextType {
   activeUserId: UserId;
@@ -105,6 +106,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
         }
       } else {
+        setActiveSession(null);
+        setDbUserProfile(null);
+        setCurrentHouse(null);
         setLoading(false);
       }
     });
@@ -124,8 +128,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let targetHouseId = profile.houseId;
 
-    // Auto-Healing Fallback 1: Check local storage for any house where user is listed as member
-    if (!targetHouseId) {
+    // Offline-only recovery may use the local roster. Cloud auth always treats the
+    // canonical profile document as the source of membership truth.
+    if (!targetHouseId && !isFirebaseConfigured) {
       const houses = loadHousesDB();
       const matchedLocal = houses.find((h) => h.members && h.members.some((m) => m.uid === profile.uid));
       if (matchedLocal) {
@@ -137,28 +142,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Auto-Healing Fallback 2: Check Firestore `houses` collection for any house where user is listed as member
-    if (!targetHouseId && isFirebaseConfigured && db) {
-      try {
-        const housesCol = collection(db, 'houses');
-        const snap = await getDocs(housesCol);
-        if (!snap.empty) {
-          snap.forEach((docSnap) => {
-            const h = docSnap.data() as House;
-            if (h.members && h.members.some((m) => m.uid === profile.uid)) {
-              targetHouseId = h.id;
-              const healedProfile = { ...profile, houseId: targetHouseId };
-              setDbUserProfile(healedProfile);
-              setActiveSession(healedProfile);
-              syncSaveUser(healedProfile);
-            }
-          });
-        }
-      } catch (err) {
-        console.warn('Firestore syncHouseForUser search notice:', err);
-      }
-    }
-
     if (!targetHouseId) {
       setCurrentHouse(null);
       return;
@@ -166,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const houses = loadHousesDB();
     const house = houses.find((h) => h.id === targetHouseId) || null;
-    if (house) {
+    if (house && !isFirebaseConfigured) {
       setCurrentHouse({ ...house });
     }
 
@@ -186,7 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             saveHousesDB(houses);
             if (
               firestoreHouse.leaderUid === profile.uid &&
-              (!firestoreHouse.memberUids || firestoreHouse.publicJoin === undefined)
+              (!firestoreHouse.memberUids || !firestoreHouse.memberMap || firestoreHouse.publicJoin === undefined)
             ) {
               syncSaveHouse(firestoreHouse);
             }
@@ -198,9 +181,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setActiveSession(purgedProfile);
             syncSaveUser(purgedProfile);
           }
+        } else {
+          setCurrentHouse(null);
+          const purgedProfile = { ...profile, houseId: null, role: null };
+          setDbUserProfile(purgedProfile);
+          setActiveSession(purgedProfile);
+          await syncSaveUser(purgedProfile);
         }
       } catch (err) {
         console.warn('Firestore syncHouseForUser notice:', err);
+        if ((err as { code?: string })?.code === 'permission-denied') {
+          const purgedProfile = { ...profile, houseId: null, role: null };
+          setCurrentHouse(null);
+          setDbUserProfile(purgedProfile);
+          setActiveSession(purgedProfile);
+          await syncSaveUser(purgedProfile);
+        }
       }
     }
   };
@@ -240,6 +236,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           saveHousesDB([...houses, updatedHouse]);
         }
+      } else {
+        setCurrentHouse(null);
+        setDbUserProfile((prev) => {
+          const purged = prev ? { ...prev, houseId: null, role: null } : null;
+          if (purged) {
+            setActiveSession(purged);
+            void syncSaveUser(purged);
+          }
+          return purged;
+        });
       }
     });
     return () => unsub();
@@ -286,7 +292,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!existingUser) {
       existingUser = {
-        uid: firebaseUid || `user-${Date.now()}`,
+        uid: firebaseUid || createId('user'),
         displayName: cleanEmail.split('@')[0],
         email: cleanEmail,
         houseId: null,
@@ -294,6 +300,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existingUser]);
+    } else if (firebaseUid && existingUser.uid !== firebaseUid) {
+      // A Firebase UID is the canonical identity. Never retain a locally-generated
+      // UID after cloud authentication, because that can attribute money to the
+      // wrong person. Cloud household membership must be rejoined explicitly.
+      const staleUid = existingUser.uid;
+      existingUser = { ...existingUser, uid: firebaseUid, houseId: null, role: null };
+      saveUsersDB([...users.filter((user) => user.uid !== staleUid), existingUser]);
+      const houses = loadHousesDB().map((house) => {
+        const members = house.members.filter((member) => member.uid !== staleUid);
+        return { ...house, members, memberUids: members.map((member) => member.uid) };
+      });
+      saveHousesDB(houses);
     }
 
     setActiveSession(existingUser);
@@ -342,7 +360,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const newUser: UserProfile = {
-      uid: firebaseUid || `user-${Date.now()}`,
+      uid: firebaseUid || createId('user'),
       displayName: displayName.trim() || cleanEmail.split('@')[0],
       email: cleanEmail,
       houseId: null,
@@ -385,7 +403,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return m;
       });
-      const updatedHouse = { ...currentHouse, members: updatedMembers };
+      const updatedHouse = { ...currentHouse, members: updatedMembers, memberMap: Object.fromEntries(updatedMembers.map((member) => [member.uid, member])) };
       const houses = loadHousesDB();
       const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
       saveHousesDB(updatedHouses);
@@ -396,11 +414,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const snapshot = await transaction.get(houseRef);
           if (!snapshot.exists()) return;
           const latest = snapshot.data() as House;
-          transaction.update(houseRef, {
-            members: latest.members.map((member) =>
-              member.uid === dbUserProfile.uid ? { ...member, avatar: avatarUrl } : member
-            ),
-          });
+          const members = latest.members.map((member) =>
+            member.uid === dbUserProfile.uid ? { ...member, avatar: avatarUrl } : member
+          );
+          transaction.update(houseRef, sanitizeForFirestore({
+            members,
+            memberMap: Object.fromEntries(members.map((member) => [member.uid, member])),
+          }));
         });
       } else {
         syncSaveHouse(updatedHouse);
@@ -480,7 +500,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
     }
 
-    const houseId = `house-${Date.now()}`;
+    const houseId = createId('house');
     const now = new Date().toISOString();
 
     const leaderMember: HouseMember = {
@@ -499,7 +519,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       leaderUid: dbUserProfile.uid,
       members: [leaderMember],
       memberUids: [dbUserProfile.uid],
+      memberMap: { [dbUserProfile.uid]: leaderMember },
       publicJoin: true,
+      ledgerRevision: 0,
       createdAt: now,
     };
 
@@ -512,7 +534,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (codeSnapshot.exists()) {
           throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
         }
-        transaction.set(doc(db!, 'houses', houseId), newHouse);
+        transaction.set(doc(db!, 'houses', houseId), sanitizeForFirestore(newHouse));
         transaction.set(codeRef, { houseId, name, leaderUid: dbUserProfile.uid });
         transaction.set(doc(db!, 'users', dbUserProfile.uid), updatedProfile, { merge: true });
       });
@@ -566,6 +588,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!house) {
       throw new Error(`No house found with code "${cleanCode}". Please verify and try again.`);
     }
+    if (house.members.length >= 10 && !house.members.some((member) => member.uid === dbUserProfile.uid)) {
+      throw new Error('This household has reached the 10-member accounting limit.');
+    }
 
     const isAlreadyMember = house.members.some((m) => m.uid === dbUserProfile.uid);
     if (!isAlreadyMember) {
@@ -579,16 +604,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         joinedAt: now,
       };
 
-      house.members.push(newMember);
-      house.memberUids = Array.from(new Set([...(house.memberUids || house.members.map((member) => member.uid)), dbUserProfile.uid]));
-
-      // Save/update house in local DB
-      const existingIdx = houses.findIndex((h) => h.id === house!.id);
-      if (existingIdx >= 0) {
-        houses[existingIdx] = house;
-        saveHousesDB(houses);
-      } else {
-        saveHousesDB([...houses, house]);
+      if (!isFirebaseConfigured) {
+        const members = [...house.members, newMember];
+        house = {
+          ...house,
+          members,
+          memberUids: members.map((member) => member.uid),
+          memberMap: Object.fromEntries(members.map((member) => [member.uid, member])),
+        };
       }
     }
 
@@ -603,25 +626,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const latestHouse = snapshot.data() as House;
         const latestMembers = latestHouse.members || [];
         const alreadyJoined = latestMembers.some((member) => member.uid === dbUserProfile.uid);
+        if (!alreadyJoined && latestMembers.length >= 10) throw new Error('This household has reached the 10-member accounting limit.');
+        const committedMember: HouseMember = {
+          uid: dbUserProfile.uid,
+          displayName: dbUserProfile.displayName,
+          email: dbUserProfile.email,
+          avatar: dbUserProfile.avatar,
+          role: 'member',
+          joinedAt: new Date().toISOString(),
+        };
         committedHouse = alreadyJoined
           ? latestHouse
           : {
               ...latestHouse,
-              members: [...latestMembers, {
-                uid: dbUserProfile.uid,
-                displayName: dbUserProfile.displayName,
-                email: dbUserProfile.email,
-                avatar: dbUserProfile.avatar,
-                role: 'member' as const,
-                joinedAt: new Date().toISOString(),
-              }],
+              members: [...latestMembers, committedMember],
               memberUids: Array.from(new Set([...(latestHouse.memberUids || latestMembers.map((member) => member.uid)), dbUserProfile.uid])),
+              memberMap: { ...(latestHouse.memberMap || Object.fromEntries(latestMembers.map((member) => [member.uid, member]))), [dbUserProfile.uid]: committedMember },
             };
-        transaction.set(houseRef, committedHouse, { merge: true });
+        transaction.set(houseRef, sanitizeForFirestore(committedHouse), { merge: true });
         transaction.set(doc(db!, 'users', dbUserProfile.uid), updatedProfile, { merge: true });
       });
       house = committedHouse;
     }
+
+    const persistedHouses = loadHousesDB();
+    const persistedIndex = persistedHouses.findIndex((item) => item.id === house!.id);
+    if (persistedIndex >= 0) persistedHouses[persistedIndex] = house;
+    else persistedHouses.push(house);
+    saveHousesDB(persistedHouses);
 
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {
@@ -680,29 +712,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Only the House Leader can remove members.');
     }
     if (currentHouse.leaderUid === targetUid) throw new Error('House leader cannot be kicked from house');
+    if (hasPendingLedgerMutations(currentHouse.id)) throw new Error('Wait for pending ledger changes to sync before removing a member.');
 
     // Load active expenses & settlements for currentHouse to check target member balance
     const storageScope = houseStorageScope(currentHouse.id);
     let houseExpenses: Expense[] = loadExpenses(storageScope);
     let houseSettlements: Settlement[] = loadSettlements(storageScope);
 
+    let ledgerRevisionBefore = currentHouse.ledgerRevision || 0;
     if (isFirebaseConfigured && db) {
       try {
+        const houseSnapshot = await getDoc(doc(db, 'houses', currentHouse.id));
+        if (!houseSnapshot.exists()) throw new Error('Household no longer exists.');
+        ledgerRevisionBefore = Number(houseSnapshot.data().ledgerRevision || 0);
         const expSnap = await getDocs(query(collection(db, 'expenses'), where('houseId', '==', currentHouse.id)));
-        if (!expSnap.empty) {
-          const fsExpenses: Expense[] = [];
-          expSnap.forEach((docSnap) => fsExpenses.push(docSnap.data() as Expense));
-          houseExpenses = fsExpenses;
-        }
+        const fsExpenses: Expense[] = [];
+        expSnap.forEach((docSnap) => fsExpenses.push(docSnap.data() as Expense));
+        houseExpenses = fsExpenses;
 
         const stSnap = await getDocs(query(collection(db, 'settlements'), where('houseId', '==', currentHouse.id)));
-        if (!stSnap.empty) {
-          const fsSettlements: Settlement[] = [];
-          stSnap.forEach((docSnap) => fsSettlements.push(docSnap.data() as Settlement));
-          houseSettlements = fsSettlements;
-        }
+        const fsSettlements: Settlement[] = [];
+        stSnap.forEach((docSnap) => fsSettlements.push(docSnap.data() as Settlement));
+        houseSettlements = fsSettlements;
       } catch (err) {
-        console.warn('Firestore kickMember settlement balance check fallback notice:', err);
+        console.error('Unable to verify the latest ledger before removing a member.', err);
+        throw new Error('Could not verify the live household balance. No member was removed. Please reconnect and try again.');
       }
     }
 
@@ -733,7 +767,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const updatedMembers = currentHouse.members.filter((m) => m.uid !== targetUid);
-    const updatedHouse = { ...currentHouse, members: updatedMembers, memberUids: updatedMembers.map((member) => member.uid) };
+    const updatedHouse = { ...currentHouse, members: updatedMembers, memberUids: updatedMembers.map((member) => member.uid), memberMap: Object.fromEntries(updatedMembers.map((member) => [member.uid, member])) };
 
     if (isFirebaseConfigured && db) {
       await runTransaction(db, async (transaction) => {
@@ -743,11 +777,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error('Only the current House Leader can remove members.');
         }
         const latest = snapshot.data() as House;
+        if (Number(latest.ledgerRevision || 0) !== ledgerRevisionBefore) throw new Error('The ledger changed while balances were being checked. Please try again.');
         const remainingMembers = latest.members.filter((member) => member.uid !== targetUid);
-        transaction.update(houseRef, {
+        transaction.update(houseRef, sanitizeForFirestore({
           members: remainingMembers,
           memberUids: remainingMembers.map((member) => member.uid),
-        });
+          memberMap: Object.fromEntries(remainingMembers.map((member) => [member.uid, member])),
+        }));
         transaction.set(doc(db!, 'users', targetUid), { houseId: null, role: null }, { merge: true });
       });
     }
@@ -802,6 +838,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       leaderUid: targetUid,
       members: updatedMembers,
       memberUids: updatedMembers.map((member) => member.uid),
+      memberMap: Object.fromEntries(updatedMembers.map((member) => [member.uid, member])),
     };
 
     if (isFirebaseConfigured && db) {
@@ -811,7 +848,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!snapshot.exists() || snapshot.data().leaderUid !== myUid) {
           throw new Error('Only the current House Leader can transfer leadership.');
         }
-        transaction.set(houseRef, updatedHouse, { merge: true });
+        transaction.set(houseRef, sanitizeForFirestore(updatedHouse), { merge: true });
         transaction.set(doc(db!, 'users', myUid), { role: 'member' }, { merge: true });
         transaction.set(doc(db!, 'users', targetUid), { role: 'leader' }, { merge: true });
         transaction.set(doc(db!, 'houseCodes', currentHouse.code.toUpperCase()), {
@@ -862,6 +899,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const myUid = dbUserProfile.uid || activeUserId;
+    if (hasPendingLedgerMutations(currentHouse.id)) throw new Error('Wait for pending ledger changes to sync before leaving the household.');
 
     // Load active expenses & settlements for currentHouse
     let houseExpenses: Expense[] = passedExpenses || [];
@@ -875,23 +913,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Also fetch latest Firestore expenses & settlements if Firestore is connected
+    let ledgerRevisionBefore = currentHouse.ledgerRevision || 0;
     if (isFirebaseConfigured && db) {
       try {
+        const houseSnapshot = await getDoc(doc(db, 'houses', currentHouse.id));
+        if (!houseSnapshot.exists()) throw new Error('Household no longer exists.');
+        ledgerRevisionBefore = Number(houseSnapshot.data().ledgerRevision || 0);
         const expSnap = await getDocs(query(collection(db, 'expenses'), where('houseId', '==', currentHouse.id)));
-        if (!expSnap.empty) {
-          const fsExpenses: Expense[] = [];
-          expSnap.forEach((docSnap) => fsExpenses.push(docSnap.data() as Expense));
-          houseExpenses = fsExpenses;
-        }
+        const fsExpenses: Expense[] = [];
+        expSnap.forEach((docSnap) => fsExpenses.push(docSnap.data() as Expense));
+        houseExpenses = fsExpenses;
 
         const stSnap = await getDocs(query(collection(db, 'settlements'), where('houseId', '==', currentHouse.id)));
-        if (!stSnap.empty) {
-          const fsSettlements: Settlement[] = [];
-          stSnap.forEach((docSnap) => fsSettlements.push(docSnap.data() as Settlement));
-          houseSettlements = fsSettlements;
-        }
+        const fsSettlements: Settlement[] = [];
+        stSnap.forEach((docSnap) => fsSettlements.push(docSnap.data() as Settlement));
+        houseSettlements = fsSettlements;
       } catch (err) {
-        console.warn('Firestore leaveHouse settlement balance check fallback notice:', err);
+        console.error('Unable to verify the latest ledger before leaving.', err);
+        throw new Error('Could not verify your live household balance. You have not left the household. Please reconnect and try again.');
       }
     }
 
@@ -922,7 +961,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // If balance is zero and no pending settlements exist, process leaving
     const updatedMembers = currentHouse.members.filter((m) => m.uid !== dbUserProfile.uid);
-    const updatedHouse = { ...currentHouse, members: updatedMembers, memberUids: updatedMembers.map((member) => member.uid) };
+    const updatedHouse = { ...currentHouse, members: updatedMembers, memberUids: updatedMembers.map((member) => member.uid), memberMap: Object.fromEntries(updatedMembers.map((member) => [member.uid, member])) };
 
     if (isFirebaseConfigured && db) {
       await runTransaction(db, async (transaction) => {
@@ -930,11 +969,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const snapshot = await transaction.get(houseRef);
         if (!snapshot.exists()) return;
         const latest = snapshot.data() as House;
+        if (Number(latest.ledgerRevision || 0) !== ledgerRevisionBefore) throw new Error('The ledger changed while balances were being checked. Please try again.');
         const remainingMembers = latest.members.filter((member) => member.uid !== dbUserProfile.uid);
-        transaction.update(houseRef, {
+        transaction.update(houseRef, sanitizeForFirestore({
           members: remainingMembers,
           memberUids: remainingMembers.map((member) => member.uid),
-        });
+          memberMap: Object.fromEntries(remainingMembers.map((member) => [member.uid, member])),
+        }));
         transaction.set(doc(db!, 'users', dbUserProfile.uid), { houseId: null, role: null }, { merge: true });
       });
     }

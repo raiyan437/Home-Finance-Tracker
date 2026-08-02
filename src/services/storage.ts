@@ -142,6 +142,36 @@ export interface BackupDataPayload {
   categoryBudgets?: Record<string, number>;
 }
 
+export interface BackupImportResult {
+  ok: boolean;
+  data?: BackupDataPayload;
+  error?: string;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const validBackupExpense = (value: unknown): value is Expense => {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string') return false;
+  if (!Number.isInteger(value.amountCents) || Number(value.amountCents) <= 0 || !Array.isArray(value.shares)) return false;
+  const shares = value.shares as unknown[];
+  return shares.length > 0 && shares.every((share) => isRecord(share) && typeof share.userId === 'string' && Number.isInteger(share.amountCents) && Number(share.amountCents) >= 0)
+    && shares.reduce<number>((sum, share) => sum + Number((share as Record<string, unknown>).amountCents), 0) === value.amountCents;
+};
+
+const validBackupSettlement = (value: unknown): value is Settlement => isRecord(value)
+  && typeof value.id === 'string'
+  && typeof value.fromUserId === 'string'
+  && typeof value.toUserId === 'string'
+  && value.fromUserId !== value.toUserId
+  && Number.isInteger(value.amountCents)
+  && Number(value.amountCents) > 0
+  && (value.status === 'completed' || value.status === 'reversed');
+
+const validBackupCard = (value: unknown): value is PaymentCard => isRecord(value)
+  && typeof value.id === 'string'
+  && typeof value.bankName === 'string'
+  && typeof value.createdAt === 'string';
+
 export const exportBackupJSON = (houseId?: string, userId?: string): string => {
   const rawUsers = JSON.parse(localStorage.getItem('home_finance_users_db_v3') || '[]');
   const sanitizedUsers = Array.isArray(rawUsers)
@@ -165,46 +195,59 @@ export const exportBackupJSON = (houseId?: string, userId?: string): string => {
     housesDB: houseId
       ? JSON.parse(localStorage.getItem('home_finance_houses_db_v3') || '[]').filter((house: { id: string }) => house.id === houseId)
       : [],
-    personalBudgetTaka: Number(localStorage.getItem(`home_finance_personal_budget_v1_${userId}`)) || 15000,
+    personalBudgetTaka: localStorage.getItem(`home_finance_personal_budget_v1_${userId}`) === null
+      ? 15000
+      : Number(localStorage.getItem(`home_finance_personal_budget_v1_${userId}`)),
     categoryBudgets: JSON.parse(localStorage.getItem(`home_finance_category_budgets_v1_${userId}`) || '{}'),
   };
   return JSON.stringify(payload, null, 2);
 };
 
-export const importBackupJSON = (jsonStr: string, houseId?: string, userId?: string): boolean => {
+export const importBackupJSON = (jsonStr: string, houseId?: string, userId?: string): BackupImportResult => {
   try {
-    const data: BackupDataPayload = JSON.parse(jsonStr);
-    if (!data || typeof data !== 'object') return false;
+    const data = JSON.parse(jsonStr) as BackupDataPayload;
+    if (!isRecord(data) || typeof data.version !== 'string') return { ok: false, error: 'Missing backup version.' };
+    if (!Array.isArray(data.expenses) || !data.expenses.every(validBackupExpense)) return { ok: false, error: 'Backup contains invalid expenses.' };
+    if (!Array.isArray(data.settlements) || !data.settlements.every(validBackupSettlement)) return { ok: false, error: 'Backup contains invalid settlements.' };
+    if (!Array.isArray(data.cards) || !data.cards.every(validBackupCard)) return { ok: false, error: 'Backup contains invalid cards.' };
+
+    const scopedExpenses = data.expenses.filter((expense) =>
+      (houseId && expense.scope !== 'personal' && expense.houseId === houseId)
+      || (userId && expense.scope === 'personal' && expense.ownerId === userId && expense.paidBy === userId)
+    );
+    const scopedSettlements = data.settlements.filter((settlement) => Boolean(houseId) && settlement.houseId === houseId);
+    const scopedCards = data.cards.filter((card) => Boolean(userId) && card.ownerId === userId);
+    const sanitizedData: BackupDataPayload = { ...data, expenses: scopedExpenses, settlements: scopedSettlements, cards: scopedCards };
 
     if (Array.isArray(data.expenses)) {
       if (houseId) {
         saveExpenses(
-          data.expenses.filter((expense) => expense.scope !== 'personal' && expense.houseId === houseId),
+          scopedExpenses.filter((expense) => expense.scope !== 'personal' && expense.houseId === houseId),
           houseStorageScope(houseId)
         );
       }
       if (userId) {
         saveExpenses(
-          data.expenses.filter((expense) => expense.scope === 'personal' && expense.ownerId === userId),
+          scopedExpenses.filter((expense) => expense.scope === 'personal' && expense.ownerId === userId),
           personalStorageScope(userId)
         );
       }
     }
     if (Array.isArray(data.settlements) && houseId) {
-      saveSettlements(data.settlements.filter((settlement) => settlement.houseId === houseId), houseStorageScope(houseId));
+      saveSettlements(scopedSettlements, houseStorageScope(houseId));
     }
     if (Array.isArray(data.cards) && userId) {
-      saveCards(data.cards.filter((card) => card.ownerId === userId), personalStorageScope(userId));
+      saveCards(scopedCards, personalStorageScope(userId));
     }
-    if (data.personalBudgetTaka && userId) {
+    if (typeof data.personalBudgetTaka === 'number' && Number.isFinite(data.personalBudgetTaka) && data.personalBudgetTaka >= 0 && userId) {
       localStorage.setItem(`home_finance_personal_budget_v1_${userId}`, String(data.personalBudgetTaka));
     }
     if (data.categoryBudgets && userId) {
       localStorage.setItem(`home_finance_category_budgets_v1_${userId}`, JSON.stringify(data.categoryBudgets));
     }
-    return true;
+    return { ok: true, data: sanitizedData };
   } catch (err) {
     console.error('Failed to import JSON backup payload:', err);
-    return false;
+    return { ok: false, error: 'The selected file is not valid JSON.' };
   }
 };
