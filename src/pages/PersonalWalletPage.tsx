@@ -58,7 +58,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (err) {
+      } catch {
         // Fallback
       }
     }

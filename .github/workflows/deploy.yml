@@ -44,6 +44,9 @@ jobs:
       - name: Run Linter
         run: npm run lint
 
+      - name: Run Automated Tests
+        run: npm test
+
       - name: Type Check
         run: npx tsc -b
 

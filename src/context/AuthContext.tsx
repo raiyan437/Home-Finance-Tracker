@@ -1,7 +1,8 @@
+/* oxlint-disable react/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserId, UserProfile, House, HouseMember, Expense, Settlement } from '../types';
 import { USERS, calculateNetBalances, getHouseUsers } from '../features/settlementEngine';
-import { loadExpenses, loadSettlements } from '../services/storage';
+import { loadExpenses, loadSettlements, houseStorageScope } from '../services/storage';
 import {
   loadUsersDB,
   saveUsersDB,
@@ -9,9 +10,11 @@ import {
   saveHousesDB,
   getActiveSession,
   setActiveSession,
+  saveLocalCredential,
+  verifyLocalCredential,
 } from '../services/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { syncSaveUser, syncSaveHouse, subscribeHouse } from '../services/firebaseSync';
 import {
   signInWithEmailAndPassword,
@@ -84,7 +87,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             userDocRef,
             (snap) => {
               if (snap.exists()) {
-                const fbProfile = snap.data() as UserProfile;
+                const { password: _removedPassword, ...safeProfile } = snap.data() as UserProfile & { password?: string };
+                const fbProfile = safeProfile as UserProfile;
                 setDbUserProfile((prev) => ({ ...prev, ...fbProfile }));
                 setActiveSession(fbProfile);
                 syncHouseForUser(fbProfile);
@@ -180,6 +184,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (idx >= 0) houses[idx] = firestoreHouse;
             else houses.push(firestoreHouse);
             saveHousesDB(houses);
+            if (
+              firestoreHouse.leaderUid === profile.uid &&
+              (!firestoreHouse.memberUids || firestoreHouse.publicJoin === undefined)
+            ) {
+              syncSaveHouse(firestoreHouse);
+            }
           } else {
             // User was removed / kicked from house
             setCurrentHouse(null);
@@ -198,7 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sync House state whenever dbUserProfile reference or values change
   useEffect(() => {
     syncHouseForUser(dbUserProfile);
-  }, [dbUserProfile?.houseId]);
+  }, [dbUserProfile]);
 
   // Realtime House Roster Listener (Live multi-user roster updates across devices)
   useEffect(() => {
@@ -233,7 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
     return () => unsub();
-  }, [dbUserProfile?.houseId, currentHouse?.id, activeUserId]);
+  }, [dbUserProfile?.houseId, dbUserProfile?.uid, currentHouse?.id, activeUserId]);
 
   const switchProfile = (userId: UserId) => {
     if (USERS[userId]) {
@@ -253,17 +263,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
         firebaseUid = userCred.user.uid;
       } catch (fbErr: any) {
-        // If account was deleted in Firebase Console or credentials don't match, purge stale local cache & throw error
-        const users = loadUsersDB();
-        const filtered = users.filter((u) => u.email.toLowerCase() !== cleanEmail);
-        saveUsersDB(filtered);
         setLoading(false);
+        if (fbErr?.code === 'auth/network-request-failed') {
+          throw new Error('Unable to reach Firebase. Check your connection and try again.');
+        }
         throw new Error('Invalid email or password. Please verify your credentials or Sign Up.');
       }
     }
 
     const users = loadUsersDB();
     let existingUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (!auth && existingUser && !(await verifyLocalCredential(cleanEmail, pass))) {
+      setLoading(false);
+      throw new Error('Invalid email or password. Please verify your credentials or Sign Up.');
+    }
 
     if (!existingUser && !firebaseUid) {
       setLoading(false);
@@ -275,15 +289,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: firebaseUid || `user-${Date.now()}`,
         displayName: cleanEmail.split('@')[0],
         email: cleanEmail,
-        password: pass,
         houseId: null,
         role: null,
         createdAt: new Date().toISOString(),
       };
       saveUsersDB([...users, existingUser]);
-    } else if (pass) {
-      existingUser.password = pass;
-      saveUsersDB(users);
     }
 
     setActiveSession(existingUser);
@@ -325,9 +335,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (fbErr.code === 'auth/email-already-in-use') {
           setLoading(false);
           throw new Error('Email is already registered. Please log in.');
-        } else {
-          console.warn('Firebase signup notice:', fbErr);
         }
+        setLoading(false);
+        throw new Error('Unable to create the account securely. Please check your connection and try again.');
       }
     }
 
@@ -335,13 +345,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: firebaseUid || `user-${Date.now()}`,
       displayName: displayName.trim() || cleanEmail.split('@')[0],
       email: cleanEmail,
-      password: pass,
       houseId: null,
       role: null,
       createdAt: new Date().toISOString(),
     };
 
     saveUsersDB([...users, newUser]);
+    if (!auth) await saveLocalCredential(newUser.uid, cleanEmail, pass);
     setActiveSession(newUser);
     setDbUserProfile(newUser);
     syncHouseForUser(newUser);
@@ -380,7 +390,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
       saveHousesDB(updatedHouses);
       setCurrentHouse(updatedHouse);
-      syncSaveHouse(updatedHouse);
+      if (isFirebaseConfigured && db) {
+        await runTransaction(db, async (transaction) => {
+          const houseRef = doc(db!, 'houses', currentHouse.id);
+          const snapshot = await transaction.get(houseRef);
+          if (!snapshot.exists()) return;
+          const latest = snapshot.data() as House;
+          transaction.update(houseRef, {
+            members: latest.members.map((member) =>
+              member.uid === dbUserProfile.uid ? { ...member, avatar: avatarUrl } : member
+            ),
+          });
+        });
+      } else {
+        syncSaveHouse(updatedHouse);
+      }
     }
 
     if (auth?.currentUser) {
@@ -400,12 +424,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const users = loadUsersDB();
-    const targetUser = users.find((u) => u.uid === dbUserProfile.uid);
-
-    if (targetUser?.password && targetUser.password !== currentPass) {
-      throw new Error('Current password is incorrect.');
-    }
-
     if (auth?.currentUser && auth.currentUser.email) {
       try {
         const cred = EmailAuthProvider.credential(auth.currentUser.email, currentPass);
@@ -415,22 +433,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (fbErr.code === 'auth/wrong-password' || fbErr.code === 'auth/invalid-credential') {
           throw new Error('Current password is incorrect.');
         }
-        console.warn('Firebase reauth notice:', fbErr);
+        throw new Error('Unable to update the password securely. Please check your connection and try again.');
       }
+    } else {
+      const validCurrentPassword = await verifyLocalCredential(dbUserProfile.email, currentPass);
+      if (!validCurrentPassword) throw new Error('Current password is incorrect.');
+      await saveLocalCredential(dbUserProfile.uid, dbUserProfile.email, newPass);
     }
 
-    // Save updated password in local DB
-    const updatedUsers = users.map((u) => {
-      if (u.uid === dbUserProfile.uid) {
-        return { ...u, password: newPass };
-      }
-      return u;
-    });
-    saveUsersDB(updatedUsers);
-
-    const updatedProfile = { ...dbUserProfile, password: newPass };
-    setActiveSession(updatedProfile);
-    setDbUserProfile(updatedProfile);
+    saveUsersDB(users);
+    setActiveSession(dbUserProfile);
   };
 
   // Logout Handler
@@ -438,7 +450,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (auth) {
       try {
         await signOut(auth);
-      } catch (e) {}
+      } catch {
+        // Local session cleanup still proceeds if the remote sign-out request fails.
+      }
     }
     setActiveSession(null);
     setDbUserProfile(null);
@@ -448,6 +462,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Create House Handler
   const createHouse = async (houseName: string, customHouseCode?: string) => {
     if (!dbUserProfile) throw new Error('You must be logged in to create a house');
+    if (dbUserProfile.houseId || currentHouse) throw new Error('Leave your current household before creating another one.');
     const name = houseName.trim();
     if (!name) throw new Error('House name cannot be empty');
 
@@ -455,23 +470,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!cleanCode) {
       cleanCode = `HM-${Math.floor(1000 + Math.random() * 9000)}`;
     }
+    if (!/^[A-Z0-9-]{4,10}$/.test(cleanCode)) {
+      throw new Error('House code must be 4-10 characters using only letters, numbers, and hyphens.');
+    }
 
     const houses = loadHousesDB();
     const existingCodeMatch = houses.find((h) => h.code.toUpperCase() === cleanCode);
     if (existingCodeMatch) {
       throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
-    }
-
-    if (isFirebaseConfigured && db) {
-      try {
-        const q = query(collection(db, 'houses'), where('code', '==', cleanCode));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
-        }
-      } catch (err: any) {
-        if (err.message && err.message.includes('already taken')) throw err;
-      }
     }
 
     const houseId = `house-${Date.now()}`;
@@ -492,8 +498,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name,
       leaderUid: dbUserProfile.uid,
       members: [leaderMember],
+      memberUids: [dbUserProfile.uid],
+      publicJoin: true,
       createdAt: now,
     };
+
+    const updatedProfile = { ...dbUserProfile, houseId, role: 'leader' as const };
+
+    if (isFirebaseConfigured && db) {
+      await runTransaction(db, async (transaction) => {
+        const codeRef = doc(db!, 'houseCodes', cleanCode);
+        const codeSnapshot = await transaction.get(codeRef);
+        if (codeSnapshot.exists()) {
+          throw new Error(`Warning: House code '${cleanCode}' is already taken. Please choose a different unique code.`);
+        }
+        transaction.set(doc(db!, 'houses', houseId), newHouse);
+        transaction.set(codeRef, { houseId, name, leaderUid: dbUserProfile.uid });
+        transaction.set(doc(db!, 'users', dbUserProfile.uid), updatedProfile, { merge: true });
+      });
+    }
 
     saveHousesDB([...houses, newHouse]);
 
@@ -506,30 +529,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     saveUsersDB(updatedUsers);
 
-    const updatedProfile = { ...dbUserProfile, houseId, role: 'leader' as const };
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse(newHouse);
-    await syncSaveHouse(newHouse);
-    await syncSaveUser(updatedProfile);
+    if (!isFirebaseConfigured) {
+      await syncSaveHouse(newHouse);
+      await syncSaveUser(updatedProfile);
+    }
   };
 
   // Join House Handler (Supports Local & Firestore Cross-Device Queries)
   const joinHouse = async (houseCode: string) => {
     if (!dbUserProfile) throw new Error('You must be logged in to join a house');
+    if (dbUserProfile.houseId || currentHouse) throw new Error('Leave your current household before joining another one.');
     const cleanCode = houseCode.trim().toUpperCase();
     if (!cleanCode) throw new Error('Please enter a house code');
+    if (!/^[A-Z0-9-]{4,10}$/.test(cleanCode)) throw new Error('Invalid house code format.');
 
     const houses = loadHousesDB();
     let house = houses.find((h) => h.code.toUpperCase() === cleanCode);
 
-    // Cross-Device Fallback: If not found in local browser storage, query Firestore!
+    // Cross-device lookup uses a minimal code index instead of listing every house.
     if (!house && isFirebaseConfigured && db) {
       try {
-        const q = query(collection(db, 'houses'), where('code', '==', cleanCode));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          house = snapshot.docs[0].data() as House;
+        const codeSnapshot = await getDoc(doc(db, 'houseCodes', cleanCode));
+        if (codeSnapshot.exists()) {
+          const targetHouseId = codeSnapshot.data().houseId as string;
+          const houseSnapshot = await getDoc(doc(db, 'houses', targetHouseId));
+          if (houseSnapshot.exists()) house = houseSnapshot.data() as House;
         }
       } catch (err) {
         console.warn('Firestore joinHouse query fallback notice:', err);
@@ -553,6 +580,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       house.members.push(newMember);
+      house.memberUids = Array.from(new Set([...(house.memberUids || house.members.map((member) => member.uid)), dbUserProfile.uid]));
 
       // Save/update house in local DB
       const existingIdx = houses.findIndex((h) => h.id === house!.id);
@@ -564,6 +592,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    const updatedProfile = { ...dbUserProfile, houseId: house.id, role: 'member' as const };
+
+    if (isFirebaseConfigured && db) {
+      let committedHouse = house;
+      await runTransaction(db, async (transaction) => {
+        const houseRef = doc(db!, 'houses', house!.id);
+        const snapshot = await transaction.get(houseRef);
+        if (!snapshot.exists()) throw new Error('This household no longer exists.');
+        const latestHouse = snapshot.data() as House;
+        const latestMembers = latestHouse.members || [];
+        const alreadyJoined = latestMembers.some((member) => member.uid === dbUserProfile.uid);
+        committedHouse = alreadyJoined
+          ? latestHouse
+          : {
+              ...latestHouse,
+              members: [...latestMembers, {
+                uid: dbUserProfile.uid,
+                displayName: dbUserProfile.displayName,
+                email: dbUserProfile.email,
+                avatar: dbUserProfile.avatar,
+                role: 'member' as const,
+                joinedAt: new Date().toISOString(),
+              }],
+              memberUids: Array.from(new Set([...(latestHouse.memberUids || latestMembers.map((member) => member.uid)), dbUserProfile.uid])),
+            };
+        transaction.set(houseRef, committedHouse, { merge: true });
+        transaction.set(doc(db!, 'users', dbUserProfile.uid), updatedProfile, { merge: true });
+      });
+      house = committedHouse;
+    }
+
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {
       if (u.uid === dbUserProfile.uid) {
@@ -573,36 +632,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     saveUsersDB(updatedUsers);
 
-    const updatedProfile = { ...dbUserProfile, houseId: house.id, role: 'member' as const };
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse({ ...house });
-    await syncSaveHouse(house);
-    await syncSaveUser(updatedProfile);
+    if (!isFirebaseConfigured) {
+      await syncSaveHouse(house);
+      await syncSaveUser(updatedProfile);
+    }
   };
 
   // Update House Name Handler (Leader Power)
   const updateHouseName = async (newName: string) => {
     if (!currentHouse) throw new Error('No active house found');
+    if (!dbUserProfile || currentHouse.leaderUid !== dbUserProfile.uid) {
+      throw new Error('Only the House Leader can rename the household.');
+    }
     const trimmed = newName.trim();
     if (!trimmed) throw new Error('House name cannot be empty');
 
     const updatedHouse = { ...currentHouse, name: trimmed };
+    if (isFirebaseConfigured && db) {
+      await runTransaction(db, async (transaction) => {
+        const houseRef = doc(db!, 'houses', currentHouse.id);
+        const snapshot = await transaction.get(houseRef);
+        if (!snapshot.exists() || snapshot.data().leaderUid !== dbUserProfile.uid) {
+          throw new Error('Only the current House Leader can rename the household.');
+        }
+        transaction.update(houseRef, { name: trimmed });
+        transaction.set(doc(db!, 'houseCodes', currentHouse.code.toUpperCase()), {
+          houseId: currentHouse.id,
+          name: trimmed,
+          leaderUid: dbUserProfile.uid,
+        }, { merge: true });
+      });
+    }
     const houses = loadHousesDB();
     const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
     saveHousesDB(updatedHouses);
     setCurrentHouse(updatedHouse);
-    syncSaveHouse(updatedHouse);
+    if (!isFirebaseConfigured) syncSaveHouse(updatedHouse);
   };
 
   // Kick Member Handler (Leader Power with settlement balance check)
   const kickMember = async (targetUid: string) => {
     if (!currentHouse) throw new Error('No active house found');
+    if (!dbUserProfile || currentHouse.leaderUid !== dbUserProfile.uid) {
+      throw new Error('Only the House Leader can remove members.');
+    }
     if (currentHouse.leaderUid === targetUid) throw new Error('House leader cannot be kicked from house');
 
     // Load active expenses & settlements for currentHouse to check target member balance
-    let houseExpenses: Expense[] = loadExpenses().filter((e) => !e.houseId || e.houseId === currentHouse.id);
-    let houseSettlements: Settlement[] = loadSettlements().filter((s) => !(s as any).houseId || (s as any).houseId === currentHouse.id);
+    const storageScope = houseStorageScope(currentHouse.id);
+    let houseExpenses: Expense[] = loadExpenses(storageScope);
+    let houseSettlements: Settlement[] = loadSettlements(storageScope);
 
     if (isFirebaseConfigured && db) {
       try {
@@ -651,13 +733,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const updatedMembers = currentHouse.members.filter((m) => m.uid !== targetUid);
-    const updatedHouse = { ...currentHouse, members: updatedMembers };
+    const updatedHouse = { ...currentHouse, members: updatedMembers, memberUids: updatedMembers.map((member) => member.uid) };
+
+    if (isFirebaseConfigured && db) {
+      await runTransaction(db, async (transaction) => {
+        const houseRef = doc(db!, 'houses', currentHouse.id);
+        const snapshot = await transaction.get(houseRef);
+        if (!snapshot.exists() || snapshot.data().leaderUid !== dbUserProfile.uid) {
+          throw new Error('Only the current House Leader can remove members.');
+        }
+        const latest = snapshot.data() as House;
+        const remainingMembers = latest.members.filter((member) => member.uid !== targetUid);
+        transaction.update(houseRef, {
+          members: remainingMembers,
+          memberUids: remainingMembers.map((member) => member.uid),
+        });
+        transaction.set(doc(db!, 'users', targetUid), { houseId: null, role: null }, { merge: true });
+      });
+    }
 
     const houses = loadHousesDB();
     const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
     saveHousesDB(updatedHouses);
     setCurrentHouse(updatedHouse);
-    syncSaveHouse(updatedHouse);
+    if (!isFirebaseConfigured) syncSaveHouse(updatedHouse);
 
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {
@@ -702,7 +801,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...currentHouse,
       leaderUid: targetUid,
       members: updatedMembers,
+      memberUids: updatedMembers.map((member) => member.uid),
     };
+
+    if (isFirebaseConfigured && db) {
+      await runTransaction(db, async (transaction) => {
+        const houseRef = doc(db!, 'houses', currentHouse.id);
+        const snapshot = await transaction.get(houseRef);
+        if (!snapshot.exists() || snapshot.data().leaderUid !== myUid) {
+          throw new Error('Only the current House Leader can transfer leadership.');
+        }
+        transaction.set(houseRef, updatedHouse, { merge: true });
+        transaction.set(doc(db!, 'users', myUid), { role: 'member' }, { merge: true });
+        transaction.set(doc(db!, 'users', targetUid), { role: 'leader' }, { merge: true });
+        transaction.set(doc(db!, 'houseCodes', currentHouse.code.toUpperCase()), {
+          houseId: currentHouse.id,
+          name: currentHouse.name,
+          leaderUid: targetUid,
+        }, { merge: true });
+      });
+    }
 
     const houses = loadHousesDB();
     const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
@@ -725,12 +843,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setDbUserProfile(updatedMyProfile);
     setCurrentHouse(updatedHouse);
 
-    await syncSaveHouse(updatedHouse);
-    await syncSaveUser(updatedMyProfile);
+    if (!isFirebaseConfigured) {
+      await syncSaveHouse(updatedHouse);
+      await syncSaveUser(updatedMyProfile);
+    }
 
     const targetUserRecord = updatedUsers.find((u) => u.uid === targetUid);
     if (targetUserRecord) {
-      await syncSaveUser(targetUserRecord);
+      if (!isFirebaseConfigured) await syncSaveUser(targetUserRecord);
     }
   };
 
@@ -748,12 +868,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let houseSettlements: Settlement[] = passedSettlements || [];
 
     if (!passedExpenses || passedExpenses.length === 0) {
-      const localExp = loadExpenses();
-      houseExpenses = localExp.filter((e) => !e.houseId || e.houseId === currentHouse.id);
+      houseExpenses = loadExpenses(houseStorageScope(currentHouse.id));
     }
     if (!passedSettlements || passedSettlements.length === 0) {
-      const localSt = loadSettlements();
-      houseSettlements = localSt.filter((s) => !(s as any).houseId || (s as any).houseId === currentHouse.id);
+      houseSettlements = loadSettlements(houseStorageScope(currentHouse.id));
     }
 
     // Also fetch latest Firestore expenses & settlements if Firestore is connected
@@ -804,7 +922,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // If balance is zero and no pending settlements exist, process leaving
     const updatedMembers = currentHouse.members.filter((m) => m.uid !== dbUserProfile.uid);
-    const updatedHouse = { ...currentHouse, members: updatedMembers };
+    const updatedHouse = { ...currentHouse, members: updatedMembers, memberUids: updatedMembers.map((member) => member.uid) };
+
+    if (isFirebaseConfigured && db) {
+      await runTransaction(db, async (transaction) => {
+        const houseRef = doc(db!, 'houses', currentHouse.id);
+        const snapshot = await transaction.get(houseRef);
+        if (!snapshot.exists()) return;
+        const latest = snapshot.data() as House;
+        const remainingMembers = latest.members.filter((member) => member.uid !== dbUserProfile.uid);
+        transaction.update(houseRef, {
+          members: remainingMembers,
+          memberUids: remainingMembers.map((member) => member.uid),
+        });
+        transaction.set(doc(db!, 'users', dbUserProfile.uid), { houseId: null, role: null }, { merge: true });
+      });
+    }
 
     const houses = loadHousesDB();
     const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
@@ -823,8 +956,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
     setCurrentHouse(null);
-    await syncSaveHouse(updatedHouse);
-    await syncSaveUser(updatedProfile);
+    if (!isFirebaseConfigured) {
+      await syncSaveHouse(updatedHouse);
+      await syncSaveUser(updatedProfile);
+    }
   };
 
   const userProfile: User = {

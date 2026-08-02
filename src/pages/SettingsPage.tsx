@@ -28,6 +28,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
   const {
     firebaseUser,
     dbUserProfile,
+    currentHouse,
     updateUserProfilePhoto,
     changeUserPassword,
     logout,
@@ -108,7 +109,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
   };
 
   const handleExportBackup = () => {
-    const jsonStr = exportBackupJSON();
+    const jsonStr = exportBackupJSON(currentHouse?.id, dbUserProfile?.uid);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -126,7 +127,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
-      const ok = importBackupJSON(content);
+      const ok = importBackupJSON(content, currentHouse?.id, dbUserProfile?.uid);
       if (ok) {
         setSuccessMsg('Backup restored successfully! Reloading session...');
         setTimeout(() => window.location.reload(), 1200);

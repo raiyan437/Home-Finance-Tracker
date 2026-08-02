@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { Expense, Settlement } from '../types';
-import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from '../features/settlementEngine';
+import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers, LEGACY_USER } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 import { CategoryChart, PayerContributionCard } from '../components/CategoryChart';
@@ -243,13 +243,13 @@ export const DashboardPage: React.FC<DashboardProps> = ({
                 );
               })}
 
-              {userBalances['legacy-user'] && (userBalances['legacy-user'].totalPaidCents > 0 || userBalances['legacy-user'].totalShareCents > 0) && (
+              {userBalances[LEGACY_USER.id] && (userBalances[LEGACY_USER.id].totalPaidCents > 0 || userBalances[LEGACY_USER.id].totalShareCents > 0) && (
                 <div className="glass-card balance-card" style={{ opacity: 0.85, borderStyle: 'dashed' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <UserAvatar user={userBalances['legacy-user'].user} size={42} />
+                    <UserAvatar user={userBalances[LEGACY_USER.id].user} size={42} />
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '1rem' }}>
-                        {userBalances['legacy-user'].user.name}
+                        {userBalances[LEGACY_USER.id].user.name}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                         Isolated legacy member balance pool
@@ -257,7 +257,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
                     </div>
                   </div>
                   <div className="tabular-nums" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                    {formatCurrency(userBalances['legacy-user'].netBalanceCents, false, lang)}
+                    {formatCurrency(userBalances[LEGACY_USER.id].netBalanceCents, false, lang)}
                   </div>
                 </div>
               )}

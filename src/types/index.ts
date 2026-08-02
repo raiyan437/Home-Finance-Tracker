@@ -7,7 +7,6 @@ export interface UserProfile {
   displayName: string;
   email: string;
   avatar?: string;
-  password?: string;
   houseId?: string | null;
   role?: HouseRole | null;
   createdAt: string;
@@ -28,6 +27,8 @@ export interface House {
   name: string;
   leaderUid: string;
   members: HouseMember[];
+  memberUids?: string[]; // Denormalized membership index used by Firestore rules
+  publicJoin?: boolean;
   createdAt: string;
 }
 
@@ -96,6 +97,7 @@ export interface Expense {
   isRecurring?: boolean;
   recurringFrequency?: RecurringFrequency;
   lastGeneratedDate?: string; // YYYY-MM-DD format of last generated recurring instance
+  recurringSourceId?: string; // Template expense ID for generated occurrences
   receiptUrl?: string; // Base64 data URL or photo link
   comments?: ExpenseComment[];
   notes?: string;

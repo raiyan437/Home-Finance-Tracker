@@ -1,4 +1,4 @@
-import { collection, onSnapshot, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, query, where, deleteField } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../config/firebase';
 import type { Expense, Settlement, PaymentCard, UserProfile, House } from '../types';
 
@@ -28,7 +28,8 @@ export const syncSaveUser = async (userProfile: UserProfile) => {
   if (!isFirebaseConfigured || !db) return;
   try {
     const docRef = doc(db, 'users', userProfile.uid);
-    await setDoc(docRef, sanitizeForFirestore(userProfile), { merge: true });
+    const { password: _removedPassword, ...safeProfile } = userProfile as UserProfile & { password?: string };
+    await setDoc(docRef, { ...sanitizeForFirestore(safeProfile), password: deleteField() }, { merge: true });
   } catch (err) {
     console.warn('Firestore save user fallback:', err);
   }
@@ -40,8 +41,18 @@ export const syncSaveUser = async (userProfile: UserProfile) => {
 export const syncSaveHouse = async (house: House) => {
   if (!isFirebaseConfigured || !db) return;
   try {
+    const normalizedHouse: House = {
+      ...house,
+      memberUids: house.members.map((member) => member.uid),
+      publicJoin: house.publicJoin !== false,
+    };
     const docRef = doc(db, 'houses', house.id);
-    await setDoc(docRef, sanitizeForFirestore(house), { merge: true });
+    await setDoc(docRef, sanitizeForFirestore(normalizedHouse), { merge: true });
+    await setDoc(
+      doc(db, 'houseCodes', house.code.toUpperCase()),
+      sanitizeForFirestore({ houseId: house.id, name: house.name, leaderUid: house.leaderUid }),
+      { merge: true }
+    );
   } catch (err) {
     console.warn('Firestore save house fallback:', err);
   }
@@ -63,7 +74,7 @@ export const subscribeHouse = (houseId: string, onUpdate: (house: House | null) 
       },
       (err) => console.warn('Firestore House Sync Warning:', err)
     );
-  } catch (err) {
+  } catch {
     return () => {};
   }
 };
@@ -96,6 +107,34 @@ export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void, house
     );
   } catch (err) {
     console.warn('Firestore Expenses init warning:', err);
+    return () => {};
+  }
+};
+
+/** Listens only to private expenses owned by the authenticated user. */
+export const subscribePersonalExpenses = (onUpdate: (expenses: Expense[]) => void, ownerId?: string | null) => {
+  if (!isFirebaseConfigured || !db) return () => {};
+  if (!ownerId) {
+    onUpdate([]);
+    return () => {};
+  }
+
+  try {
+    const q = query(collection(db, 'expenses'), where('ownerId', '==', ownerId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: Expense[] = [];
+        snapshot.forEach((snapshotDoc) => {
+          const expense = snapshotDoc.data() as Expense;
+          if (expense.scope === 'personal') list.push(expense);
+        });
+        onUpdate(list);
+      },
+      (err) => console.warn('Firestore Personal Expenses Sync Warning:', err)
+    );
+  } catch (err) {
+    console.warn('Firestore Personal Expenses init warning:', err);
     return () => {};
   }
 };
@@ -152,7 +191,7 @@ export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => vo
       },
       (err) => console.warn('Firestore Settlements Sync Warning:', err)
     );
-  } catch (err) {
+  } catch {
     return () => {};
   }
 };
@@ -214,20 +253,11 @@ export const subscribeCards = (
         snapshot.forEach((doc) => {
           list.push(doc.data() as PaymentCard);
         });
-        // If houseId query returns no cards, fallback to listening to all cards collection
-        if (houseId && list.length === 0) {
-          const unsubFallback = onSnapshot(colRef, (fullSnap) => {
-            const fullList: PaymentCard[] = [];
-            fullSnap.forEach((d) => fullList.push(d.data() as PaymentCard));
-            onUpdate(fullList);
-          });
-          return () => unsubFallback();
-        }
         onUpdate(list);
       },
       (err) => console.warn('Firestore Cards Sync Warning:', err)
     );
-  } catch (err) {
+  } catch {
     return () => {};
   }
 };

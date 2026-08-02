@@ -144,7 +144,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setSplitMethod(initialExpense.splitMethod || 'equal');
       setScope(fixedScope || initialExpense.scope || 'household');
       setPaymentType(initialExpense.paymentMethod?.type || 'cash');
-      setSelectedCardId(initialExpense.paymentMethod?.cardId || (payerCards[0]?.id || cards[0]?.id || ''));
+      setSelectedCardId(initialExpense.paymentMethod?.cardId || cards[0]?.id || '');
       setIsRecurring(Boolean(initialExpense.isRecurring));
       setRecurringFrequency(initialExpense.recurringFrequency || 'monthly');
       setReceiptUrl(initialExpense.receiptUrl || '');
@@ -202,7 +202,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setCustomSharesStr(customObj);
       setPercentagesStr(percObj);
     }
-  }, [isOpen, initialExpense, houseUsers, activeUserId, cards]);
+  }, [
+    isOpen,
+    initialExpense,
+    fixedScope,
+    isLeader,
+    allUserIds,
+    activeUserKey,
+    myUidInUsers,
+    cards,
+  ]);
 
   const toggleParticipant = (userId: UserId) => {
     if (selectedParticipants.includes(userId)) {
@@ -243,6 +252,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           if (parsed.title) setTitle((prev) => prev || parsed.title || '');
           if (parsed.date) setDate(parsed.date);
           if (parsed.amountCents) setAmountStr((parsed.amountCents / 100).toFixed(2));
+        } else {
+          setErrorMessage('Receipt text could not be read clearly. Please enter the details manually.');
         }
       };
       reader.readAsDataURL(file);

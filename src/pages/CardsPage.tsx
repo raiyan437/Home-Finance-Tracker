@@ -17,7 +17,7 @@ interface CardsManagerProps {
   lang?: Language;
 }
 
-export const CARD_COLOR_PRESETS = [
+const CARD_COLOR_PRESETS = [
   { name: 'Midnight Blue', value: 'linear-gradient(135deg, #1e3a8a, #3b82f6)' },
   { name: 'Emerald Green', value: 'linear-gradient(135deg, #065f46, #10b981)' },
   { name: 'Violet Glow', value: 'linear-gradient(135deg, #5b21b6, #8b5cf6)' },
