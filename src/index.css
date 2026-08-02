@@ -3431,6 +3431,59 @@ button.mobile-add-fab { border-radius: 18px !important; }
   .material-select__check { transition-duration: .01ms; }
 }
 
+/* House naming and profile-picture controls */
+.house-name-heading-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.house-name-heading {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+
+.house-name-edit-button {
+  min-height: 36px;
+  padding-inline: 14px;
+  color: var(--md-sys-color-on-secondary-container);
+  background: var(--md-sys-color-secondary-container);
+}
+
+.house-name-edit-button:hover {
+  color: var(--md-sys-color-on-secondary-container);
+  background: color-mix(in srgb, var(--md-sys-color-secondary-container) 84%, var(--md-sys-color-secondary));
+}
+
+.house-name-edit-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(100%, 580px);
+}
+
+.house-name-edit-input {
+  flex: 1 1 210px;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 1rem;
+}
+
+.profile-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .house-name-edit-form { width: 100%; }
+  .house-name-edit-input { flex-basis: 100%; }
+}
+
 @media (max-width: 767px) {
   .main-content { padding: 22px 16px 112px; }
   .page-title { font-size: 2rem; }

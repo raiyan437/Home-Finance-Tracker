@@ -50,6 +50,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
   // House Name Edit States
   const [isEditingHouseName, setIsEditingHouseName] = useState(false);
   const [newHouseNameInput, setNewHouseNameInput] = useState('');
+  const [isSavingHouseName, setIsSavingHouseName] = useState(false);
 
   const isLeader =
     Boolean(firebaseUser && currentHouse && currentHouse.leaderUid === firebaseUser.uid) ||
@@ -113,11 +114,14 @@ export const HousePage: React.FC<HouseViewProps> = () => {
     if (!newHouseNameInput.trim()) return;
 
     try {
+      setIsSavingHouseName(true);
       await updateHouseName(newHouseNameInput.trim());
       setSuccessMsg('House name updated successfully!');
       setIsEditingHouseName(false);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to update house name.');
+    } finally {
+      setIsSavingHouseName(false);
     }
   };
 
@@ -284,37 +288,42 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                   <Home size={26} />
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="house-name-heading-row">
                     {!isEditingHouseName ? (
-                      <h2 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.02em' }}>
-                        {currentHouse.name}
-                      </h2>
+                      <>
+                        <h2 className="house-name-heading">{currentHouse.name}</h2>
+                        {isLeader && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm house-name-edit-button"
+                            onClick={() => {
+                              setNewHouseNameInput(currentHouse.name);
+                              setIsEditingHouseName(true);
+                            }}
+                            title="Edit house name"
+                          >
+                            <Edit3 size={15} />
+                            <span>Edit name</span>
+                          </button>
+                        )}
+                      </>
                     ) : (
-                      <form onSubmit={handleSaveHouseName} style={{ display: 'flex', gap: '8px' }}>
+                      <form onSubmit={handleSaveHouseName} className="house-name-edit-form">
                         <input
                           type="text"
-                          className="form-input"
-                          style={{ padding: '6px 12px', fontSize: '1rem' }}
+                          className="form-input house-name-edit-input"
                           value={newHouseNameInput}
                           onChange={(e) => setNewHouseNameInput(e.target.value)}
                           required
+                          autoFocus
+                          disabled={isSavingHouseName}
                         />
-                        <button type="submit" className="btn btn-primary btn-sm">Save</button>
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditingHouseName(false)}>Cancel</button>
+                        <button type="submit" className="btn btn-primary btn-sm" disabled={isSavingHouseName}>
+                          <Check size={15} />
+                          <span>{isSavingHouseName ? 'Saving...' : 'Save'}</span>
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-sm" disabled={isSavingHouseName} onClick={() => setIsEditingHouseName(false)}>Cancel</button>
                       </form>
-                    )}
-
-                    {isLeader && !isEditingHouseName && (
-                      <button
-                        className="icon-btn"
-                        onClick={() => {
-                          setNewHouseNameInput(currentHouse.name);
-                          setIsEditingHouseName(true);
-                        }}
-                        title="Edit House Name"
-                      >
-                        <Edit3 size={15} />
-                      </button>
                     )}
                   </div>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>

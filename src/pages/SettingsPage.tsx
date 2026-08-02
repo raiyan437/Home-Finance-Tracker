@@ -4,7 +4,7 @@ import { UserAvatar } from '../components/UserAvatar';
 import { isFirebaseConfigured } from '../config/firebase';
 import { exportBackupJSON, importBackupJSON } from '../services/storage';
 import { requestNotificationPermission, getNotificationPermissionState, isNotificationSupported } from '../utils/notifications';
-import { saveAttachment } from '../services/attachments';
+import { prepareProfilePhoto, saveAttachment } from '../services/attachments';
 import { syncSaveCard, syncSaveExpense, syncSaveSettlement } from '../services/firebaseSync';
 import {
   LogOut,
@@ -18,6 +18,7 @@ import {
   KeyRound,
   Eye,
   EyeOff,
+  Trash2,
 } from 'lucide-react';
 
 import type { Language } from '../utils/i18n';
@@ -53,6 +54,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
 
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const hasProfilePhoto = Boolean(dbUserProfile?.avatar || firebaseUser?.photoURL);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,11 +70,27 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
     setSuccessMsg(null);
 
     try {
-      const photoUrl = await saveAttachment(file, 'avatars');
+      const optimizedPhoto = await prepareProfilePhoto(file);
+      const photoUrl = await saveAttachment(optimizedPhoto, 'avatars');
       await updateUserProfilePhoto(photoUrl);
       setSuccessMsg('Profile photo updated successfully!');
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to update profile photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setIsUploadingPhoto(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await updateUserProfilePhoto(null);
+      setSuccessMsg('Profile photo removed successfully.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to remove profile photo.');
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -251,11 +269,19 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
               {firebaseUser?.email || dbUserProfile?.email || 'Logged in account'}
             </p>
-            <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex' }}>
-              <Camera size={14} />
-              <span>{isUploadingPhoto ? 'Uploading...' : 'Change Profile Picture'}</span>
-              <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} disabled={isUploadingPhoto} />
-            </label>
+            <div className="profile-photo-actions">
+              <label className="btn btn-secondary btn-sm" style={{ cursor: isUploadingPhoto ? 'wait' : 'pointer', margin: 0, display: 'inline-flex' }}>
+                <Camera size={14} />
+                <span>{isUploadingPhoto ? 'Saving...' : 'Change Profile Picture'}</span>
+                <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} disabled={isUploadingPhoto} />
+              </label>
+              {hasProfilePhoto && (
+                <button type="button" className="btn btn-danger btn-sm" onClick={handleRemoveAvatar} disabled={isUploadingPhoto}>
+                  <Trash2 size={14} />
+                  <span>Remove Photo</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

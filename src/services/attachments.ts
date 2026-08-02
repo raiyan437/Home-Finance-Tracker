@@ -1,10 +1,11 @@
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { auth, fileStorage, isFirebaseConfigured } from '../config/firebase';
 import { createId } from '../utils/ids';
 
 export type AttachmentKind = 'avatars' | 'receipts' | 'settlement-proofs';
 const CLOUD_MAX_BYTES = 5 * 1024 * 1024;
 const OFFLINE_MAX_BYTES = 300 * 1024;
+const UPLOAD_TIMEOUT_MS = 20_000;
 
 const asDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -12,6 +13,70 @@ const asDataUrl = (file: File): Promise<string> => new Promise((resolve, reject)
   reader.onerror = () => reject(new Error('Unable to read the selected image.'));
   reader.readAsDataURL(file);
 });
+
+const uploadImageWithTimeout = async (path: string, file: File, ownerUid: string): Promise<string> => {
+  if (!fileStorage) throw new Error('Cloud storage is unavailable.');
+  const storageRef = ref(fileStorage, path);
+  const uploadTask = uploadBytesResumable(storageRef, file, {
+    contentType: file.type,
+    customMetadata: { ownerUid },
+  });
+
+  let timeoutId: number | undefined;
+  try {
+    await Promise.race([
+      uploadTask,
+      new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          uploadTask.cancel();
+          reject(new Error('Image upload timed out. Please check your connection and try again.'));
+        }, UPLOAD_TIMEOUT_MS);
+      }),
+    ]);
+    return await getDownloadURL(storageRef);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+};
+
+/** Downsizes profile photos before upload so mobile uploads remain quick and reliable. */
+export const prepareProfilePhoto = async (file: File): Promise<File> => {
+  if (!file.type.startsWith('image/')) throw new Error('Only image files can be used as profile pictures.');
+  if (file.size > CLOUD_MAX_BYTES) throw new Error('Image must be 5 MB or smaller.');
+
+  const imageUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      const timeoutId = window.setTimeout(() => reject(new Error('Unable to read the selected image.')), 10_000);
+      element.onload = () => {
+        window.clearTimeout(timeoutId);
+        resolve(element);
+      };
+      element.onerror = () => {
+        window.clearTimeout(timeoutId);
+        reject(new Error('Unable to read the selected image. Please choose a standard JPG, PNG, or WebP image.'));
+      };
+      element.src = imageUrl;
+    });
+
+    const maxDimension = 512;
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Unable to prepare the selected image.');
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Unable to prepare the selected image.')), 'image/webp', 0.84);
+    });
+    return new File([blob], 'profile-photo.webp', { type: 'image/webp' });
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+};
 
 export const saveAttachment = async (file: File, kind: AttachmentKind, houseId?: string): Promise<string> => {
   if (!file.type.startsWith('image/')) throw new Error('Only image attachments are supported.');
@@ -22,9 +87,7 @@ export const saveAttachment = async (file: File, kind: AttachmentKind, houseId?:
     const path = houseId
       ? `houses/${houseId}/${kind}/${createId('file')}.${extension}`
       : `users/${auth.currentUser.uid}/${kind}/${createId('file')}.${extension}`;
-    const storageRef = ref(fileStorage, path);
-    await uploadBytes(storageRef, file, { contentType: file.type, customMetadata: { ownerUid: auth.currentUser.uid } });
-    return getDownloadURL(storageRef);
+    return uploadImageWithTimeout(path, file, auth.currentUser.uid);
   }
 
   if (file.size > OFFLINE_MAX_BYTES) {

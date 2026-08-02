@@ -14,7 +14,7 @@ import {
   verifyLocalCredential,
 } from '../services/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, runTransaction, setDoc, deleteField } from 'firebase/firestore';
 import { syncSaveUser, syncSaveHouse, subscribeHouse, hasPendingLedgerMutations, sanitizeForFirestore } from '../services/firebaseSync';
 import {
   signInWithEmailAndPassword,
@@ -40,7 +40,7 @@ interface AuthContextType {
   switchProfile: (userId: UserId) => void;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
-  updateUserProfilePhoto: (avatarUrl: string) => Promise<void>;
+  updateUserProfilePhoto: (avatarUrl: string | null) => Promise<void>;
   changeUserPassword: (currentPass: string, newPass: string) => Promise<void>;
   logout: () => Promise<void>;
   createHouse: (houseName: string, customHouseCode?: string) => Promise<void>;
@@ -388,28 +388,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Update User Profile Photo Handler
-  const updateUserProfilePhoto = async (avatarUrl: string) => {
+  const updateUserProfilePhoto = async (avatarUrl: string | null) => {
     if (!dbUserProfile) throw new Error('You must be logged in to update profile photo.');
 
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {
       if (u.uid === dbUserProfile.uid) {
-        return { ...u, avatar: avatarUrl };
+        const { avatar: _previousAvatar, ...profileWithoutAvatar } = u;
+        return avatarUrl ? { ...profileWithoutAvatar, avatar: avatarUrl } : profileWithoutAvatar;
       }
       return u;
     });
     saveUsersDB(updatedUsers);
 
-    const updatedProfile = { ...dbUserProfile, avatar: avatarUrl };
+    const { avatar: _previousAvatar, ...profileWithoutAvatar } = dbUserProfile;
+    const updatedProfile = avatarUrl ? { ...profileWithoutAvatar, avatar: avatarUrl } : profileWithoutAvatar;
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
-    syncSaveUser(updatedProfile);
+
+    // Persist the avatar field directly so removal uses Firestore's deleteField
+    // sentinel instead of leaving an old photo behind after a merge write.
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'users', dbUserProfile.uid), {
+          avatar: avatarUrl ?? deleteField(),
+        }, { merge: true });
+      } catch (error) {
+        console.warn('Profile photo sync was queued for retry.', error);
+        void syncSaveUser(updatedProfile);
+      }
+    } else {
+      void syncSaveUser(updatedProfile);
+    }
 
     // Also update house member roster avatar across local storage & Cloud Firestore
     if (currentHouse && currentHouse.members) {
       const updatedMembers = currentHouse.members.map((m) => {
         if (m.uid === dbUserProfile.uid) {
-          return { ...m, avatar: avatarUrl };
+          const { avatar: _memberAvatar, ...memberWithoutAvatar } = m;
+          return avatarUrl ? { ...memberWithoutAvatar, avatar: avatarUrl } : memberWithoutAvatar;
         }
         return m;
       });
@@ -419,30 +436,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveHousesDB(updatedHouses);
       setCurrentHouse(updatedHouse);
       if (isFirebaseConfigured && db) {
-        await runTransaction(db, async (transaction) => {
+        // This denormalized roster update must never keep the profile-photo UI
+        // in a loading state; the user profile above remains the source of truth.
+        void runTransaction(db, async (transaction) => {
           const houseRef = doc(db!, 'houses', currentHouse.id);
           const snapshot = await transaction.get(houseRef);
           if (!snapshot.exists()) return;
           const latest = snapshot.data() as House;
-          const members = latest.members.map((member) =>
-            member.uid === dbUserProfile.uid ? { ...member, avatar: avatarUrl } : member
-          );
+          const members = latest.members.map((member) => {
+            if (member.uid !== dbUserProfile.uid) return member;
+            const { avatar: _memberAvatar, ...memberWithoutAvatar } = member;
+            return avatarUrl ? { ...memberWithoutAvatar, avatar: avatarUrl } : memberWithoutAvatar;
+          });
           transaction.update(houseRef, sanitizeForFirestore({
             members,
             memberMap: Object.fromEntries(members.map((member) => [member.uid, member])),
           }));
-        });
+        }).catch((error) => console.warn('House roster avatar sync will retry later.', error));
       } else {
-        syncSaveHouse(updatedHouse);
+        void syncSaveHouse(updatedHouse);
       }
     }
 
     if (auth?.currentUser) {
-      try {
-        await updateProfile(auth.currentUser, { photoURL: avatarUrl });
-      } catch (e) {
-        console.warn('Firebase profile photo update notice:', e);
-      }
+      void updateProfile(auth.currentUser, { photoURL: avatarUrl }).catch((error) => {
+        console.warn('Firebase Auth profile photo update notice:', error);
+      });
     }
   };
 

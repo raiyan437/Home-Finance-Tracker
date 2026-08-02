@@ -3,12 +3,12 @@ import type { Expense, UserId, Category, PaymentCard } from '../types';
 import { USERS, getHouseUsers } from '../features/settlementEngine';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
-import { exportAuditReportCsv } from '../features/exportCsv';
 import { UserAvatar } from '../components/UserAvatar';
 import { MaterialSelect } from '../components/MaterialSelect';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
-import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
+import { toLocalMonthKey } from '../utils/localDate';
+import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -43,7 +43,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   );
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState<string>('All');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => toLocalMonthKey());
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [selectedUserFilter, setSelectedUserFilter] = useState<UserId | 'All'>('All');
   const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<'All' | 'cash' | 'card'>('All');
@@ -52,7 +52,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
 
   const availableMonths = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>([toLocalMonthKey()]);
     expenses.forEach((e) => {
       if (e.date) {
         set.add(e.date.slice(0, 7));
@@ -75,7 +75,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   const filteredExpenses = useMemo(() => {
     return expenses
       .filter((exp) => {
-        if (selectedMonth !== 'All' && !exp.date.startsWith(selectedMonth)) {
+        if (!exp.date.startsWith(selectedMonth)) {
           return false;
         }
 
@@ -153,10 +153,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button className="btn btn-secondary" onClick={() => exportAuditReportCsv(expenses)}>
-            <Download size={16} />
-            <span>{getTranslation('exportCsv', lang)}</span>
-          </button>
+          {/* CSV export is intentionally disabled until the reporting workflow is ready. */}
           <button className="btn btn-primary" onClick={onOpenAddExpense}>
             <Plus size={18} />
             <span>Log Household Expense</span>
@@ -186,9 +183,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
             onChange={setSelectedMonth}
             ariaLabel="Filter by month"
             style={{ width: 'auto', minWidth: '170px' }}
-            options={[
-              { value: 'All', label: 'All Months' },
-              ...availableMonths.map((m) => {
+            options={availableMonths.map((m) => {
               const dateObj = new Date(m + '-01');
               const monthLabel = isNaN(dateObj.getTime())
                 ? m
@@ -197,8 +192,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                     year: 'numeric',
                   });
                 return { value: m, label: monthLabel };
-              }),
-            ]}
+              })}
           />
 
           {/* Category Filter */}
