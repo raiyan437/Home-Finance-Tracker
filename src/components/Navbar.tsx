@@ -30,8 +30,6 @@ import {
 
 export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'house' | 'settings';
 
-export type AccentColor = 'charcoal' | 'midnight' | 'emerald' | 'amber';
-
 interface NavbarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;

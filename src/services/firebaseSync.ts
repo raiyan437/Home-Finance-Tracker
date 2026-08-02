@@ -341,9 +341,6 @@ export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => vo
   }
 };
 
-export const subscribeToExpenses = subscribeExpenses;
-export const subscribeToSettlements = subscribeSettlements;
-
 /**
  * Saves a settlement in Firestore.
  */

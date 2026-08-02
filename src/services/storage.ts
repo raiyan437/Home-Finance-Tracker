@@ -102,34 +102,6 @@ export const saveCards = (cards: PaymentCard[], scope?: string): void => {
   }
 };
 
-export const clearAllFinancialData = (houseScope?: string, userScope?: string): void => {
-  if (houseScope) {
-    localStorage.setItem(scopedKey(EXPENSES_STORAGE_KEY, houseScope), JSON.stringify([]));
-    localStorage.setItem(scopedKey(SETTLEMENTS_STORAGE_KEY, houseScope), JSON.stringify([]));
-  }
-  if (userScope) {
-    localStorage.setItem(scopedKey(EXPENSES_STORAGE_KEY, userScope), JSON.stringify([]));
-    localStorage.setItem(scopedKey(CARDS_STORAGE_KEY, userScope), JSON.stringify([]));
-    const userId = userScope.startsWith('personal:') ? userScope.slice('personal:'.length) : userScope;
-    localStorage.removeItem(`home_finance_personal_budget_v1_${userId}`);
-    localStorage.removeItem(`home_finance_category_budgets_v1_${userId}`);
-  }
-  if (!houseScope && !userScope) {
-    localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify([]));
-    localStorage.setItem(SETTLEMENTS_STORAGE_KEY, JSON.stringify([]));
-    localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify([]));
-  }
-  if (!userScope) {
-    localStorage.removeItem('home_finance_personal_budget_v1');
-    localStorage.removeItem('home_finance_category_budgets_v1');
-  }
-};
-
-export const resetToSeedData = (): { expenses: Expense[]; settlements: Settlement[]; cards: PaymentCard[] } => {
-  clearAllFinancialData();
-  return { expenses: [], settlements: [], cards: [] };
-};
-
 export interface BackupDataPayload {
   version: string;
   exportedAt: string;

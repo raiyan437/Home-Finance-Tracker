@@ -8,12 +8,6 @@ export const dollarsToCents = (takaStr: number | string): number => {
   return Math.round(parsed * 100);
 };
 
-export const takaToCents = dollarsToCents;
-
-export const centsToDollars = (cents: number): number => {
-  return cents / 100;
-};
-
 export const toBengaliDigits = (str: string): string => {
   const bnDigits: Record<string, string> = {
     '0': '০',
