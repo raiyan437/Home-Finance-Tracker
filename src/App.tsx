@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import type { TabType } from './components/Navbar';
@@ -25,9 +25,12 @@ import {
   loadCards,
   saveCards,
   clearAllFinancialData,
+  houseStorageScope,
+  personalStorageScope,
 } from './services/storage';
 import {
   subscribeExpenses,
+  subscribePersonalExpenses,
   subscribeSettlements,
   subscribeCards,
   syncSaveExpense,
@@ -38,6 +41,7 @@ import {
   syncDeleteCard,
 } from './services/firebaseSync';
 import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from './features/settlementEngine';
+import { generateDueRecurringExpenses, localDateKey } from './features/recurringEngine';
 
 // Code-split heavy views for instant page loads
 const MonthlyPage = lazy(() =>
@@ -58,12 +62,26 @@ const HousePage = lazy(() =>
 
 const VALID_TABS: TabType[] = ['dashboard', 'expenses', 'settlement', 'personal', 'cards', 'monthly', 'house', 'settings'];
 
+const getBasePath = (): string => {
+  if (typeof window === 'undefined') return '';
+  if (window.location.hostname.endsWith('github.io')) {
+    const firstSegment = window.location.pathname.split('/').filter(Boolean)[0];
+    return firstSegment ? `/${firstSegment}` : '';
+  }
+  return '';
+};
+
+const getPathForTab = (tab: TabType): string => {
+  const basePath = getBasePath();
+  return tab === 'dashboard' ? `${basePath}/` : `${basePath}/${tab}`;
+};
+
 const getTabFromPath = (): TabType | 'notfound' => {
   // Backward compatibility: If user visits an old hash link (e.g. /#/expenses), clean it to /expenses
   if (typeof window !== 'undefined' && window.location.hash) {
     const rawHash = window.location.hash.replace('#', '').replace('/', '').trim().toLowerCase() as TabType;
     if (VALID_TABS.includes(rawHash)) {
-      const cleanPath = rawHash === 'dashboard' ? '/' : `/${rawHash}`;
+      const cleanPath = getPathForTab(rawHash);
       window.history.replaceState({}, '', cleanPath);
       return rawHash;
     }
@@ -71,7 +89,12 @@ const getTabFromPath = (): TabType | 'notfound' => {
 
   if (typeof window === 'undefined') return 'dashboard';
 
-  const pathname = window.location.pathname.replace(/^\/+/, '').trim().toLowerCase();
+  const basePath = getBasePath();
+  const pathname = window.location.pathname
+    .slice(basePath.length)
+    .replace(/^\/+/, '')
+    .trim()
+    .toLowerCase();
   if (!pathname || pathname === 'dashboard' || pathname === 'index.html') {
     return 'dashboard';
   }
@@ -83,6 +106,24 @@ const getTabFromPath = (): TabType | 'notfound' => {
 
 const AppContent: React.FC = () => {
   const { activeUserId, currentHouse, isAuthenticated, dbUserProfile, loading } = useAuth();
+  const currentUserId = dbUserProfile?.uid || activeUserId;
+  const currentHouseScope = currentHouse?.id ? houseStorageScope(currentHouse.id) : undefined;
+  const currentPersonalScope = personalStorageScope(currentUserId);
+
+  const persistExpenses = useCallback((allExpenses: Expense[]) => {
+    if (currentHouseScope && currentHouse?.id) {
+      saveExpenses(
+        allExpenses.filter((expense) => expense.scope !== 'personal' && expense.houseId === currentHouse.id),
+        currentHouseScope
+      );
+    }
+    saveExpenses(
+      allExpenses.filter(
+        (expense) => expense.scope === 'personal' && expense.ownerId === currentUserId
+      ),
+      currentPersonalScope
+    );
+  }, [currentHouse?.id, currentHouseScope, currentPersonalScope, currentUserId]);
 
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [activeTab, setActiveTabState] = useState<TabType | 'notfound'>(getTabFromPath);
@@ -94,7 +135,7 @@ const AppContent: React.FC = () => {
 
   const handleTabChange = (nextTab: TabType) => {
     setActiveTabState(nextTab);
-    const targetPath = nextTab === 'dashboard' ? '/' : `/${nextTab}`;
+    const targetPath = getPathForTab(nextTab);
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
@@ -136,13 +177,82 @@ const AppContent: React.FC = () => {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
-  const [pendingSettlementTx, setPendingSettlementTx] = useState<SimplifiedTransaction | null>(null);
 
   // Initialize data, theme, accent, and Firestore realtime subscriptions
   useEffect(() => {
-    setExpenses(loadExpenses());
-    setSettlements(loadSettlements());
-    setCards(loadCards());
+    let cachedHouseExpenses = currentHouseScope ? loadExpenses(currentHouseScope) : [];
+    let cachedPersonalExpenses = loadExpenses(currentPersonalScope);
+    let cachedSettlements = currentHouseScope ? loadSettlements(currentHouseScope) : [];
+    const cachedCards = loadCards(currentPersonalScope);
+
+    // One-time migration for records created before houseId/ownerId scoping was introduced.
+    const migrationKey = `home_finance_scope_migrated_v4_${currentHouse?.id || 'no-house'}_${currentUserId}`;
+    if (localStorage.getItem(migrationKey) !== 'true') {
+      const legacyExpenses = loadExpenses();
+      const legacySettlements = loadSettlements();
+      const memberIdentitySet = new Set(
+        (currentHouse?.members || []).flatMap((member) => [
+          member.uid.toLowerCase(),
+          member.displayName.toLowerCase(),
+          member.email.toLowerCase(),
+          member.email.split('@')[0].toLowerCase(),
+        ])
+      );
+      const identityBelongsToHouse = (identity: string) => memberIdentitySet.has(identity.toLowerCase().trim());
+
+      if (currentHouse?.id) {
+        const migratedHouseExpenses = legacyExpenses
+          .filter(
+            (expense) =>
+              expense.scope !== 'personal' &&
+              !expense.houseId &&
+              identityBelongsToHouse(expense.paidBy) &&
+              expense.shares.every((share) => identityBelongsToHouse(share.userId))
+          )
+          .map((expense) => ({ ...expense, scope: 'household' as const, houseId: currentHouse.id }));
+        const migratedSettlements = legacySettlements
+          .filter(
+            (settlement) =>
+              !settlement.houseId &&
+              identityBelongsToHouse(settlement.fromUserId) &&
+              identityBelongsToHouse(settlement.toUserId)
+          )
+          .map((settlement) => ({ ...settlement, houseId: currentHouse.id }));
+        cachedHouseExpenses = [...migratedHouseExpenses, ...cachedHouseExpenses];
+        cachedSettlements = [...migratedSettlements, ...cachedSettlements];
+        migratedHouseExpenses.forEach((expense) => syncSaveExpense(expense, currentHouse.id));
+        migratedSettlements.forEach((settlement) => syncSaveSettlement(settlement, currentHouse.id));
+      }
+
+      const migratedPersonalExpenses = legacyExpenses
+        .filter(
+          (expense) =>
+            expense.scope === 'personal' &&
+            (expense.ownerId === currentUserId || expense.ownerId === activeUserId || expense.paidBy === currentUserId || expense.paidBy === activeUserId)
+        )
+        .map((expense) => ({
+          ...expense,
+          id: expense.ownerId === currentUserId ? expense.id : `migrated-${currentUserId}-${expense.id}`,
+          ownerId: currentUserId,
+          paidBy: currentUserId,
+          houseId: undefined,
+        }));
+      cachedPersonalExpenses = [...migratedPersonalExpenses, ...cachedPersonalExpenses];
+      migratedPersonalExpenses.forEach((expense) => syncSaveExpense(expense));
+      localStorage.setItem(migrationKey, 'true');
+    }
+
+    const publishExpenses = () => {
+      const deduplicated = new Map<string, Expense>();
+      [...cachedHouseExpenses, ...cachedPersonalExpenses].forEach((expense) => deduplicated.set(expense.id, expense));
+      const combined = Array.from(deduplicated.values());
+      setExpenses(combined);
+      persistExpenses(combined);
+    };
+
+    publishExpenses();
+    setSettlements(cachedSettlements);
+    setCards(cachedCards);
 
     const savedTheme = (localStorage.getItem('home_finance_theme') as 'dark' | 'light') || 'dark';
     setTheme(savedTheme);
@@ -152,81 +262,59 @@ const AppContent: React.FC = () => {
 
     // Subscribe to Firestore Realtime Updates when available
     const unsubExp = subscribeExpenses((fbExpenses) => {
-      setExpenses(fbExpenses);
-      saveExpenses(fbExpenses);
+      cachedHouseExpenses = fbExpenses.filter((expense) => expense.scope !== 'personal');
+      publishExpenses();
     }, houseId);
+
+    const unsubPersonalExp = subscribePersonalExpenses((fbExpenses) => {
+      cachedPersonalExpenses = fbExpenses;
+      publishExpenses();
+    }, currentUserId);
 
     const unsubSt = subscribeSettlements((fbSettlements) => {
       setSettlements(fbSettlements);
-      saveSettlements(fbSettlements);
+      cachedSettlements = fbSettlements;
+      if (currentHouseScope) saveSettlements(fbSettlements, currentHouseScope);
     }, houseId);
 
     const cardOwnerId = dbUserProfile?.uid || activeUserId;
     const unsubCards = subscribeCards(
       (fbCards) => {
         setCards(fbCards);
-        saveCards(fbCards);
+        saveCards(fbCards, currentPersonalScope);
       },
-      houseId,
+      null,
       cardOwnerId
     );
 
     return () => {
       unsubExp();
+      unsubPersonalExp();
       unsubSt();
       unsubCards();
     };
-  }, [currentHouse?.id, dbUserProfile?.uid, activeUserId]);
+  }, [currentHouse?.id, currentHouse?.members, currentHouseScope, currentPersonalScope, currentUserId, activeUserId, dbUserProfile?.uid, persistExpenses]);
 
-  // Automated Recurring Expense Generator Engine (runs once per session on mount)
+  // Generate every due occurrence exactly once using deterministic IDs.
   useEffect(() => {
     if (expenses.length === 0) return;
-    const todayStr = new Date().toISOString().split('T')[0];
-    const newGeneratedExpenses: Expense[] = [];
-    const processedParentIds = new Set<string>();
-
-    expenses.forEach((exp) => {
-      if (!exp.isRecurring) return;
-      if (processedParentIds.has(exp.id)) return;
-      processedParentIds.add(exp.id);
-
-      const lastGen = exp.lastGeneratedDate || exp.date;
-      const freq = exp.recurringFrequency || 'monthly';
-
-      const lastDateObj = new Date(lastGen);
-      if (isNaN(lastDateObj.getTime())) return;
-
-      const nextDateObj = new Date(lastDateObj);
-      if (freq === 'weekly') {
-        nextDateObj.setDate(nextDateObj.getDate() + 7);
-      } else {
-        nextDateObj.setMonth(nextDateObj.getMonth() + 1);
-      }
-
-      const nextDateStr = nextDateObj.toISOString().split('T')[0];
-      if (nextDateStr <= todayStr && lastGen !== todayStr) {
-        const now = new Date().toISOString();
-        const cloned: Expense = {
-          ...exp,
-          id: `exp-recur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          date: nextDateStr,
-          lastGeneratedDate: nextDateStr,
-          createdAt: now,
-          updatedAt: now,
-        };
-        exp.lastGeneratedDate = nextDateStr;
-        newGeneratedExpenses.push(cloned);
-      }
-    });
-
-    if (newGeneratedExpenses.length > 0) {
-      const updated = [...newGeneratedExpenses, ...expenses];
-      setExpenses(updated);
-      saveExpenses(updated);
-      newGeneratedExpenses.forEach((e) => syncSaveExpense(e, currentHouse?.id));
+    const result = generateDueRecurringExpenses(
+      expenses,
+      localDateKey(),
+      new Date().toISOString(),
+      (template) =>
+        template.scope === 'personal' ||
+        template.paidBy === currentUserId ||
+        dbUserProfile?.role === 'leader'
+    );
+    if (result.generated.length > 0 || result.updatedTemplates.length > 0) {
+      setExpenses(result.expenses);
+      persistExpenses(result.expenses);
+      [...result.generated, ...result.updatedTemplates].forEach((expense) =>
+        syncSaveExpense(expense, expense.scope === 'personal' ? undefined : expense.houseId || currentHouse?.id)
+      );
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentHouse?.id]);
+  }, [expenses, currentHouse?.id, currentUserId, dbUserProfile?.role, persistExpenses]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -242,34 +330,23 @@ const AppContent: React.FC = () => {
   // Filter household expenses (shared scope) vs personal expenses (private scope)
   const householdExpenses = useMemo(() => {
     if (!currentHouse?.id) return [];
-    const myUid = dbUserProfile?.uid || activeUserId;
-    const memberUids = currentHouse.members?.map((m) => m.uid) || [myUid];
 
     return expenses.filter((e) => {
       const isHousehold = !e.scope || e.scope === 'household';
       if (!isHousehold) return false;
 
-      if (e.houseId === currentHouse.id) return true;
-      const isMemberPayer = memberUids.includes(e.paidBy) || memberUids.some((uid) => e.paidBy?.toLowerCase() === uid.toLowerCase());
-      const isMemberShare = e.shares && e.shares.some((s) => memberUids.includes(s.userId));
-      return isMemberPayer || isMemberShare;
+      return e.houseId === currentHouse.id;
     });
-  }, [expenses, currentHouse, activeUserId, dbUserProfile]);
+  }, [expenses, currentHouse]);
 
   const houseSettlements = useMemo(() => {
     if (!currentHouse?.id) return [];
-    const myUid = dbUserProfile?.uid || activeUserId;
-    const memberUids = currentHouse.members?.map((m) => m.uid) || [myUid];
-
-    return settlements.filter((s) => {
-      if ((s as any).houseId === currentHouse.id) return true;
-      return memberUids.includes(s.fromUserId) || memberUids.includes(s.toUserId);
-    });
-  }, [settlements, currentHouse, activeUserId, dbUserProfile]);
+    return settlements.filter((settlement) => settlement.houseId === currentHouse.id);
+  }, [settlements, currentHouse]);
 
   const personalExpenses = useMemo(() => {
-    return expenses.filter((e) => e.scope === 'personal' && (e.ownerId === activeUserId || e.paidBy === activeUserId));
-  }, [expenses, activeUserId]);
+    return expenses.filter((e) => e.scope === 'personal' && e.ownerId === currentUserId);
+  }, [expenses, currentUserId]);
 
   const userCards = useMemo(() => {
     const myUid = dbUserProfile?.uid || activeUserId;
@@ -323,7 +400,7 @@ const AppContent: React.FC = () => {
     }
 
     setExpenses(updatedExpenses);
-    saveExpenses(updatedExpenses);
+    persistExpenses(updatedExpenses);
     syncSaveExpense(targetExpense, isPersonal ? undefined : currentHouse?.id);
     notifyNewExpense(targetExpense.title, formatCurrency(targetExpense.amountCents), dbUserProfile?.displayName || activeUserId);
   };
@@ -333,7 +410,7 @@ const AppContent: React.FC = () => {
     if (!deletingExpenseId) return;
     const updated = expenses.filter((e) => e.id !== deletingExpenseId);
     setExpenses(updated);
-    saveExpenses(updated);
+    persistExpenses(updated);
     syncDeleteExpense(deletingExpenseId);
     setDeletingExpenseId(null);
   };
@@ -363,7 +440,7 @@ const AppContent: React.FC = () => {
     });
 
     setExpenses(updated);
-    saveExpenses(updated);
+    persistExpenses(updated);
     if (updatedExp) {
       syncSaveExpense(updatedExp, currentHouse?.id);
     }
@@ -386,7 +463,7 @@ const AppContent: React.FC = () => {
     });
 
     setExpenses(updated);
-    saveExpenses(updated);
+    persistExpenses(updated);
     if (updatedExp) {
       syncSaveExpense(updatedExp, currentHouse?.id);
     }
@@ -415,7 +492,7 @@ const AppContent: React.FC = () => {
     }
 
     setCards(updatedCards);
-    saveCards(updatedCards);
+    saveCards(updatedCards, currentPersonalScope);
     syncSaveCard(targetCard, currentHouse?.id);
   };
 
@@ -423,7 +500,7 @@ const AppContent: React.FC = () => {
   const handleDeleteCard = (cardId: string) => {
     const updatedCards = cards.filter((c) => c.id !== cardId);
     setCards(updatedCards);
-    saveCards(updatedCards);
+    saveCards(updatedCards, currentPersonalScope);
     syncDeleteCard(cardId);
 
     // Scrub or switch linked expenses to cash
@@ -441,33 +518,30 @@ const AppContent: React.FC = () => {
     });
 
     setExpenses(updatedExpenses);
-    saveExpenses(updatedExpenses);
+    persistExpenses(updatedExpenses);
   };
 
   // Mark Settlement as Paid handler
-  const handleMarkSettledConfirm = (proofUrl?: string) => {
-    if (!pendingSettlementTx) return;
-
+  const handleMarkSettledConfirm = (transaction: SimplifiedTransaction, proofUrl?: string) => {
     const now = new Date().toISOString();
     const newSettlement: Settlement = {
       id: `set-${Date.now()}`,
-      fromUserId: pendingSettlementTx.fromUser.id,
-      toUserId: pendingSettlementTx.toUser.id,
-      amountCents: pendingSettlementTx.amountCents,
+      fromUserId: transaction.fromUser.id,
+      toUserId: transaction.toUser.id,
+      amountCents: transaction.amountCents,
       status: 'completed',
       proofUrl,
       houseId: currentHouse?.id,
       createdAt: now,
       settledAt: now,
-      notes: `Direct settlement between ${pendingSettlementTx.fromUser.name} and ${pendingSettlementTx.toUser.name}`,
+      notes: `Direct settlement between ${transaction.fromUser.name} and ${transaction.toUser.name}`,
     };
 
     const updatedSettlements = [newSettlement, ...settlements];
     setSettlements(updatedSettlements);
-    saveSettlements(updatedSettlements);
+    if (currentHouseScope) saveSettlements(updatedSettlements, currentHouseScope);
     syncSaveSettlement(newSettlement, currentHouse?.id);
-    notifyPendingSettlement(pendingSettlementTx.fromUser.name, pendingSettlementTx.toUser.name, formatCurrency(pendingSettlementTx.amountCents));
-    setPendingSettlementTx(null);
+    notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
   };
 
   // Reverse Settlement Handler
@@ -480,7 +554,7 @@ const AppContent: React.FC = () => {
           ...st,
           status: 'reversed' as const,
           reversedAt: now,
-          reversedBy: activeUserId,
+          reversedBy: currentUserId,
         };
         return targetSt;
       }
@@ -488,7 +562,7 @@ const AppContent: React.FC = () => {
     });
 
     setSettlements(updated);
-    saveSettlements(updated);
+    if (currentHouseScope) saveSettlements(updated, currentHouseScope);
     if (targetSt) {
       syncSaveSettlement(targetSt, currentHouse?.id);
     }
@@ -498,7 +572,7 @@ const AppContent: React.FC = () => {
   const handleClearSettlements = () => {
     settlements.forEach((s) => syncDeleteSettlement(s.id));
     setSettlements([]);
-    saveSettlements([]);
+    if (currentHouseScope) saveSettlements([], currentHouseScope);
   };
 
   // Reset Data handler — clears financial data only, preserves user accounts and house membership
@@ -507,7 +581,7 @@ const AppContent: React.FC = () => {
     settlements.forEach((s) => syncDeleteSettlement(s.id));
     cards.forEach((c) => syncDeleteCard(c.id));
 
-    clearAllFinancialData();
+    clearAllFinancialData(currentHouseScope, currentPersonalScope);
 
     setExpenses([]);
     setSettlements([]);
@@ -633,7 +707,7 @@ const AppContent: React.FC = () => {
             <SettlementPage
               expenses={householdExpenses}
               settlements={houseSettlements}
-              onMarkSettled={(tx: SimplifiedTransaction) => setPendingSettlementTx(tx)}
+              onMarkSettled={handleMarkSettledConfirm}
               onReverseSettlement={handleReverseSettlement}
               onClearSettlements={handleClearSettlements}
               lang={lang}
@@ -712,21 +786,6 @@ const AppContent: React.FC = () => {
         onClose={() => setIsResetConfirmOpen(false)}
       />
 
-      {/* Mark Settled Confirm Modal */}
-      <ConfirmModal
-        isOpen={!!pendingSettlementTx}
-        title="Mark Settlement as Paid"
-        message={
-          pendingSettlementTx
-            ? `Confirm that ${pendingSettlementTx.fromUser.name} paid ${pendingSettlementTx.toUser.name} ৳${(
-                pendingSettlementTx.amountCents / 100
-              ).toFixed(2)}? This will update current net balances.`
-            : ''
-        }
-        confirmText="Confirm Payment"
-        onConfirm={() => handleMarkSettledConfirm()}
-        onClose={() => setPendingSettlementTx(null)}
-      />
     </div>
   );
 };

@@ -45,7 +45,7 @@ When making any code modifications, **ALWAYS** enforce these rules:
 
 * **Frontend**: React 19, TypeScript, Vite 8 (Rolldown bundler), Vanilla CSS Design System (Midnight Slate theme)
 * **Routing**: HTML5 History API (`pushState`, `popstate`) + `vercel.json` SPA rewrites
-* **Database & Auth**: Firebase Auth + Cloud Firestore Realtime Listeners (`onSnapshot` WebSockets) with `localStorage` offline fallback
+* **Database & Auth**: Firebase Auth + Cloud Firestore owner/house-scoped realtime listeners with partitioned `localStorage` offline fallback
 * **Icons**: `lucide-react`
 * **Build Verification**:
   ```powershell
@@ -54,6 +54,9 @@ When making any code modifications, **ALWAYS** enforce these rules:
   
   # Typecheck
   npx tsc --noEmit
+
+  # Automated business-logic tests
+  npm test
   
   # Production Build
   npm run build
@@ -91,7 +94,7 @@ d:/Others/Google Antigravity/Home Finance/
     ├── features/               # Isolated domain logic engines
     │   ├── settlementEngine.ts # Integer cent math, greedy minimum cash flow solver (N^2 -> N-1 transfers)
     │   ├── exportCsv.ts        # Client-side CSV report generator
-    │   └── ocrScanner.ts       # HTML5 Canvas receipt photo OCR parser
+    │   └── ocrScanner.ts       # Lazily loaded Tesseract.js receipt OCR parser
     ├── pages/                  # Top-level view pages
     │   ├── DashboardPage.tsx   # 2-column hero overview, net balances, all-time & monthly metrics, debt action cards
     │   ├── ExpenseListPage.tsx # Transaction ledger, category/payer filters, search, New-to-Old / Old-to-New sort selector
@@ -104,8 +107,8 @@ d:/Others/Google Antigravity/Home Finance/
     │   ├── LoginPage.tsx & SignUpPage.tsx # Standalone authentication views
     │   └── NotFoundPage.tsx    # Clean 404 error page with dashboard return CTA
     ├── services/               # Data persistence layer
-    │   ├── firebaseSync.ts     # Cloud Firestore realtime WebSocket snapshot listeners & sanitizers
-    │   ├── storage.ts          # LocalStorage offline fallback & export/import persistence
+    │   ├── firebaseSync.ts     # House/owner-scoped Firestore listeners & sanitizers
+    │   ├── storage.ts          # Household/user-partitioned offline cache & backups
     │   └── mockAuthDatabase.ts # Session database drivers
     ├── types/
     │   └── index.ts            # Strongly typed contracts (Expense, Settlement, PaymentCard, House, UserProfile)
@@ -149,6 +152,7 @@ npm run dev
 ### How to Verify Changes Before Pushing:
 ```powershell
 npx tsc --noEmit
+npm test
 npm run build
 ```
 
@@ -158,14 +162,14 @@ git add .
 git commit -m "feat: your concise feature description"
 git push origin main
 ```
-*Note: Vercel automatically deploys every commit pushed to `main`.*
+*Note: Vercel automatically deploys every commit pushed to `main`. Deploy Firestore rules separately with `npm run deploy:rules`.*
 
 ---
 
 ## 7. Outstanding Extension Points / Future Roadmap
 
 1. **Modularize `AuthContext.tsx`**: Extract house-specific state (`currentHouse`, `createHouse`, `transferLeadership`) into a dedicated `HouseContext` or `useHouse` hook.
-2. **Client-Side Tesseract.js OCR**: Upgrade `ocrScanner.ts` to full Tesseract worker parsing for auto-filling total prices directly from uploaded receipt photos.
+2. **OCR Language Expansion**: Add Bengali language data and receipt-specific preprocessing to the existing Tesseract.js scanner.
 3. **Printable PDF Export**: Add PDF monthly statement download alongside CSV export.
 4. **FCM Push Notifications**: Register Firebase Cloud Messaging Service Worker for background push notifications on debt settlements.
 

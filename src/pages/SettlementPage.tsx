@@ -12,7 +12,7 @@ import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Im
 interface SettlementViewProps {
   expenses: Expense[];
   settlements: Settlement[];
-  onMarkSettled: (transaction: SimplifiedTransaction) => void;
+  onMarkSettled: (transaction: SimplifiedTransaction, proofUrl?: string) => void;
   onReverseSettlement?: (settlementId: string) => void;
   onClearSettlements?: () => void;
   lang?: Language;
@@ -390,7 +390,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  onMarkSettled({ ...confirmingTx, proofUrl: proofUrl || undefined } as any);
+                  onMarkSettled(confirmingTx, proofUrl || undefined);
                   setConfirmingTx(null);
                 }}
               >

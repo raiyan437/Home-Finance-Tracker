@@ -80,12 +80,12 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
             title="Print or Save PDF Financial Statement"
           >
             <Printer size={16} />
-            <span>Download Statement PDF</span>
+            <span>Print / Save as PDF</span>
           </button>
 
           <button
             className="btn btn-secondary no-print"
-            onClick={() => exportAuditReportCsv(monthExpenses, settlements, `report_${selectedMonth}.csv`)}
+            onClick={() => exportAuditReportCsv(monthExpenses, monthSettlements, `report_${selectedMonth}.csv`)}
             title="Download CSV Audit Report"
           >
             <Download size={16} />

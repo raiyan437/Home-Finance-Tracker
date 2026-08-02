@@ -186,11 +186,16 @@ export const calculateSimplifiedSettlements = (
   userBalances: Record<UserId, UserBalance>,
   activeUsers: User[] = ALL_USERS
 ): SimplifiedTransaction[] => {
-  if (!activeUsers || activeUsers.length < 2) {
+  const includedUsers = [...activeUsers];
+  Object.values(userBalances).forEach((balance) => {
+    if (!includedUsers.some((user) => user.id === balance.user.id)) includedUsers.push(balance.user);
+  });
+
+  if (includedUsers.length < 2) {
     return [];
   }
 
-  const balances: { userId: UserId; user: User; net: number }[] = activeUsers.map((u) => ({
+  const balances: { userId: UserId; user: User; net: number }[] = includedUsers.map((u) => ({
     userId: u.id,
     user: u,
     net: userBalances[u.id]?.netBalanceCents || 0,
