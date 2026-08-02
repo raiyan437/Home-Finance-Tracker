@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
+import { ConfirmModal } from './ConfirmModal';
 import { getTranslation } from '../utils/i18n';
 import type { Language } from '../utils/i18n';
 import {
@@ -64,6 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { userProfile, dbUserProfile, firebaseUser, currentHouse, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const t = (key: Parameters<typeof getTranslation>[0]) => getTranslation(key, lang);
 
   useEffect(() => {
@@ -79,8 +81,12 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
   }, [isMobileMenuOpen]);
 
-  const handleLogoutClick = async () => {
+  const handleLogoutClick = () => {
     setIsMobileMenuOpen(false);
+    setIsLogoutConfirmOpen(true);
+  };
+
+  const handleConfirmLogout = async () => {
     await logout();
   };
 
@@ -449,6 +455,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </section>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={isLogoutConfirmOpen}
+        title="Log out of Home Finance?"
+        message="You will return to the sign-in screen. Your household data and saved records will remain safe."
+        confirmText="Log out"
+        variant="primary"
+        onConfirm={handleConfirmLogout}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+      />
     </>
   );
 };

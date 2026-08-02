@@ -585,7 +585,7 @@ const AppContent: React.FC = () => {
     if (authView === 'signup') {
       return <SignUpPage onSwitchToLogin={() => setAuthView('login')} />;
     }
-    return <LoginPage onSwitchToSignUp={() => setAuthView('signup')} />;
+    return <LoginPage onSwitchToSignUp={() => setAuthView('signup')} onLoginSuccess={() => handleTabChange('dashboard')} />;
   }
 
   return (

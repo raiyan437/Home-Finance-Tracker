@@ -270,10 +270,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         firebaseUid = userCred.user.uid;
       } catch (fbErr: any) {
         setLoading(false);
-        if (fbErr?.code === 'auth/network-request-failed') {
-          throw new Error('Unable to reach Firebase. Check your connection and try again.');
+        switch (fbErr?.code) {
+          case 'auth/invalid-email':
+            throw new Error('Enter a valid email address.');
+          case 'auth/network-request-failed':
+            throw new Error('Unable to reach the sign-in service. Check your connection and try again.');
+          case 'auth/too-many-requests':
+            throw new Error('Too many sign-in attempts. Please wait a few minutes before trying again.');
+          case 'auth/user-disabled':
+            throw new Error('This account has been disabled. Please contact the household administrator.');
+          case 'auth/invalid-credential':
+          case 'auth/wrong-password':
+          case 'auth/user-not-found':
+            throw new Error('The email or password is incorrect. Please try again.');
+          default:
+            throw new Error('Sign-in could not be completed right now. Please try again.');
         }
-        throw new Error('Invalid email or password. Please verify your credentials or Sign Up.');
       }
     }
 

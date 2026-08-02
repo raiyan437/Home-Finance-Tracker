@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -7,7 +7,7 @@ interface ConfirmModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onClose: () => void;
   variant?: 'danger' | 'primary';
 }
@@ -22,7 +22,10 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onClose,
   variant = 'primary',
 }) => {
+  const [isConfirming, setIsConfirming] = useState(false);
+
   useEffect(() => {
+    if (!isOpen) setIsConfirming(false);
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       const handleEscape = (event: KeyboardEvent) => {
@@ -42,6 +45,16 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    setIsConfirming(true);
+    try {
+      await onConfirm();
+      onClose();
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -63,17 +76,15 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-          <button className="btn btn-secondary" onClick={onClose}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={isConfirming}>
             {cancelText}
           </button>
           <button
             className={`btn ${variant === 'danger' ? 'btn-danger' : 'btn-primary'}`}
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
+            onClick={handleConfirm}
+            disabled={isConfirming}
           >
-            {confirmText}
+            {isConfirming ? 'Please wait…' : confirmText}
           </button>
         </div>
       </div>

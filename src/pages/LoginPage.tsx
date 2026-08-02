@@ -14,9 +14,10 @@ import {
 
 interface LoginPageProps {
   onSwitchToSignUp: () => void;
+  onLoginSuccess: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp, onLoginSuccess }) => {
   const { loginWithEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +31,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
     setIsSubmitting(true);
     try {
       await loginWithEmail(email.trim(), password);
+      onLoginSuccess();
     } catch (error: unknown) {
       setErrorMsg(error instanceof Error ? error.message : 'Login failed. Please check your credentials.');
     } finally {
