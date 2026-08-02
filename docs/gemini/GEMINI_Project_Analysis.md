@@ -6,8 +6,8 @@ This document provides a full-stack architectural, functional, design, Vercel li
 ---
 
 ## Last Updated
-**Date**: 2026-08-01  
-**Status**: Fully Functional, Production Ready, Live on Vercel & GitHub Pages (`npx tsc -b` & `npm run build` pass cleanly).
+**Date**: 2026-08-02  
+**Status**: Fully Functional, Production Ready, Live on Vercel & GitHub Pages (`npx tsc -b` & `npm run build` pass cleanly in ~300ms).
 
 ---
 
@@ -15,11 +15,11 @@ This document provides a full-stack architectural, functional, design, Vercel li
 
 - **Live Deployment Hosting**: Active Production Deployment on **Vercel** and **GitHub Pages**.
 - **Live App Priority Rule**: All architecture decisions, routing, asset references (`base: './'`), data persistence, and Firebase Firestore subscriptions are optimized **live-app-first**.
-- **SPA Routing Architecture**: Hash-based client routing (`#dashboard`, `#expenses`, `#settlement`, `#personal`, `#cards`, `#monthly`, `#house`, `#settings`) combined with Vercel single-page application rewrites ([vercel.json](file:///d:/Others/Google%20Antigravity/Home%20Finance/vercel.json)) ensures zero 404 page refreshes on live Vercel deployments.
+- **Clean HTML5 Routing Architecture**: HTML5 History API client routing (`/dashboard`, `/expenses`, `/settlement`, `/personal`, `/cards`, `/monthly`, `/house`, `/settings`) with automatic hash cleaner (`/#/expenses` $\rightarrow$ `/expenses`) combined with Vercel single-page application rewrites ([vercel.json](file:///d:/Others/Google%20Antigravity/Home%20Finance/vercel.json)) guarantees zero 404 page refreshes on live Vercel deployments.
 - **Core Architecture**: React 19 + TypeScript + Vite 8 (Rolldown bundler) + Vanilla CSS Design System with Midnight Slate dark/light theme tokens and dynamic micro-animations.
 - **Financial Arithmetic Engine**: Integer-cent precision model (`amountCents`) enforcing exact cent conservation across split calculations, currency rendering, and debt matrix solutions ($\sum \text{Net} = 0$).
 - **Multi-Tenant House Scoping**: Zero data bleed between household sessions (`houseId` binding with strict fallbacks for unassigned users).
-- **Offline & Cloud Sync Hybrid**: Instant local storage via `localStorage` backed by optional real-time Firebase Firestore subscriptions (`expenses`, `settlements`, `cards`, `houses`).
+- **Offline & Cloud Sync Hybrid**: Instant local storage via `localStorage` backed by real-time Firebase Firestore subscriptions (`expenses`, `settlements`, `cards`, `houses`).
 - **Bilingual Internationalization (EN / BN)**: Complete English and Bengali UI binding with digit formatting (`০-৯`) and localization support.
 
 ---
@@ -27,29 +27,29 @@ This document provides a full-stack architectural, functional, design, Vercel li
 ## Page-Object Model (POM) Directory Mapping
 
 ### Core Application & Context
-- [src/App.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/App.tsx): Root container, hash routing, global state synchronization, recurring expense generator engine, modal handlers.
-- [src/context/AuthContext.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/context/AuthContext.tsx): Dual authentication provider (Firebase Auth + Mock Local Session DB), user profile switching, house code creation/joining logic, real-time house member subscriptions.
+- [src/App.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/App.tsx): Root container, HTML5 History API routing (`pushState`, `popstate`), global state synchronization, recurring expense generator engine, full-screen auth loading spinner guard.
+- [src/context/AuthContext.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/context/AuthContext.tsx): Dual authentication provider (Firebase Auth + Mock Local Session DB), user profile switching, house code creation/joining logic, leadership transfer, real-time house member subscriptions.
 - [src/types/index.ts](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/types/index.ts): Core TypeScript interfaces (`Expense`, `Settlement`, `PaymentCard`, `House`, `UserProfile`, `Category`, `SplitMethod`).
 
 ### Pages (`src/pages/`)
-- [DashboardPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/DashboardPage.tsx): 2-column hero overview layout with net balance cards, minimum cash-flow transfer cards, recent transactions, and left-column visual analytics panels.
-- [ExpenseListPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/ExpenseListPage.tsx): Transaction ledger with category/payer filtering, search, pagination, historical card badges, vertical metadata stacking, comment threads, and receipt previews.
+- [DashboardPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/DashboardPage.tsx): 2-column hero overview layout with net balance cards, all-time & current month metric cards, minimum cash-flow transfer cards, recent transactions, and left-column visual analytics panels.
+- [ExpenseListPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/ExpenseListPage.tsx): Transaction ledger with category/payer filtering, search, **New to Old / Old to New sort order selector**, historical card badges, vertical metadata stacking, comment threads, and receipt previews.
 - [SettlementPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/SettlementPage.tsx): Debt settlement engine view with recipient-only confirmation authorization, proof-of-payment image attachments, confirmation modals, and reversible settlement history (`[Reversed]` undo button).
 - [PersonalWalletPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/PersonalWalletPage.tsx): Private expense wallet with budget target tracker (৳15,000.00 default), category budget limits, and 80% (amber) / 100% (rose) threshold alert badges.
 - [CardsPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/CardsPage.tsx): Credit/debit card manager with bank selection, custom card styling, strict owner isolation, deletion safeguards, and spending statistics.
 - [MonthlyPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/MonthlyPage.tsx): Month-scoped historical breakdown, spending comparison cards, period-isolated settlement reporting, and CSV/PDF report generators.
-- [HousePage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/HousePage.tsx): Multi-user household management view with house code copying/sharing, inline house name editing, join input validation (`HM-XXXX`), member balance guards, and roster table.
+- [HousePage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/HousePage.tsx): Multi-user household management view with house code copying/sharing, inline house name editing, leadership transfer control, member balance guards, and roster table.
 - [SettingsPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/SettingsPage.tsx): Profile configuration, custom avatar upload, current password verification & change, environment badge, language/theme toggles, JSON backup/restore tools, and data reset tools.
 - [LoginPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/LoginPage.tsx) & [SignUpPage.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/pages/SignUpPage.tsx): Dedicated standalone authentication pages with open public registration and email validation.
 
 ### Components (`src/components/`)
-- [Navbar.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/Navbar.tsx): Dark charcoal sidebar navigation with titanium active indicator, category groupings, dynamic avatar initials badge, and language toggle.
-- [AddExpenseModal.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/AddExpenseModal.tsx): Transaction creation/editing form supporting Equal, Percentage, Exact, and Adjustment splits, leader-only payer reattribution rule, card assignment, recurring schedules, and OCR receipt scanning.
-- [CategoryPieChart.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/CategoryPieChart.tsx): Interactive SVG Donut Pie Chart displaying proportional category spending with center label metrics and legend.
+- [Navbar.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/Navbar.tsx): Collapsible dark charcoal sidebar navigation with House Leader Gold Crown 👑 badge, clean stacked collapsed brand header, tooltips, category groupings, and language toggle.
+- [AddExpenseModal.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/AddExpenseModal.tsx): Transaction creation/editing form supporting Equal, Percentage, Exact, and Adjustment splits, payer-scoped bank card dropdown, recurring schedules, and OCR receipt scanning.
+- [CategoryPieChart.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/CategoryPieChart.tsx): Interactive SVG Donut Pie Chart with responsive center label metrics and legend.
 - [CategoryChart.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/CategoryChart.tsx): Category spending progress bars and multi-segmented out-of-pocket housemate contribution ratio bar.
+- [LoadingSpinner.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/LoadingSpinner.tsx): Titanium dual-ring loading spinner component for session authentication guards and view transitions.
 - [ConfirmModal.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/ConfirmModal.tsx) & [ErrorBoundary.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/ErrorBoundary.tsx): Universal confirmation dialog and error recovery boundary.
 - [UserAvatar.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/UserAvatar.tsx): Reusable avatar badge supporting base64 profile pictures, external URLs, and dynamic HSL gradient initials fallbacks.
-- [LiquidMetalButton.tsx](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/components/LiquidMetalButton.tsx): Modern CTA button with rotating liquid rainbow neon border hover effects.
 
 ### Services Layer (`src/services/`)
 - [firebaseSync.ts](file:///d:/Others/Google%20Antigravity/Home%20Finance/src/services/firebaseSync.ts): Real-time Cloud Firestore snapshot listeners, recursive `sanitizeForFirestore` undefined value stripper, and scoping drivers for expenses, settlements, cards, and house rosters.

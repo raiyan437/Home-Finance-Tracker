@@ -1,40 +1,88 @@
 # GEMINI Architecture & Technical Specifications
 
 **Purpose**: Architecture, data model specifications, and settlement algorithm design for the Shared Household Expense Settlement Application.  
-**Last Updated**: 2026-07-31  
+**Last Updated**: 2026-08-02  
 **Current Status**: Active Production Deployment — [https://home-finance-tracker-kappa.vercel.app/](https://home-finance-tracker-kappa.vercel.app/)  
 
 ---
 
 ## 1. System Overview
 
-The application is a single-page client-side web application designed for a 3-person household:
-* **Raiyan**
-* **Himel**
-* **Lazim**
-
-Its core objective is to track shared & personal expenses and compute the minimal set of transactions required to settle all debts.
+The application is a reactive, client-side Single Page Application (SPA) designed for multi-member households (with custom house creation, invitation codes, and leadership transfer):
+* **Household Shared Expenses**: Equal, Percentage, Exact, and Adjustment splits with integer cent math.
+* **Personal Money Tracker**: Private wallet outlays with monthly budget targets and category threshold alerts.
+* **Payment Card Manager**: Credit/debit card tracking with custom gradients and channel distribution stats.
+* **Debt Simplification Solver**: Greedy minimum cash flow engine minimizing transfers to at most $N-1$.
 
 ---
 
 ## 2. Technical Stack
 
-* **Framework**: React 18 / TypeScript / Vite
-* **Styling**: Vanilla CSS with CSS Custom Properties, HSL color tokens, responsive container queries & flex/grid systems
+* **Framework**: React 19 / TypeScript / Vite 8 (Rolldown code-splitter)
+* **Routing**: HTML5 History API (`window.location.pathname`, `pushState`, `popstate`) with automatic hash cleaner (`/#/expenses` $\rightarrow$ `/expenses`) and [vercel.json](file:///d:/Others/Google%20Antigravity/Home%20Finance/vercel.json) rewrites
+* **Database & Auth**: Firebase Auth + Cloud Firestore Realtime Listeners (`onSnapshot` WebSockets) with `localStorage` offline caching
+* **Styling**: Vanilla CSS with CSS Custom Properties, HSL color tokens, glassmorphism, responsive container queries & keyframe engines
 * **Icons**: `lucide-react`
-* **Persistence**: Browser `localStorage` with initial JSON seed fallback
+* **CI/CD**: GitHub Actions (`tsc -b`, `npm run build`, GitHub Pages) & Vercel Auto-Deploy
 
 ---
 
 ## 3. Data Models
 
-### User Entity
+### User Entity & Profile
 ```typescript
+export type UserRole = 'leader' | 'member';
+
 export interface User {
-  id: string; // 'raiyan' | 'himel' | 'lazim'
+  id: string;
   name: string;
-  avatar: string;
+  avatar?: string;
   color: string; // Accent color token
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  avatar?: string;
+  houseId?: string | null;
+  role?: UserRole | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Household Entity
+```typescript
+export interface HouseMember {
+  uid: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  joinedAt: string;
+  role: UserRole;
+}
+
+export interface House {
+  id: string;
+  name: string;
+  code: string; // Unique join code (e.g. HM-7842)
+  leaderUid: string;
+  members: HouseMember[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Payment Card Entity
+```typescript
+export interface PaymentCard {
+  id: string;
+  ownerId?: string; // Strict ownership scoping
+  bankName: string;
+  cardType: 'credit' | 'debit';
+  colorGradient: string; // Preset or custom CSS gradient
+  createdAt: string;
 }
 ```
 
@@ -49,18 +97,31 @@ export interface Share {
   percentage?: number;
 }
 
+export interface PaymentMethodInfo {
+  type: 'cash' | 'card';
+  cardId?: string;
+  cardName?: string; // Metadata snapshot for cross-member audit
+  cardType?: 'credit' | 'debit';
+}
+
 export interface Expense {
   id: string;
+  scope?: 'household' | 'personal';
+  ownerId?: string;
   title: string;
-  amountCents: number; // Stored in integer cents to avoid floating point bugs
-  paidBy: string; // User ID
+  amountCents: number; // Integer cents precision
+  paidBy: string;
   category: Category;
   date: string; // YYYY-MM-DD
   splitMethod: SplitMethod;
   shares: Share[];
+  paymentMethod?: PaymentMethodInfo;
+  receiptUrl?: string;
+  isRecurring?: boolean;
+  recurringFrequency?: 'weekly' | 'monthly';
   notes?: string;
-  createdAt: string; // ISO String
-  updatedAt: string; // ISO String
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 

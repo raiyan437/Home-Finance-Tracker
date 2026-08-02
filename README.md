@@ -9,25 +9,29 @@ An ultra-modern, cross-platform household expense tracking, payment card manager
 
 ## 🌟 Key Features
 
+- **Clean HTML5 Routing & Vercel Rewrites**: Real URLs (`/expenses`, `/settlement`, `/cards`, etc.) with zero hash tags and [vercel.json](file:///d:/Others/Google%20Antigravity/Home%20Finance/vercel.json) rewrites preventing 404 page refreshes.
 - **Taka (৳) Currency Standard**: All household expenses, balances, debt settlements, and personal budgets are tracked in Bangladeshi Taka (৳).
 - **Optimal Debt Simplification**: Solves the minimum cash flow problem to collapse complex multi-party debts into at most $N-1$ direct transfers.
 - **Cloud Firestore Realtime Sync**: Realtime multi-device database listeners (`onSnapshot`). Changes on one device instantly update all housemates' screens live.
-- **Vite 8 Rolldown Code-Splitting**: Code-split vendor chunks (`react-vendor`, `lucide-icons`, `firebase`) and `React.lazy()` views keep initial JS payload under **72 kB**.
-- **Payment Cards & Wallets**: Manage Credit & Debit bank cards with custom color gradients, bank names, and payment channel tracking (Cash vs Bank Cards).
+- **House Management & Leadership Transfer**: Create/join houses using codes (`HM-XXXX`), with leader privileges and full leadership transfer support.
+- **Collapsible Sidebar & Leader Crown 👑**: Collapsible desktop navigation with Gold Crown 👑 badges, tooltips, and clean brand header alignment.
+- **Household Expense Ledger & Sorting**: Ledger with New-to-Old (default) and Old-to-New sorting, category/payer filters, search, comment threads, and receipt previews.
+- **Payer-Scoped Payment Cards**: Users select only their own registered credit/debit cards when logging outlays, with full cross-member transaction audit visibility.
 - **Private Personal Wallet**: Log private individual expenses with month/year filters and budget target tracking.
 - **Recurring Bills Engine**: Automate monthly or weekly recurring household expenses (WiFi, Rent, Utilities).
 - **Receipt Photo Attachments & CSV Export**: Attach receipt photos to expenses and export formatted `.csv` audit statements.
-- **3D Character Male Avatars**: Custom 3D rendered character avatars for Raiyan, Himel, and Lazim.
+- **Vite 8 Rolldown Code-Splitting**: Code-split vendor chunks (`react-vendor`, `lucide-icons`, `firebase`) and `React.lazy()` views keep initial JS payload under **72 kB**.
 
 ---
 
 ## 🚀 Tech Stack
 
-- **Core**: React 18, TypeScript, Vite 8 (Rolldown bundler)
+- **Core**: React 19, TypeScript, Vite 8 (Rolldown bundler)
+- **Routing**: HTML5 History API (`window.location.pathname`, `pushState`, `popstate`) + Vercel SPA Rewrites
 - **Styling**: Vanilla CSS (Midnight Slate Glassmorphic Design Tokens)
 - **Database & Auth**: Firebase Auth & Cloud Firestore
 - **Icons**: Lucide React
-- **CI/CD**: GitHub Actions (Oxlint, Typecheck, Build, & GitHub Pages Deployment)
+- **CI/CD**: GitHub Actions & Vercel Auto-Deploy
 
 ---
 
