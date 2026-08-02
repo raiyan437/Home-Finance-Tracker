@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { exportAuditReportCsv } from '../features/exportCsv';
 import { UserAvatar } from '../components/UserAvatar';
+import { MaterialSelect } from '../components/MaterialSelect';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, Download, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
@@ -180,14 +181,14 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
           </div>
 
           {/* Month/Year Filter */}
-          <select
-            className="form-select"
-            style={{ width: 'auto', minWidth: '150px' }}
+          <MaterialSelect
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-          >
-            <option value="All">All Months</option>
-            {availableMonths.map((m) => {
+            onChange={setSelectedMonth}
+            ariaLabel="Filter by month"
+            style={{ width: 'auto', minWidth: '170px' }}
+            options={[
+              { value: 'All', label: 'All Months' },
+              ...availableMonths.map((m) => {
               const dateObj = new Date(m + '-01');
               const monthLabel = isNaN(dateObj.getTime())
                 ? m
@@ -195,66 +196,60 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                     month: 'long',
                     year: 'numeric',
                   });
-              return (
-                <option key={m} value={m}>
-                  {monthLabel}
-                </option>
-              );
-            })}
-          </select>
+                return { value: m, label: monthLabel };
+              }),
+            ]}
+          />
 
           {/* Category Filter */}
-          <select
-            className="form-select"
-            style={{ width: 'auto', minWidth: '140px' }}
+          <MaterialSelect
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value as Category | 'All')}
-          >
-            {ALL_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat === 'All' ? getTranslation('allCategories', lang) : cat}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedCategory}
+            ariaLabel="Filter by category"
+            style={{ width: 'auto', minWidth: '160px' }}
+            options={ALL_CATEGORIES.map((item) => ({
+              value: item,
+              label: item === 'All' ? getTranslation('allCategories', lang) : item,
+            }))}
+          />
 
           {/* Housemate Filter */}
-          <select
-            className="form-select"
-            style={{ width: 'auto', minWidth: '140px' }}
+          <MaterialSelect
             value={selectedUserFilter}
-            onChange={(e) => setSelectedUserFilter(e.target.value as UserId | 'All')}
-          >
-            <option value="All">{getTranslation('allHousemates', lang)}</option>
-            {houseUsers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedUserFilter}
+            ariaLabel="Filter by housemate"
+            style={{ width: 'auto', minWidth: '160px' }}
+            options={[
+              { value: 'All' as const, label: getTranslation('allHousemates', lang) },
+              ...houseUsers.map((user) => ({ value: user.id, label: user.name })),
+            ]}
+          />
 
           {/* Payment Method Filter */}
-          <select
-            className="form-select"
-            style={{ width: 'auto', minWidth: '140px' }}
+          <MaterialSelect
             value={selectedPaymentFilter}
-            onChange={(e) => setSelectedPaymentFilter(e.target.value as any)}
-          >
-            <option value="All">{getTranslation('allPayments', lang)}</option>
-            <option value="cash">{getTranslation('cash', lang)}</option>
-            <option value="card">{getTranslation('bankCard', lang)}</option>
-          </select>
+            onChange={setSelectedPaymentFilter}
+            ariaLabel="Filter by payment method"
+            style={{ width: 'auto', minWidth: '160px' }}
+            options={[
+              { value: 'All', label: getTranslation('allPayments', lang) },
+              { value: 'cash', label: getTranslation('cash', lang) },
+              { value: 'card', label: getTranslation('bankCard', lang) },
+            ]}
+          />
 
           {/* Sort Order Selector (New to Old [Default] / Old to New) */}
-          <select
-            className="form-select"
-            style={{ width: 'auto', minWidth: '160px', fontWeight: 700, borderColor: 'var(--border-medium)' }}
+          <MaterialSelect
             value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+            onChange={setSortOrder}
+            ariaLabel="Sort expense list order"
             title="Sort Expense List Order"
-          >
-            <option value="newest">📅 New to Old (Default)</option>
-            <option value="oldest">⏳ Old to New</option>
-          </select>
+            style={{ width: 'auto', minWidth: '210px' }}
+            options={[
+              { value: 'newest', label: '📅 New to Old (Default)' },
+              { value: 'oldest', label: '⏳ Old to New' },
+            ]}
+          />
         </div>
       </div>
 

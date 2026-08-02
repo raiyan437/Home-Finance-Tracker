@@ -10,6 +10,7 @@ import {
   calculatePercentageSplits,
 } from '../utils/currency';
 import { UserAvatar } from './UserAvatar';
+import { MaterialSelect } from './MaterialSelect';
 import { scanReceiptImage } from '../features/ocrScanner';
 import { saveAttachment } from '../services/attachments';
 import { toLocalDateKey } from '../utils/localDate';
@@ -601,17 +602,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     ⚠️ {payerUser?.name || 'This user'} has no bank cards registered. Please add a payment card in the Payment Cards tab.
                   </div>
                 ) : (
-                  <select
-                    className="form-select"
+                  <MaterialSelect
                     value={selectedCardId || (payerCards[0]?.id || '')}
-                    onChange={(e) => setSelectedCardId(e.target.value)}
-                  >
-                    {payerCards.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        💳 {c.bankName} ({c.cardType === 'debit' ? 'Debit Card' : 'Credit Card'})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedCardId}
+                    ariaLabel="Payment card"
+                    options={payerCards.map((card) => ({
+                      value: card.id,
+                      label: `💳 ${card.bankName} (${card.cardType === 'debit' ? 'Debit Card' : 'Credit Card'})`,
+                    }))}
+                  />
                 )}
               </div>
             )}
@@ -661,17 +660,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div className="form-group">
               <label className="form-label">Category</label>
-              <select
-                className="form-select"
+              <MaterialSelect
                 value={category}
-                onChange={(e) => setCategory(e.target.value as Category)}
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategory}
+                ariaLabel="Expense category"
+                options={CATEGORIES.map((item) => ({ value: item, label: item }))}
+              />
             </div>
 
             <div className="form-group">
@@ -793,15 +787,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {isRecurring && (
-                <select
-                  className="form-select"
-                  style={{ width: 'auto', padding: '4px 8px', fontSize: '0.8rem' }}
+                <MaterialSelect
+                  compact
                   value={recurringFrequency}
-                  onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="weekly">Weekly</option>
-                </select>
+                  onChange={setRecurringFrequency}
+                  ariaLabel="Recurring frequency"
+                  style={{ width: 'auto', minWidth: '120px' }}
+                  options={[
+                    { value: 'monthly', label: 'Monthly' },
+                    { value: 'weekly', label: 'Weekly' },
+                  ]}
+                />
               )}
               <input
                 type="checkbox"

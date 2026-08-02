@@ -6,6 +6,7 @@ import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, CreditCard, Banknote, Calendar, AlertTriangle } from 'lucide-react';
 import { toLocalDateKey, toLocalMonthKey } from '../utils/localDate';
+import { MaterialSelect } from '../components/MaterialSelect';
 
 interface PersonalWalletProps {
   expenses: Expense[];
@@ -217,30 +218,19 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
               <span className="summary-title">Monthly Personal Outlay</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
                 <Calendar size={15} style={{ color: 'var(--accent-purple)' }} />
-                <select
-                  className="form-select"
-                  style={{
-                    padding: '3px 8px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    width: 'auto',
-                    backgroundColor: 'var(--bg-input)',
-                    borderRadius: 'var(--radius-sm)',
-                  }}
+                <MaterialSelect
+                  compact
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  {availableMonths.map((mKey) => {
+                  onChange={setSelectedMonth}
+                  ariaLabel="Personal wallet month"
+                  style={{ width: 'auto', minWidth: '150px' }}
+                  options={availableMonths.map((mKey) => {
                     const [y, m] = mKey.split('-');
                     const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
                     const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                    return (
-                      <option key={mKey} value={mKey}>
-                        {label}
-                      </option>
-                    );
+                    return { value: mKey, label };
                   })}
-                </select>
+                />
               </div>
             </div>
 
@@ -480,13 +470,12 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
                   <label className="form-label">Category</label>
-                  <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value as Category)}>
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                  <MaterialSelect
+                    value={category}
+                    onChange={setCategory}
+                    ariaLabel="Personal expense category"
+                    options={CATEGORIES.map((item) => ({ value: item, label: item }))}
+                  />
                 </div>
 
                 <div className="form-group">
@@ -515,18 +504,13 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
                 </div>
 
                 {paymentType === 'card' && userCards.length > 0 && (
-                  <select
-                    className="form-select"
-                    style={{ marginTop: '10px' }}
+                  <MaterialSelect
                     value={selectedCardId}
-                    onChange={(e) => setSelectedCardId(e.target.value)}
-                  >
-                    {userCards.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        💳 {c.bankName}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedCardId}
+                    ariaLabel="Personal expense payment card"
+                    style={{ marginTop: '10px' }}
+                    options={userCards.map((card) => ({ value: card.id, label: `💳 ${card.bankName}` }))}
+                  />
                 )}
               </div>
 

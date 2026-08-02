@@ -6,6 +6,7 @@ import { exportAuditReportCsv } from '../features/exportCsv';
 import { useAuth } from '../context/AuthContext';
 import { CategoryChart } from '../components/CategoryChart';
 import { UserAvatar } from '../components/UserAvatar';
+import { MaterialSelect } from '../components/MaterialSelect';
 import { Calendar, Users, Download, Printer } from 'lucide-react';
 
 import type { Language } from '../utils/i18n';
@@ -97,23 +98,18 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Calendar size={18} style={{ color: 'var(--accent-primary)' }} />
-            <select
-              className="form-select"
-              style={{ width: '190px', fontWeight: 800 }}
+            <MaterialSelect
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            >
-              {availableMonths.map((mKey) => {
+              onChange={setSelectedMonth}
+              ariaLabel="Report month"
+              style={{ width: '190px' }}
+              options={availableMonths.map((mKey) => {
                 const [y, m] = mKey.split('-');
                 const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
                 const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                return (
-                  <option key={mKey} value={mKey}>
-                    {label}
-                  </option>
-                );
+                return { value: mKey, label };
               })}
-            </select>
+            />
           </div>
         </div>
       </div>

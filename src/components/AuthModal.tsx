@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { ALL_USERS } from '../features/settlementEngine';
 import type { UserId } from '../types';
 import { UserAvatar } from './UserAvatar';
+import { MaterialSelect } from './MaterialSelect';
 import { X, Lock, User, KeyRound, ShieldCheck, Check, AlertCircle, LogOut } from 'lucide-react';
 
 interface AuthModalProps {
@@ -208,17 +209,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 {isSignUp && (
                   <div className="form-group">
                     <label className="form-label">Link to Housemate Profile</label>
-                    <select
-                      className="form-select"
+                    <MaterialSelect
                       value={selectedHousemate}
-                      onChange={(e) => setSelectedHousemate(e.target.value as UserId)}
-                    >
-                      {ALL_USERS.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setSelectedHousemate}
+                      ariaLabel="Link to housemate profile"
+                      options={ALL_USERS.map((user) => ({ value: user.id, label: user.name }))}
+                    />
                   </div>
                 )}
 
