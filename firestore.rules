@@ -159,7 +159,9 @@ service cloud.firestore {
       allow get: if signedIn()
                  && (request.auth.uid in resource.data.memberUids
                      || resource.data.publicJoin == true);
-      allow list: if false;
+      // Supports cross-device recovery when a user's profile document lost its
+      // houseId. Firestore only permits queries constrained to the caller's UID.
+      allow list: if signedIn() && request.auth.uid in resource.data.memberUids;
       allow create: if signedIn()
                     && validRoster(request.resource.data)
                     && request.resource.data.leaderUid == request.auth.uid

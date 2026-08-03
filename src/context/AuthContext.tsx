@@ -6,6 +6,7 @@ import { loadExpenses, loadSettlements, houseStorageScope } from '../services/st
 import {
   loadUsersDB,
   saveUsersDB,
+  cacheUserProfile,
   loadHousesDB,
   saveHousesDB,
   getActiveSession,
@@ -15,7 +16,15 @@ import {
 } from '../services/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, runTransaction, setDoc, deleteField } from 'firebase/firestore';
-import { syncSaveUser, syncSaveHouse, subscribeHouse, hasPendingLedgerMutations, sanitizeForFirestore } from '../services/firebaseSync';
+import {
+  syncSaveUser,
+  syncSaveHouse,
+  subscribeHouse,
+  hasPendingLedgerMutations,
+  sanitizeForFirestore,
+  discardPendingUserProfileMutation,
+} from '../services/firebaseSync';
+import { createProfileFromIdentity, normalizeCloudProfile } from '../features/profileReconciliation';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -66,6 +75,118 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const cacheHouse = (house: House): void => {
+    const houses = loadHousesDB();
+    const index = houses.findIndex((candidate) => candidate.id === house.id);
+    if (index >= 0) houses[index] = house;
+    else houses.push(house);
+    saveHousesDB(houses);
+  };
+
+  const recoverRosterMembership = async (
+    profile: UserProfile,
+    hintedHouseId?: string | null
+  ): Promise<UserProfile> => {
+    if (!db || profile.houseId) return profile;
+
+    try {
+      let matchedHouse: House | null = null;
+      if (hintedHouseId) {
+        const hintedSnapshot = await getDoc(doc(db, 'houses', hintedHouseId));
+        if (hintedSnapshot.exists()) {
+          const hintedHouse = hintedSnapshot.data() as House;
+          if (hintedHouse.members?.some((member) => member.uid === profile.uid)) matchedHouse = hintedHouse;
+        }
+      }
+
+      if (!matchedHouse) {
+        const membershipSnapshot = await getDocs(query(
+          collection(db, 'houses'),
+          where('memberUids', 'array-contains', profile.uid)
+        ));
+        const matches = membershipSnapshot.docs
+          .map((snapshot) => snapshot.data() as House)
+          .filter((house) => house.members?.some((member) => member.uid === profile.uid))
+          .sort((a, b) => a.id.localeCompare(b.id));
+        matchedHouse = matches[0] ?? null;
+        if (matches.length > 1) {
+          console.warn(`Multiple household memberships found for ${profile.uid}; using ${matchedHouse?.id}.`);
+        }
+      }
+
+      if (!matchedHouse) return profile;
+      cacheHouse(matchedHouse);
+      return {
+        ...profile,
+        houseId: matchedHouse.id,
+        role: matchedHouse.leaderUid === profile.uid ? 'leader' : 'member',
+      };
+    } catch (error) {
+      // Recovery is best-effort. A rules/network failure must never erase a
+      // membership that may still be valid in Firebase.
+      console.warn('Household membership recovery will retry later.', error);
+      return profile;
+    }
+  };
+
+  const resolveFirebaseProfile = async (
+    user: FirebaseUser,
+    suppliedCloudProfile?: Partial<UserProfile> | null
+  ): Promise<UserProfile> => {
+    const cached = loadUsersDB().find((candidate) => candidate.uid === user.uid);
+    let cloudProfile = suppliedCloudProfile;
+    let cloudDocumentExists = suppliedCloudProfile !== null;
+
+    if (suppliedCloudProfile === undefined && db) {
+      try {
+        const snapshot = await getDoc(doc(db, 'users', user.uid));
+        cloudDocumentExists = snapshot.exists();
+        cloudProfile = snapshot.exists() ? snapshot.data() as Partial<UserProfile> : null;
+      } catch (error) {
+        console.warn('Cloud profile could not be refreshed; keeping the verified local cache.', error);
+        const offlineProfile = cached ?? createProfileFromIdentity({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          creationTime: user.metadata.creationTime,
+        });
+        cacheUserProfile(offlineProfile);
+        setActiveSession(offlineProfile);
+        setDbUserProfile(offlineProfile);
+        return offlineProfile;
+      }
+    }
+
+    const identity = {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      creationTime: user.metadata.creationTime,
+    };
+    const baseProfile = cloudDocumentExists && cloudProfile
+      ? normalizeCloudProfile(identity, cloudProfile)
+      : {
+          ...createProfileFromIdentity(identity),
+          ...(cached?.displayName ? { displayName: cached.displayName } : {}),
+          ...(cached?.avatar ? { avatar: cached.avatar } : {}),
+          ...(cached?.createdAt ? { createdAt: cached.createdAt } : {}),
+        };
+    const resolvedProfile = await recoverRosterMembership(baseProfile, cached?.houseId);
+
+    // A successful cloud read supersedes any stale full-profile write queued by
+    // another browser session. This prevents a delayed houseId:null replay.
+    discardPendingUserProfileMutation(user.uid);
+    cacheUserProfile(resolvedProfile);
+    setActiveSession(resolvedProfile);
+    setDbUserProfile(resolvedProfile);
+
+    const membershipRecovered = resolvedProfile.houseId !== baseProfile.houseId;
+    if (!cloudDocumentExists || membershipRecovered) await syncSaveUser(resolvedProfile);
+    return resolvedProfile;
+  };
+
   // Connect Firebase Auth Listener & Realtime Profile Sync from Firestore
   useEffect(() => {
     if (!auth) {
@@ -87,14 +208,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unsubUserDoc = onSnapshot(
             userDocRef,
             (snap) => {
-              if (snap.exists()) {
-                const { password: _removedPassword, ...safeProfile } = snap.data() as UserProfile & { password?: string };
-                const fbProfile = safeProfile as UserProfile;
-                setDbUserProfile((prev) => ({ ...prev, ...fbProfile }));
-                setActiveSession(fbProfile);
-                syncHouseForUser(fbProfile);
-              }
-              setLoading(false);
+              void resolveFirebaseProfile(user, snap.exists() ? snap.data() as Partial<UserProfile> : null)
+                .then((profile) => syncHouseForUser(profile))
+                .finally(() => setLoading(false));
             },
             (err) => {
               console.warn('Firestore User Profile Sync Warning:', err);
@@ -149,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const houses = loadHousesDB();
     const house = houses.find((h) => h.id === targetHouseId) || null;
-    if (house && !isFirebaseConfigured) {
+    if (house) {
       setCurrentHouse({ ...house });
     }
 
@@ -163,10 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const isStillMember = firestoreHouse.members && firestoreHouse.members.some((m) => m.uid === profile.uid);
           if (isStillMember) {
             setCurrentHouse({ ...firestoreHouse });
-            const idx = houses.findIndex((h) => h.id === firestoreHouse.id);
-            if (idx >= 0) houses[idx] = firestoreHouse;
-            else houses.push(firestoreHouse);
-            saveHousesDB(houses);
+            cacheHouse(firestoreHouse);
             if (
               firestoreHouse.leaderUid === profile.uid &&
               (!firestoreHouse.memberUids || !firestoreHouse.memberMap || firestoreHouse.publicJoin === undefined)
@@ -179,24 +292,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const purgedProfile = { ...profile, houseId: null, role: null };
             setDbUserProfile(purgedProfile);
             setActiveSession(purgedProfile);
-            syncSaveUser(purgedProfile);
+            cacheUserProfile(purgedProfile);
+            await syncSaveUser(purgedProfile);
           }
         } else {
           setCurrentHouse(null);
           const purgedProfile = { ...profile, houseId: null, role: null };
           setDbUserProfile(purgedProfile);
           setActiveSession(purgedProfile);
+          cacheUserProfile(purgedProfile);
           await syncSaveUser(purgedProfile);
         }
       } catch (err) {
         console.warn('Firestore syncHouseForUser notice:', err);
-        if ((err as { code?: string })?.code === 'permission-denied') {
-          const purgedProfile = { ...profile, houseId: null, role: null };
-          setCurrentHouse(null);
-          setDbUserProfile(purgedProfile);
-          setActiveSession(purgedProfile);
-          await syncSaveUser(purgedProfile);
-        }
       }
     }
   };
@@ -221,7 +329,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentHouse(null);
           setDbUserProfile((prev) => {
             const purged = prev ? { ...prev, houseId: null, role: null } : null;
-            if (purged) setActiveSession(purged);
+            if (purged) {
+              setActiveSession(purged);
+              cacheUserProfile(purged);
+            }
             return purged;
           });
           return;
@@ -242,11 +353,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const purged = prev ? { ...prev, houseId: null, role: null } : null;
           if (purged) {
             setActiveSession(purged);
+            cacheUserProfile(purged);
             void syncSaveUser(purged);
           }
           return purged;
         });
       }
+    }, (error) => {
+      // Listener errors are not evidence that the user left the household.
+      console.warn('Live household updates are temporarily unavailable.', error);
     });
     return () => unsub();
   }, [dbUserProfile?.houseId, dbUserProfile?.uid, currentHouse?.id, activeUserId]);
@@ -262,12 +377,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (email: string, pass: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
-    let firebaseUid: string | null = null;
-
     if (auth) {
       try {
         const userCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-        firebaseUid = userCred.user.uid;
+        const profile = await resolveFirebaseProfile(userCred.user);
+        await syncHouseForUser(profile);
+        setLoading(false);
+        return;
       } catch (fbErr: any) {
         setLoading(false);
         switch (fbErr?.code) {
@@ -290,46 +406,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const users = loadUsersDB();
-    let existingUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
+    const existingUser = users.find((u) => u.email.toLowerCase() === cleanEmail);
 
     if (!auth && existingUser && !(await verifyLocalCredential(cleanEmail, pass))) {
       setLoading(false);
       throw new Error('Invalid email or password. Please verify your credentials or Sign Up.');
     }
 
-    if (!existingUser && !firebaseUid) {
+    if (!existingUser) {
       setLoading(false);
       throw new Error('Invalid email or password. Please verify your credentials or Sign Up.');
     }
 
-    if (!existingUser) {
-      existingUser = {
-        uid: firebaseUid || createId('user'),
-        displayName: cleanEmail.split('@')[0],
-        email: cleanEmail,
-        houseId: null,
-        role: null,
-        createdAt: new Date().toISOString(),
-      };
-      saveUsersDB([...users, existingUser]);
-    } else if (firebaseUid && existingUser.uid !== firebaseUid) {
-      // A Firebase UID is the canonical identity. Never retain a locally-generated
-      // UID after cloud authentication, because that can attribute money to the
-      // wrong person. Cloud household membership must be rejoined explicitly.
-      const staleUid = existingUser.uid;
-      existingUser = { ...existingUser, uid: firebaseUid, houseId: null, role: null };
-      saveUsersDB([...users.filter((user) => user.uid !== staleUid), existingUser]);
-      const houses = loadHousesDB().map((house) => {
-        const members = house.members.filter((member) => member.uid !== staleUid);
-        return { ...house, members, memberUids: members.map((member) => member.uid) };
-      });
-      saveHousesDB(houses);
-    }
-
     setActiveSession(existingUser);
     setDbUserProfile(existingUser);
-    syncHouseForUser(existingUser);
-    syncSaveUser(existingUser);
+    await syncHouseForUser(existingUser);
     setLoading(false);
   };
 

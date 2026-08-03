@@ -66,6 +66,10 @@ export const flushSyncOutbox = async (): Promise<void> => {
   return flushPromise;
 };
 
+export const discardPendingUserProfileMutation = (uid: string): void => {
+  writeOutbox(readOutbox().filter((item) => !(item.collection === 'users' && item.id === uid)));
+};
+
 const syncMutation = async (mutation: Omit<PendingMutation, 'key' | 'queuedAt'>): Promise<SyncResult> => {
   if (!isFirebaseConfigured || !db) return { synced: false, queued: false };
   try {
@@ -153,7 +157,11 @@ export const syncSaveHouse = async (house: House) => {
 /**
  * Listens for realtime changes to a specific house document in Firestore `houses` collection.
  */
-export const subscribeHouse = (houseId: string, onUpdate: (house: House | null) => void) => {
+export const subscribeHouse = (
+  houseId: string,
+  onUpdate: (house: House | null) => void,
+  onError?: (error: unknown) => void
+) => {
   if (!isFirebaseConfigured || !db || !houseId) return () => {};
 
   try {
@@ -166,7 +174,7 @@ export const subscribeHouse = (houseId: string, onUpdate: (house: House | null) 
       },
       (err) => {
         console.warn('Firestore House Sync Warning:', err);
-        if ((err as { code?: string }).code === 'permission-denied') onUpdate(null);
+        onError?.(err);
       }
     );
   } catch {

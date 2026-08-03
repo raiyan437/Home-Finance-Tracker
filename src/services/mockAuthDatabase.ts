@@ -1,4 +1,5 @@
 import type { UserProfile, House } from '../types';
+import { mergeProfileIntoCache } from '../features/profileReconciliation';
 
 const USERS_DB_KEY = 'home_finance_users_db_v3';
 const HOUSES_DB_KEY = 'home_finance_houses_db_v3';
@@ -109,6 +110,12 @@ export const saveUsersDB = (users: UserProfile[]) => {
     return profile;
   });
   localStorage.setItem(USERS_DB_KEY, JSON.stringify(sanitized));
+};
+
+// Cloud profiles are canonical. Keep exactly one local cache entry per UID/email
+// so a browser from another device cannot revive a stale household assignment.
+export const cacheUserProfile = (profile: UserProfile): void => {
+  saveUsersDB(mergeProfileIntoCache(loadUsersDB(), profile));
 };
 
 // Helper: Load Houses DB
