@@ -195,7 +195,11 @@ export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void, house
 
   try {
     const colRef = collection(db, 'expenses');
-    const q = query(colRef, where('houseId', '==', houseId));
+    const q = query(
+      colRef,
+      where('houseId', '==', houseId),
+      where('scope', '==', 'household')
+    );
 
     return onSnapshot(
       q,
@@ -224,7 +228,11 @@ export const subscribePersonalExpenses = (onUpdate: (expenses: Expense[]) => voi
   }
 
   try {
-    const q = query(collection(db, 'expenses'), where('ownerId', '==', ownerId));
+    const q = query(
+      collection(db, 'expenses'),
+      where('ownerId', '==', ownerId),
+      where('scope', '==', 'personal')
+    );
     return onSnapshot(
       q,
       (snapshot) => {
