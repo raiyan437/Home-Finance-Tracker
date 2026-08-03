@@ -267,11 +267,11 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
 
             return (
               <div key={exp.id} className="expense-item-card animate-fade-in" onClick={() => toggleExpand(exp.id)}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div className="expense-item-header">
+                  <div className="expense-item-main">
                     <UserAvatar user={payer} size={42} />
 
-                    <div>
+                    <div className="expense-item-info">
                       <div className="expense-title-row">
                         <span className="expense-title font-display">{exp.title}</span>
                         <span className={`cat-pill cat-${exp.category}`}>{exp.category}</span>
@@ -325,20 +325,16 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                         <div>Paid by <strong style={{ color: 'var(--text-primary)' }}>{payer.name}</strong></div>
                         <div>Date: <strong style={{ color: 'var(--text-primary)' }}>{exp.date}</strong></div>
                         <div>Split: <strong style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>{exp.splitMethod}</strong></div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: commentCount > 0 ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: commentCount > 0 ? 700 : 500, marginTop: '1px' }}>
-                          <MessageSquare size={13} />
-                          <span>{commentCount} {commentCount === 1 ? 'Comment' : 'Comments'}</span>
-                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div className="tabular-nums" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <div className="expense-item-controls">
+                    <div className="expense-amount-display tabular-nums">
                       {formatCurrency(exp.amountCents, false, lang)}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="expense-actions-group">
                       {(exp.paidBy === myUid || isLeader) && (
                         <button
                           className="btn record-action-button record-action-edit"
@@ -365,12 +361,28 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                           <span>Delete</span>
                         </button>
                       )}
-                      <div style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>
-                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                      </div>
                     </div>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  className="expense-expand-toggle"
+                  aria-expanded={isExpanded}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpand(exp.id);
+                  }}
+                >
+                  <span className="expense-comment-summary">
+                    <MessageSquare size={14} />
+                    <span>{commentCount} {commentCount === 1 ? 'Comment' : 'Comments'}</span>
+                  </span>
+                  <span className="expense-expand-label">
+                    {isExpanded ? 'Hide details' : 'View split & comments'}
+                    {isExpanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                  </span>
+                </button>
 
                 {/* Expanded Details Pane */}
                 {isExpanded && (

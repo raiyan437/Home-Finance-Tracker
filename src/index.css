@@ -3778,6 +3778,137 @@ button.mobile-add-fab { border-radius: 18px !important; }
 }
 .record-action-delete.on-card { background: rgba(127, 29, 29, .48); }
 
+/* Household expense card layout */
+.expense-item-card {
+  display: block;
+  padding: 20px;
+  margin-bottom: 0;
+}
+
+.expense-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  gap: 20px;
+}
+
+.expense-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.expense-item-info {
+  min-width: 0;
+}
+
+.expense-item-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: max-content;
+  padding-top: 1px;
+}
+
+.expense-item-controls .expense-amount-display {
+  color: var(--text-primary);
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+
+.expense-item-controls .expense-actions-group {
+  justify-content: flex-end;
+}
+
+.expense-expand-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px 0 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.expense-expand-toggle:hover {
+  color: var(--text-primary);
+}
+
+.expense-comment-summary,
+.expense-expand-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.expense-comment-summary svg {
+  color: var(--accent-primary);
+}
+
+.expense-expand-label {
+  gap: 5px;
+  color: var(--text-secondary);
+}
+
+.expense-expand-pane {
+  margin-top: 16px;
+  padding: 18px 0 0;
+  border-top: 0;
+}
+
+.expense-item-card:hover {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 640px) {
+  .expense-item-card {
+    padding: 16px;
+  }
+
+  .expense-item-header {
+    gap: 16px;
+  }
+
+  .expense-item-controls {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 540px) {
+  .expense-item-header {
+    flex-direction: column;
+  }
+
+  .expense-item-controls {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    padding-top: 0;
+  }
+
+  .expense-item-controls .expense-amount-display {
+    margin-right: auto;
+  }
+
+  .expense-expand-toggle {
+    margin-top: 14px;
+  }
+}
+
 /* Personal wallet settings */
 .wallet-setting-card { overflow: hidden; }
 .wallet-cash-icon {

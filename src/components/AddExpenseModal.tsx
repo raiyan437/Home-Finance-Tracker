@@ -32,14 +32,6 @@ interface AddExpenseModalProps {
 
 const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
 
-const PRESETS = [
-  { name: 'Weekly Groceries', amount: '120.00', category: 'Groceries' as Category },
-  { name: 'WiFi Internet Bill', amount: '45.00', category: 'Utilities' as Category },
-  { name: 'Electricity & Gas', amount: '85.50', category: 'Utilities' as Category },
-  { name: 'House Supplies & Clean', amount: '35.00', category: 'Household' as Category },
-  { name: 'Friday Takeout Food', amount: '54.00', category: 'Food' as Category },
-];
-
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   isOpen,
   onClose,
@@ -234,12 +226,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     } else {
       setSelectedParticipants([...selectedParticipants, userId]);
     }
-  };
-
-  const applyPreset = (preset: (typeof PRESETS)[0]) => {
-    setTitle(preset.name);
-    setAmountStr(preset.amount);
-    setCategory(preset.category);
   };
 
   const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -472,28 +458,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           </div>
         )}
 
-        {/* Quick Template Presets Bar */}
-        {!initialExpense && scope === 'household' && (
-          <div style={{ marginBottom: '18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              <Sparkles size={14} style={{ color: 'var(--accent-amber)' }} />
-              <span>Quick Template Presets</span>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-                  onClick={() => applyPreset(p)}
-                >
-                  {p.name} (৳{p.amount})
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {errorMessage && (
