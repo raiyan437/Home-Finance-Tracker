@@ -1,7 +1,7 @@
 /* oxlint-disable react/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserId, UserProfile, House, HouseMember, Expense, Settlement, PersonalWalletSettings } from '../types';
-import { USERS, calculateNetBalances, getHouseUsers } from '../features/settlementEngine';
+import { USERS, calculateNetBalances, getCanonicalHouseMembers, getHouseUsers } from '../features/settlementEngine';
 import { loadExpenses, loadSettlements, houseStorageScope } from '../services/storage';
 import {
   loadUsersDB,
@@ -514,40 +514,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
 
-    // Also update house member roster avatar across local storage & Cloud Firestore
-    if (currentHouse && currentHouse.members) {
-      const updatedMembers = currentHouse.members.map((m) => {
-        if (m.uid === dbUserProfile.uid) {
-          const { avatar: _memberAvatar, ...memberWithoutAvatar } = m;
+    // Keep the denormalized household roster in sync as well. The profile
+    // document is private to its owner, so other household members can only
+    // render this photo from the shared roster. Use the canonical houseId when
+    // currentHouse has not finished loading yet (a common cross-device race).
+    const targetHouseId = currentHouse?.id || dbUserProfile.houseId || null;
+    if (targetHouseId) {
+      const cachedHouse = currentHouse || loadHousesDB().find((house) => house.id === targetHouseId) || null;
+      const applyRosterAvatar = (house: House): House => {
+        const sourceMembers = getCanonicalHouseMembers(house);
+        const updatedMembers = sourceMembers.map((member) => {
+          if (member.uid !== dbUserProfile.uid) return member;
+          const { avatar: _memberAvatar, ...memberWithoutAvatar } = member;
           return avatarUrl ? { ...memberWithoutAvatar, avatar: avatarUrl } : memberWithoutAvatar;
-        }
-        return m;
-      });
-      const updatedHouse = { ...currentHouse, members: updatedMembers, memberMap: Object.fromEntries(updatedMembers.map((member) => [member.uid, member])) };
-      const houses = loadHousesDB();
-      const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
-      saveHousesDB(updatedHouses);
-      setCurrentHouse(updatedHouse);
+        });
+        return {
+          ...house,
+          members: updatedMembers,
+          memberUids: house.memberUids?.length ? house.memberUids : updatedMembers.map((member) => member.uid),
+          memberMap: Object.fromEntries(updatedMembers.map((member) => [member.uid, member])),
+        };
+      };
+
+      // Reflect the change immediately from the local cache while the cloud
+      // transaction is committing, including sessions that loaded offline.
+      const locallyUpdatedHouse = cachedHouse ? applyRosterAvatar(cachedHouse) : null;
+      if (locallyUpdatedHouse) {
+        const houses = loadHousesDB();
+        saveHousesDB(houses.some((house) => house.id === targetHouseId)
+          ? houses.map((house) => (house.id === targetHouseId ? locallyUpdatedHouse : house))
+          : [...houses, locallyUpdatedHouse]);
+        setCurrentHouse(locallyUpdatedHouse);
+      }
+
       if (isFirebaseConfigured && db) {
-        // This denormalized roster update must never keep the profile-photo UI
-        // in a loading state; the user profile above remains the source of truth.
-        await runTransaction(db, async (transaction) => {
-          const houseRef = doc(db!, 'houses', currentHouse.id);
-          const snapshot = await transaction.get(houseRef);
-          if (!snapshot.exists()) return;
-          const latest = snapshot.data() as House;
-          const members = latest.members.map((member) => {
-            if (member.uid !== dbUserProfile.uid) return member;
-            const { avatar: _memberAvatar, ...memberWithoutAvatar } = member;
-            return avatarUrl ? { ...memberWithoutAvatar, avatar: avatarUrl } : memberWithoutAvatar;
+        let cloudUpdatedHouse: House | null = null;
+        try {
+          await runTransaction(db, async (transaction) => {
+            const houseRef = doc(db!, 'houses', targetHouseId);
+            const snapshot = await transaction.get(houseRef);
+            if (!snapshot.exists()) return;
+            const latest = snapshot.data() as House;
+            const sourceMembers = getCanonicalHouseMembers(latest);
+            if (!sourceMembers.some((member) => member.uid === dbUserProfile.uid)) return;
+            const updatedHouse = applyRosterAvatar({ ...latest, members: sourceMembers });
+            cloudUpdatedHouse = updatedHouse;
+            transaction.update(houseRef, sanitizeForFirestore({
+              members: updatedHouse.members,
+              memberMap: updatedHouse.memberMap,
+            }));
           });
-          transaction.update(houseRef, sanitizeForFirestore({
-            members,
-            memberMap: Object.fromEntries(members.map((member) => [member.uid, member])),
-          }));
-        }).catch((error) => console.warn('The profile photo saved, but the house roster preview will retry later.', error));
-      } else {
-        await syncSaveHouse(updatedHouse);
+
+          if (cloudUpdatedHouse) {
+            cacheHouse(cloudUpdatedHouse);
+            setCurrentHouse(cloudUpdatedHouse);
+          }
+        } catch (error) {
+          // Do not make profile-photo changes look stuck if a roster write is
+          // temporarily unavailable. The user profile is already saved and
+          // the realtime listener will reconcile the shared roster on retry.
+          console.warn('The profile photo saved, but the house roster preview will retry later.', error);
+        }
+      } else if (locallyUpdatedHouse) {
+        await syncSaveHouse(locallyUpdatedHouse);
       }
     }
 

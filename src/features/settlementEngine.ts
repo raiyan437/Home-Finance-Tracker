@@ -1,4 +1,4 @@
-import type { User, UserId, Expense, Settlement, UserBalance, SimplifiedTransaction, House, UserProfile } from '../types';
+import type { User, UserId, Expense, Settlement, UserBalance, SimplifiedTransaction, House, HouseMember, UserProfile } from '../types';
 
 export const USERS: Record<UserId, User> = {
   raiyan: {
@@ -31,6 +31,40 @@ export const LEGACY_USER: User = {
 };
 
 /**
+ * Returns a resilient, UID-ordered roster by merging the two denormalized
+ * house indexes. Firestore writes the UI `members` list and rule-verifiable
+ * `memberMap` together, but a cross-device listener can observe them between
+ * writes or encounter an older document that only has one index.
+ */
+export const getCanonicalHouseMembers = (house: House): HouseMember[] => {
+  const members = Array.isArray(house.members) ? house.members : [];
+  const membersByUid = new Map(members.map((member) => [member.uid, member]));
+  const indexedMembers = house.memberMap || {};
+  const orderedUids = Array.from(new Set([
+    ...(house.memberUids || []),
+    ...members.map((member) => member.uid),
+    ...Object.keys(indexedMembers),
+  ]));
+
+  return orderedUids
+    .map((uid) => {
+      const member = membersByUid.get(uid);
+      const indexedMember = indexedMembers[uid];
+      if (!member && !indexedMember) return null;
+      if (!member) return indexedMember ?? null;
+      if (!indexedMember) return member;
+      return {
+        ...indexedMember,
+        ...member,
+        // Prefer whichever index has a usable photo while preserving the
+        // member list as the primary source for all other display fields.
+        ...(member.avatar || !indexedMember.avatar ? {} : { avatar: indexedMember.avatar }),
+      };
+    })
+    .filter((member): member is HouseMember => Boolean(member));
+};
+
+/**
  * Returns the list of User objects for members in the active house.
  * If user is not in any house, returns only that logged-in user.
  */
@@ -38,10 +72,8 @@ export const getHouseUsers = (
   house?: House | null,
   currentUser?: UserProfile | User | null
 ): User[] => {
-  if (house && house.members && house.members.length > 0) {
-    const canonicalMembers = house.memberMap && house.memberUids
-      ? house.memberUids.map((uid) => house.memberMap?.[uid]).filter((member): member is NonNullable<typeof member> => Boolean(member))
-      : house.members;
+  if (house && (house.members?.length || Object.keys(house.memberMap || {}).length)) {
+    const canonicalMembers = getCanonicalHouseMembers(house);
     return canonicalMembers.map((m) => {
       const isCurrent = currentUser && (m.uid === (currentUser as any).uid || m.email === (currentUser as any).email);
       const resolvedName = (isCurrent && (currentUser as any).displayName) || m.displayName || m.email?.split('@')[0] || 'Member';
