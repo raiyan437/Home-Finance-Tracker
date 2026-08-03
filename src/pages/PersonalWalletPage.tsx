@@ -18,7 +18,6 @@ interface PersonalWalletProps {
 
 const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
 const BUDGET_STORAGE_KEY = 'home_finance_personal_budget_v1';
-const CAT_BUDGET_STORAGE_KEY = 'home_finance_category_budgets_v1';
 
 export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   expenses,
@@ -52,34 +51,10 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
     );
   });
 
-  // Persistent category monthly budget limits (in Taka strings)
-  const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem(`${CAT_BUDGET_STORAGE_KEY}_${myUid}`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // Fallback
-      }
-    }
-    return {
-      Groceries: '8000',
-      Household: '5000',
-      Utilities: '4000',
-      Food: '6000',
-      Personal: '5000',
-      Other: '3000',
-    };
-  });
-
   // Save budget targets to localStorage
   useEffect(() => {
     localStorage.setItem(`${BUDGET_STORAGE_KEY}_${myUid}`, monthlyBudgetTaka);
   }, [monthlyBudgetTaka, myUid]);
-
-  useEffect(() => {
-    localStorage.setItem(`${CAT_BUDGET_STORAGE_KEY}_${myUid}`, JSON.stringify(categoryBudgets));
-  }, [categoryBudgets, myUid]);
 
   const userCards = useMemo(() => {
     return cards.filter((c) => c.ownerId === myUid);
@@ -122,15 +97,6 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
 
   const monthlyBudgetCents = dollarsToCents(monthlyBudgetTaka);
   const budgetRatioPercent = monthlyBudgetCents > 0 ? (totalPersonalSpentCents / monthlyBudgetCents) * 100 : 0;
-
-  // Category breakdown
-  const categoryTotals = useMemo(() => {
-    const map: Record<string, number> = {};
-    monthPersonalExpenses.forEach((e) => {
-      map[e.category] = (map[e.category] || 0) + e.amountCents;
-    });
-    return map;
-  }, [monthPersonalExpenses]);
 
   const handleOpenAdd = (exp?: Expense) => {
     if (exp) {
@@ -295,71 +261,6 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Per-Category Monthly Budget Threshold Limits Grid */}
-      <div className="glass-card">
-        <h3 className="section-title" style={{ marginBottom: '14px' }}>
-          {getTranslation('categoryBudgets', lang)}
-        </h3>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-          {CATEGORIES.map((cat) => {
-            const spentCents = categoryTotals[cat] || 0;
-            const limitStr = categoryBudgets[cat] || '5000';
-            const limitCents = dollarsToCents(limitStr);
-            const ratio = limitCents > 0 ? (spentCents / limitCents) * 100 : 0;
-
-            return (
-              <div
-                key={cat}
-                style={{
-                  backgroundColor: 'var(--bg-input)',
-                  padding: '14px',
-                  borderRadius: 'var(--radius-md)',
-                  border: ratio >= 100 ? '1px solid var(--accent-rose)' : ratio >= 80 ? '1px solid var(--accent-amber)' : '1px solid var(--border-subtle)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{cat}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Limit: ৳</span>
-                    <input
-                      type="number"
-                      step="100"
-                      className="form-input tabular-nums"
-                      style={{ width: '80px', padding: '2px 6px', fontSize: '0.8rem' }}
-                      value={limitStr}
-                      onChange={(e) => setCategoryBudgets({ ...categoryBudgets, [cat]: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
-                  <span>Spent: <strong>{formatCurrency(spentCents, false, lang)}</strong></span>
-                  <span style={{ fontWeight: 700, color: ratio >= 100 ? 'var(--accent-rose)' : ratio >= 80 ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>
-                    {ratio.toFixed(0)}%
-                  </span>
-                </div>
-
-                <div className="progress-bar-bg" style={{ height: '6px' }}>
-                  <div
-                    className="progress-bar-fill"
-                    style={{
-                      width: `${Math.min(100, ratio)}%`,
-                      backgroundColor:
-                        ratio >= 100
-                          ? 'var(--accent-rose)'
-                          : ratio >= 80
-                          ? 'var(--accent-amber)'
-                          : 'var(--accent-primary)',
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
 

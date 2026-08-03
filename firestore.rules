@@ -123,16 +123,23 @@ service cloud.firestore {
                          && getAfter(/databases/$(database)/documents/houses/$(profile.houseId)).data.leaderUid == uid)));
     }
 
+    function validProfileAvatar(profile) {
+      return !('avatar' in profile)
+             || (profile.avatar is string
+                 && ((profile.avatar.size() < 2048 && profile.avatar.matches('https://.*'))
+                     || (profile.avatar.size() < 40000
+                         && profile.avatar.matches('data:image/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+'))));
+    }
+
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create: if signedIn() && request.auth.uid == uid
                     && !('password' in request.resource.data)
-                    && (!('avatar' in request.resource.data) || (request.resource.data.avatar is string && request.resource.data.avatar.size() < 2048 && request.resource.data.avatar.matches('https://.*')))
+                    && validProfileAvatar(request.resource.data)
                     && profileMembershipValid(uid, request.resource.data);
       allow update: if signedIn()
                     && !('password' in request.resource.data)
-                    && (!('avatar' in request.resource.data)
-                        || (request.resource.data.avatar is string && request.resource.data.avatar.size() < 2048 && request.resource.data.avatar.matches('https://.*'))
+                    && (validProfileAvatar(request.resource.data)
                         || (('avatar' in resource.data) && request.resource.data.avatar == resource.data.avatar))
                     && profileMembershipValid(uid, request.resource.data)
                     && (request.auth.uid == uid

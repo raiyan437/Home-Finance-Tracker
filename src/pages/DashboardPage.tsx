@@ -1,14 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Expense, Settlement } from '../types';
 import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers, LEGACY_USER } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 import { toLocalMonthKey } from '../utils/localDate';
+import { filterDashboardMonth, getDashboardMonths } from '../features/monthlyDashboard';
 import { CategoryChart, PayerContributionCard } from '../components/CategoryChart';
 import { CategoryPieChart } from '../components/CategoryPieChart';
 import { UserAvatar } from '../components/UserAvatar';
-import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote, Users, PieChart } from 'lucide-react';
+import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote, Users, PieChart, CalendarDays } from 'lucide-react';
 import type { Language } from '../utils/i18n';
+import { MaterialSelect } from '../components/MaterialSelect';
 
 interface DashboardProps {
   expenses: Expense[];
@@ -27,10 +29,23 @@ export const DashboardPage: React.FC<DashboardProps> = ({
 }) => {
   const { currentHouse, dbUserProfile } = useAuth();
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
+  const currentMonthKey = useMemo(() => toLocalMonthKey(), []);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+
+  const availableMonths = useMemo(
+    () => getDashboardMonths(expenses, settlements, currentMonthKey),
+    [expenses, settlements, currentMonthKey]
+  );
+  const selectedData = useMemo(
+    () => filterDashboardMonth(expenses, settlements, selectedMonth),
+    [expenses, settlements, selectedMonth]
+  );
+  const monthExpenses = selectedData.expenses;
+  const monthSettlements = selectedData.settlements;
 
   const userBalances = useMemo(
-    () => calculateNetBalances(expenses, settlements, houseUsers),
-    [expenses, settlements, houseUsers]
+    () => calculateNetBalances(monthExpenses, monthSettlements, houseUsers),
+    [monthExpenses, monthSettlements, houseUsers]
   );
 
   const simplifiedSettlements = useMemo(
@@ -38,36 +53,32 @@ export const DashboardPage: React.FC<DashboardProps> = ({
     [userBalances, houseUsers]
   );
 
-  // Calculate Current Month Spend & Cumulative Month Spend
-  const currentMonthStr = useMemo(() => toLocalMonthKey(), []);
-  const currentMonthExpenses = useMemo(() => {
-    return expenses.filter((e) => e.date && e.date.startsWith(currentMonthStr));
-  }, [expenses, currentMonthStr]);
+  const selectedMonthSpentCents = useMemo(
+    () => monthExpenses.reduce((sum, expense) => sum + expense.amountCents, 0),
+    [monthExpenses]
+  );
+  const selectedMonthSettledCents = useMemo(
+    () => monthSettlements
+      .filter((settlement) => settlement.status === 'completed')
+      .reduce((sum, settlement) => sum + settlement.amountCents, 0),
+    [monthSettlements]
+  );
 
-  const currentMonthSpentCents = useMemo(() => {
-    return currentMonthExpenses.reduce((sum, exp) => sum + exp.amountCents, 0);
-  }, [currentMonthExpenses]);
-
-  // All-time cumulative spend across all months
-  const allTimeTotalCents = useMemo(() => {
-    return expenses.reduce((sum, exp) => sum + exp.amountCents, 0);
-  }, [expenses]);
-
-  const currentMonthLabel = useMemo(() => {
-    const d = new Date(currentMonthStr + '-01');
+  const selectedMonthLabel = useMemo(() => {
+    const d = new Date(selectedMonth + '-01');
     return isNaN(d.getTime())
-      ? currentMonthStr
+      ? selectedMonth
       : d.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' });
-  }, [currentMonthStr, lang]);
+  }, [selectedMonth, lang]);
 
   // Calculate total pending debt in household
   const totalPendingDebtCents = simplifiedSettlements.reduce((sum, st) => sum + st.amountCents, 0);
 
   const memberCount = Math.max(1, houseUsers.length);
-  const currentMonthAveragePerMemberCents = Math.round(currentMonthSpentCents / memberCount);
+  const selectedMonthAveragePerMemberCents = Math.round(selectedMonthSpentCents / memberCount);
   const memberNamesText = houseUsers.map((u) => u.name).join(', ');
 
-  const recentExpenses = [...expenses]
+  const recentExpenses = [...monthExpenses]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
@@ -76,7 +87,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
     let cardCents = 0;
     let cashCents = 0;
 
-    expenses.forEach((exp) => {
+    monthExpenses.forEach((exp) => {
       if (exp.paymentMethod?.type === 'card' || exp.paymentMethod?.cardId) {
         cardCents += exp.amountCents;
       } else {
@@ -89,7 +100,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
     const cashPercentage = grandTotal > 0 ? (cashCents / grandTotal) * 100 : 0;
 
     return { cardCents, cashCents, cardPercentage, cashPercentage };
-  }, [expenses]);
+  }, [monthExpenses]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -98,11 +109,27 @@ export const DashboardPage: React.FC<DashboardProps> = ({
         <div className="page-title-group">
           <h1 className="page-title">Household Financial Dashboard</h1>
           <p className="page-description">
-            Live overview of household expenses, net debtor positions, and settlement recommendations for {memberNamesText}
+            Monthly overview of household expenses, balances, and settlements for {memberNamesText}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div className="dashboard-header-actions">
+          <div className="dashboard-month-selector">
+            <CalendarDays size={18} aria-hidden="true" />
+            <MaterialSelect
+              compact
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              ariaLabel="Dashboard month"
+              options={availableMonths.map((monthKey) => {
+                const date = new Date(`${monthKey}-01`);
+                const label = isNaN(date.getTime())
+                  ? monthKey
+                  : date.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' });
+                return { value: monthKey, label };
+              })}
+            />
+          </div>
           <button className="btn btn-primary" onClick={onNavigateToExpenses}>
             <span>Log Expense</span>
             <Receipt size={16} />
@@ -116,35 +143,35 @@ export const DashboardPage: React.FC<DashboardProps> = ({
 
       {/* Top Summary Metric Cards */}
       <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px' }}>
-        {/* Metric 1: Current Month Spend */}
+        {/* Metric 1: Selected Month Spend */}
         <div className="glass-card summary-card animate-stagger-1">
           <div className="summary-card-header">
-            <span className="summary-title">Current Month Spend</span>
+            <span className="summary-title">Selected Month Spend</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
               <TrendingUp size={22} />
             </div>
           </div>
           <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-primary)' }}>
-            {formatCurrency(currentMonthSpentCents, false, lang)}
+            {formatCurrency(selectedMonthSpentCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Spent in {currentMonthLabel} ({currentMonthExpenses.length} items)</span>
+            <span>Spent in {selectedMonthLabel} ({monthExpenses.length} items)</span>
           </div>
         </div>
 
-        {/* Metric 2: All-Time Cumulative Total Spend */}
+        {/* Metric 2: Completed settlements in selected month */}
         <div className="glass-card summary-card animate-stagger-2">
           <div className="summary-card-header">
-            <span className="summary-title">All-Time Total Spend</span>
+            <span className="summary-title">Settled This Month</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}>
               <Receipt size={22} />
             </div>
           </div>
           <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-purple)' }}>
-            {formatCurrency(allTimeTotalCents, false, lang)}
+            {formatCurrency(selectedMonthSettledCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Cumulative across all months ({expenses.length} total items)</span>
+            <span>{monthSettlements.filter((settlement) => settlement.status === 'completed').length} completed payments in {selectedMonthLabel}</span>
           </div>
         </div>
 
@@ -173,10 +200,10 @@ export const DashboardPage: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-emerald)' }}>
-            {formatCurrency(currentMonthAveragePerMemberCents, false, lang)}
+            {formatCurrency(selectedMonthAveragePerMemberCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Fair share target for {currentMonthLabel}</span>
+            <span>Fair share target for {selectedMonthLabel}</span>
           </div>
         </div>
       </div>
@@ -198,7 +225,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
                 const netCents = userBalances[user.id]?.netBalanceCents || 0;
                 const isCreditor = netCents > 0;
                 const isDebtor = netCents < 0;
-                const paidCents = expenses
+                const paidCents = monthExpenses
                   .filter((e) => e.paidBy === user.id || e.paidBy.toLowerCase() === user.name.toLowerCase())
                   .reduce((sum, e) => sum + e.amountCents, 0);
 
@@ -340,7 +367,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
 
             {recentExpenses.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                No expenses recorded yet.
+                No shared expenses recorded for {selectedMonthLabel}.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -386,7 +413,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
           </div>
 
           {/* 4. Payer Out-of-Pocket Contribution Ratio Card (Moved to Left Column beneath Recent Expenses) */}
-          <PayerContributionCard expenses={expenses} />
+          <PayerContributionCard expenses={monthExpenses} />
 
           {/* 5. Payment Channel Distribution Card (Bank Cards vs Cash) */}
           <div className="glass-card">
@@ -485,11 +512,11 @@ export const DashboardPage: React.FC<DashboardProps> = ({
               <PieChart size={18} style={{ color: 'var(--accent-primary)' }} />
               <span>Category Spending Breakdown</span>
             </h2>
-            <CategoryPieChart expenses={expenses} lang={lang} />
+            <CategoryPieChart expenses={monthExpenses} lang={lang} />
           </div>
 
           {/* 2. Category Progress Bars */}
-          <CategoryChart expenses={expenses} />
+          <CategoryChart expenses={monthExpenses} />
 
         </div>
 

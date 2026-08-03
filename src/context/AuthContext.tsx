@@ -494,35 +494,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserProfilePhoto = async (avatarUrl: string | null) => {
     if (!dbUserProfile) throw new Error('You must be logged in to update profile photo.');
 
-    const users = loadUsersDB();
-    const updatedUsers = users.map((u) => {
-      if (u.uid === dbUserProfile.uid) {
-        const { avatar: _previousAvatar, ...profileWithoutAvatar } = u;
-        return avatarUrl ? { ...profileWithoutAvatar, avatar: avatarUrl } : profileWithoutAvatar;
-      }
-      return u;
-    });
-    saveUsersDB(updatedUsers);
-
     const { avatar: _previousAvatar, ...profileWithoutAvatar } = dbUserProfile;
     const updatedProfile = avatarUrl ? { ...profileWithoutAvatar, avatar: avatarUrl } : profileWithoutAvatar;
-    setActiveSession(updatedProfile);
-    setDbUserProfile(updatedProfile);
 
-    // Persist the avatar field directly so removal uses Firestore's deleteField
-    // sentinel instead of leaving an old photo behind after a merge write.
     if (isFirebaseConfigured && db) {
       try {
         await setDoc(doc(db, 'users', dbUserProfile.uid), {
           avatar: avatarUrl ?? deleteField(),
         }, { merge: true });
       } catch (error) {
-        console.warn('Profile photo sync was queued for retry.', error);
-        void syncSaveUser(updatedProfile);
+        console.error('Profile photo cloud save failed.', error);
+        throw new Error('Profile photo could not be saved to the live account. Please try again.');
       }
-    } else {
-      void syncSaveUser(updatedProfile);
     }
+
+    cacheUserProfile(updatedProfile);
+    setActiveSession(updatedProfile);
+    setDbUserProfile(updatedProfile);
 
     // Also update house member roster avatar across local storage & Cloud Firestore
     if (currentHouse && currentHouse.members) {
@@ -541,7 +529,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (isFirebaseConfigured && db) {
         // This denormalized roster update must never keep the profile-photo UI
         // in a loading state; the user profile above remains the source of truth.
-        void runTransaction(db, async (transaction) => {
+        await runTransaction(db, async (transaction) => {
           const houseRef = doc(db!, 'houses', currentHouse.id);
           const snapshot = await transaction.get(houseRef);
           if (!snapshot.exists()) return;
@@ -555,16 +543,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             members,
             memberMap: Object.fromEntries(members.map((member) => [member.uid, member])),
           }));
-        }).catch((error) => console.warn('House roster avatar sync will retry later.', error));
+        }).catch((error) => console.warn('The profile photo saved, but the house roster preview will retry later.', error));
       } else {
-        void syncSaveHouse(updatedHouse);
+        await syncSaveHouse(updatedHouse);
       }
     }
 
     if (auth?.currentUser) {
-      void updateProfile(auth.currentUser, { photoURL: avatarUrl }).catch((error) => {
-        console.warn('Firebase Auth profile photo update notice:', error);
-      });
+      // Compact data URLs live in Firestore. Firebase Auth is only used for
+      // legacy HTTPS photos and must be cleared on removal to avoid resurrection.
+      if (!avatarUrl || avatarUrl.startsWith('http')) {
+        await updateProfile(auth.currentUser, { photoURL: avatarUrl }).catch((error) => {
+          console.warn('Firebase Auth profile photo mirror notice:', error);
+        });
+      }
     }
   };
 

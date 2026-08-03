@@ -54,7 +54,8 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
 
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const hasProfilePhoto = Boolean(dbUserProfile?.avatar || firebaseUser?.photoURL);
+  const profileAvatar = dbUserProfile ? dbUserProfile.avatar : firebaseUser?.photoURL || undefined;
+  const hasProfilePhoto = Boolean(profileAvatar);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -233,7 +234,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
               user={{
                 id: dbUserProfile?.uid || 'user',
                 name: dbUserProfile?.displayName || 'User',
-                avatar: dbUserProfile?.avatar || firebaseUser?.photoURL || undefined,
+                avatar: profileAvatar,
                 color: '#6750a4',
               }}
               size={72}

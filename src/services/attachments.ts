@@ -5,6 +5,7 @@ import { createId } from '../utils/ids';
 export type AttachmentKind = 'avatars' | 'receipts' | 'settlement-proofs';
 const CLOUD_MAX_BYTES = 5 * 1024 * 1024;
 const OFFLINE_MAX_BYTES = 300 * 1024;
+const PROFILE_PHOTO_MAX_BYTES = 28 * 1024;
 const UPLOAD_TIMEOUT_MS = 20_000;
 
 const asDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -60,7 +61,9 @@ export const prepareProfilePhoto = async (file: File): Promise<File> => {
       element.src = imageUrl;
     });
 
-    const maxDimension = 512;
+    // Profile photos are stored as compact Firestore-safe data URLs so they
+    // work even when a Firebase project has no Storage bucket configured.
+    const maxDimension = 192;
     const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -69,9 +72,16 @@ export const prepareProfilePhoto = async (file: File): Promise<File> => {
     if (!context) throw new Error('Unable to prepare the selected image.');
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Unable to prepare the selected image.')), 'image/webp', 0.84);
-    });
+    let blob: Blob | null = null;
+    for (const quality of [0.78, 0.64, 0.5, 0.38]) {
+      blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Unable to prepare the selected image.')), 'image/webp', quality);
+      });
+      if (blob.size <= PROFILE_PHOTO_MAX_BYTES) break;
+    }
+    if (!blob || blob.size > PROFILE_PHOTO_MAX_BYTES) {
+      throw new Error('This image could not be compressed enough. Please choose a simpler photo.');
+    }
     return new File([blob], 'profile-photo.webp', { type: 'image/webp' });
   } finally {
     URL.revokeObjectURL(imageUrl);
@@ -81,6 +91,11 @@ export const prepareProfilePhoto = async (file: File): Promise<File> => {
 export const saveAttachment = async (file: File, kind: AttachmentKind, houseId?: string): Promise<string> => {
   if (!file.type.startsWith('image/')) throw new Error('Only image attachments are supported.');
   if (file.size > CLOUD_MAX_BYTES) throw new Error('Image must be 5 MB or smaller.');
+
+  if (kind === 'avatars') {
+    if (file.size > PROFILE_PHOTO_MAX_BYTES) throw new Error('Profile photo is too large after optimization.');
+    return asDataUrl(file);
+  }
 
   if (isFirebaseConfigured && fileStorage && auth?.currentUser) {
     const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
