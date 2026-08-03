@@ -223,20 +223,20 @@ export const CardsPage: React.FC<CardsManagerProps> = ({
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <button
-                        className="btn btn-secondary btn-icon-only"
-                        style={{ background: 'rgba(255, 255, 255, 0.2)', border: 'none', color: 'white' }}
+                        className="btn record-action-button record-action-edit on-card"
                         onClick={() => handleOpenAdd(card)}
                         title="Edit card"
                       >
                         <Edit size={15} />
+                        <span>Edit</span>
                       </button>
                       <button
-                        className="btn btn-secondary btn-icon-only"
-                        style={{ background: 'rgba(244, 63, 94, 0.3)', border: 'none', color: 'white' }}
+                        className="btn record-action-button record-action-delete on-card"
                         onClick={() => handleDeleteClick(card)}
                         title="Delete card"
                       >
                         <Trash2 size={15} />
+                        <span>Delete</span>
                       </button>
                     </div>
                   </div>
@@ -403,7 +403,8 @@ export const CardsPage: React.FC<CardsManagerProps> = ({
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  {editingCard ? 'Save Changes' : 'Save Payment Card'}
+                  {editingCard ? <Edit size={17} /> : <Plus size={17} />}
+                  <span>{editingCard ? 'Save Changes' : 'Save Payment Card'}</span>
                 </button>
               </div>
             </form>

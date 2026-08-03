@@ -19,20 +19,23 @@ import {
   Eye,
   EyeOff,
   Trash2,
+  Languages,
 } from 'lucide-react';
 
 import type { Language } from '../utils/i18n';
 
 interface SettingsViewProps {
   lang?: Language;
+  toggleLang: () => void;
 }
 
-export const SettingsPage: React.FC<SettingsViewProps> = () => {
+export const SettingsPage: React.FC<SettingsViewProps> = ({ lang = 'en', toggleLang }) => {
   const {
     firebaseUser,
     dbUserProfile,
     currentHouse,
     updateUserProfilePhoto,
+    updatePersonalWalletSettings,
     changeUserPassword,
     logout,
   } = useAuth();
@@ -153,6 +156,11 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
           ...result.data.cards.map((card) => syncSaveCard(card)),
         ];
         const syncResults = await Promise.all(writes);
+        if (result.data.walletSettings) {
+          await updatePersonalWalletSettings(result.data.walletSettings);
+        } else if (typeof result.data.personalBudgetTaka === 'number' && result.data.personalBudgetTaka >= 0) {
+          await updatePersonalWalletSettings({ monthlyBudgetCents: Math.round(result.data.personalBudgetTaka * 100) });
+        }
         const queued = syncResults.some((item) => item?.queued);
         setSuccessMsg(queued ? 'Backup restored locally; cloud updates are queued for retry.' : 'Backup restored locally and to the cloud. Reloading session...');
         setTimeout(() => window.location.reload(), 1200);
@@ -180,7 +188,7 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
         <div className="page-title-group">
           <h1 className="page-title">Account & Security Settings</h1>
           <p className="page-description">
-            Manage profile photo, change password, security backups, browser alerts, and cloud sync mode
+            Manage language, profile photo, password, backups, browser alerts, and cloud sync
           </p>
         </div>
 
@@ -284,6 +292,25 @@ export const SettingsPage: React.FC<SettingsViewProps> = () => {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Language preference */}
+      <div className="glass-card settings-preference-card">
+        <div className="settings-preference-copy">
+          <div className="settings-preference-icon"><Languages size={20} /></div>
+          <div>
+            <h3>Language</h3>
+            <p>Choose the language used across your Home Finance workspace.</p>
+          </div>
+        </div>
+        <div className="language-segmented-control" role="group" aria-label="Application language">
+          <button type="button" className={lang === 'en' ? 'active' : ''} onClick={lang === 'en' ? undefined : toggleLang} aria-pressed={lang === 'en'}>
+            English
+          </button>
+          <button type="button" className={lang === 'bn' ? 'active' : ''} onClick={lang === 'bn' ? undefined : toggleLang} aria-pressed={lang === 'bn'}>
+            বাংলা
+          </button>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Trash2 } from 'lucide-react';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -84,7 +84,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             onClick={handleConfirm}
             disabled={isConfirming}
           >
-            {isConfirming ? 'Please wait…' : confirmText}
+            {variant === 'danger' && !isConfirming && <Trash2 size={16} />}
+            <span>{isConfirming ? 'Please wait…' : confirmText}</span>
           </button>
         </div>
       </div>

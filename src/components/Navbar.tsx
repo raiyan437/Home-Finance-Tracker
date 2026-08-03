@@ -16,7 +16,6 @@ import {
   Wallet,
   UserCheck,
   CreditCard,
-  Languages,
   Settings,
   Crown,
   LogOut,
@@ -35,7 +34,6 @@ interface NavbarProps {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   lang: Language;
-  toggleLang: () => void;
   expenseCount?: number;
   settlementCount?: number;
   personalCount?: number;
@@ -51,7 +49,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   theme,
   toggleTheme,
   lang,
-  toggleLang,
   expenseCount,
   settlementCount,
   personalCount,
@@ -293,19 +290,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="sidebar-footer-row" style={{ justifyContent: isCollapsed ? 'center' : 'space-between' }}>
             {!isCollapsed && (
               <div className="sidebar-footer-label">
-                <Languages size={15} style={{ color: 'var(--accent-cyan)' }} />
-                <span>Language</span>
-              </div>
-            )}
-            <button className="theme-toggle-btn" onClick={toggleLang} title={isCollapsed ? 'Switch English / Bangla' : 'Switch English / Bangla'}>
-              <span>{lang === 'en' ? '🇧🇩' : '🇬🇧'}</span>
-              {!isCollapsed && <span>{lang === 'en' ? ' বাংলা' : ' EN'}</span>}
-            </button>
-          </div>
-
-          <div className="sidebar-footer-row" style={{ justifyContent: isCollapsed ? 'center' : 'space-between' }}>
-            {!isCollapsed && (
-              <div className="sidebar-footer-label">
                 <Sparkles size={15} style={{ color: 'var(--accent-primary)' }} />
                 <span>{t('appearance')}</span>
               </div>
@@ -423,7 +407,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <div className="mobile-menu-actions">
               <ThemeSwitch theme={theme} onToggle={toggleTheme} />
-              <button onClick={toggleLang}><Languages size={17} /> {lang === 'en' ? 'বাংলা' : 'English'}</button>
               <button className="danger" onClick={handleLogoutClick}><LogOut size={17} /> Log out</button>
             </div>
           </section>

@@ -2,6 +2,13 @@ export type UserId = 'raiyan' | 'himel' | 'lazim' | string;
 
 export type HouseRole = 'leader' | 'member';
 
+export interface PersonalWalletSettings {
+  monthlyBudgetCents?: number;
+  cashBalanceCents?: number;
+  cashTrackedExpenseCents?: number;
+  updatedAt?: string;
+}
+
 export interface UserProfile {
   uid: string;
   displayName: string;
@@ -9,6 +16,7 @@ export interface UserProfile {
   avatar?: string;
   houseId?: string | null;
   role?: HouseRole | null;
+  walletSettings?: PersonalWalletSettings;
   createdAt: string;
 }
 

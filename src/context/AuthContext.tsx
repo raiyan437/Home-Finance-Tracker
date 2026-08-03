@@ -1,6 +1,6 @@
 /* oxlint-disable react/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User, UserId, UserProfile, House, HouseMember, Expense, Settlement } from '../types';
+import type { User, UserId, UserProfile, House, HouseMember, Expense, Settlement, PersonalWalletSettings } from '../types';
 import { USERS, calculateNetBalances, getHouseUsers } from '../features/settlementEngine';
 import { loadExpenses, loadSettlements, houseStorageScope } from '../services/storage';
 import {
@@ -50,6 +50,7 @@ interface AuthContextType {
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
   updateUserProfilePhoto: (avatarUrl: string | null) => Promise<void>;
+  updatePersonalWalletSettings: (settings: Partial<PersonalWalletSettings>) => Promise<void>;
   changeUserPassword: (currentPass: string, newPass: string) => Promise<void>;
   logout: () => Promise<void>;
   createHouse: (houseName: string, customHouseCode?: string) => Promise<void>;
@@ -171,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...createProfileFromIdentity(identity),
           ...(cached?.displayName ? { displayName: cached.displayName } : {}),
           ...(cached?.avatar ? { avatar: cached.avatar } : {}),
+          ...(cached?.walletSettings ? { walletSettings: cached.walletSettings } : {}),
           ...(cached?.createdAt ? { createdAt: cached.createdAt } : {}),
         };
     const resolvedProfile = await recoverRosterMembership(baseProfile, cached?.houseId);
@@ -558,6 +560,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     }
+  };
+
+  const updatePersonalWalletSettings = async (settings: Partial<PersonalWalletSettings>) => {
+    if (!dbUserProfile) throw new Error('You must be logged in to update wallet settings.');
+    const updatedProfile: UserProfile = {
+      ...dbUserProfile,
+      walletSettings: {
+        ...dbUserProfile.walletSettings,
+        ...settings,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, 'users', dbUserProfile.uid), {
+          walletSettings: updatedProfile.walletSettings,
+        }, { merge: true });
+      } catch (error) {
+        console.error('Wallet settings cloud save failed.', error);
+        throw new Error('Wallet settings could not be saved to the live account. Please try again.');
+      }
+    } else {
+      await syncSaveUser(updatedProfile);
+    }
+
+    cacheUserProfile(updatedProfile);
+    setActiveSession(updatedProfile);
+    setDbUserProfile(updatedProfile);
   };
 
   // Change User Password Handler
@@ -1148,6 +1179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithEmail,
         signUpWithEmail,
         updateUserProfilePhoto,
+        updatePersonalWalletSettings,
         changeUserPassword,
         logout,
         createHouse,

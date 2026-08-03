@@ -1,4 +1,4 @@
-import type { Expense, Settlement, PaymentCard, UserProfile } from '../types';
+import type { Expense, Settlement, PaymentCard, PersonalWalletSettings, UserProfile } from '../types';
 
 const EXPENSES_STORAGE_KEY = 'home_finance_expenses_v1';
 const SETTLEMENTS_STORAGE_KEY = 'home_finance_settlements_v1';
@@ -112,6 +112,7 @@ export interface BackupDataPayload {
   housesDB?: any[];
   personalBudgetTaka?: number;
   categoryBudgets?: Record<string, number>;
+  walletSettings?: PersonalWalletSettings;
 }
 
 export interface BackupImportResult {
@@ -167,10 +168,7 @@ export const exportBackupJSON = (houseId?: string, userId?: string): string => {
     housesDB: houseId
       ? JSON.parse(localStorage.getItem('home_finance_houses_db_v3') || '[]').filter((house: { id: string }) => house.id === houseId)
       : [],
-    personalBudgetTaka: localStorage.getItem(`home_finance_personal_budget_v1_${userId}`) === null
-      ? 15000
-      : Number(localStorage.getItem(`home_finance_personal_budget_v1_${userId}`)),
-    categoryBudgets: JSON.parse(localStorage.getItem(`home_finance_category_budgets_v1_${userId}`) || '{}'),
+    walletSettings: sanitizedUsers.find((user: UserProfile) => user.uid === userId)?.walletSettings,
   };
   return JSON.stringify(payload, null, 2);
 };
@@ -182,6 +180,13 @@ export const importBackupJSON = (jsonStr: string, houseId?: string, userId?: str
     if (!Array.isArray(data.expenses) || !data.expenses.every(validBackupExpense)) return { ok: false, error: 'Backup contains invalid expenses.' };
     if (!Array.isArray(data.settlements) || !data.settlements.every(validBackupSettlement)) return { ok: false, error: 'Backup contains invalid settlements.' };
     if (!Array.isArray(data.cards) || !data.cards.every(validBackupCard)) return { ok: false, error: 'Backup contains invalid cards.' };
+    if (data.walletSettings && (
+      !isRecord(data.walletSettings)
+      || ['monthlyBudgetCents', 'cashBalanceCents', 'cashTrackedExpenseCents'].some((key) => {
+        const value = data.walletSettings?.[key as keyof PersonalWalletSettings];
+        return value !== undefined && (!Number.isSafeInteger(value) || Number(value) < 0);
+      })
+    )) return { ok: false, error: 'Backup contains invalid wallet settings.' };
 
     const scopedExpenses = data.expenses.filter((expense) =>
       (houseId && expense.scope !== 'personal' && expense.houseId === houseId)

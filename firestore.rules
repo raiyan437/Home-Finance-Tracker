@@ -131,16 +131,43 @@ service cloud.firestore {
                          && profile.avatar.matches('data:image/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+'))));
     }
 
+    function validWalletSettings(profile) {
+      return !('walletSettings' in profile)
+             || (profile.walletSettings is map
+                 && profile.walletSettings.keys().hasOnly([
+                   'monthlyBudgetCents',
+                   'cashBalanceCents',
+                   'cashTrackedExpenseCents',
+                   'updatedAt'
+                 ])
+                 && (!('monthlyBudgetCents' in profile.walletSettings)
+                     || (profile.walletSettings.monthlyBudgetCents is int
+                         && profile.walletSettings.monthlyBudgetCents >= 0
+                         && profile.walletSettings.monthlyBudgetCents <= 100000000000))
+                 && (!('cashBalanceCents' in profile.walletSettings)
+                     || (profile.walletSettings.cashBalanceCents is int
+                         && profile.walletSettings.cashBalanceCents >= 0
+                         && profile.walletSettings.cashBalanceCents <= 100000000000))
+                 && (!('cashTrackedExpenseCents' in profile.walletSettings)
+                     || (profile.walletSettings.cashTrackedExpenseCents is int
+                         && profile.walletSettings.cashTrackedExpenseCents >= 0
+                         && profile.walletSettings.cashTrackedExpenseCents <= 100000000000))
+                 && (!('updatedAt' in profile.walletSettings)
+                     || profile.walletSettings.updatedAt is string));
+    }
+
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create: if signedIn() && request.auth.uid == uid
                     && !('password' in request.resource.data)
                     && validProfileAvatar(request.resource.data)
+                    && validWalletSettings(request.resource.data)
                     && profileMembershipValid(uid, request.resource.data);
       allow update: if signedIn()
                     && !('password' in request.resource.data)
                     && (validProfileAvatar(request.resource.data)
                         || (('avatar' in resource.data) && request.resource.data.avatar == resource.data.avatar))
+                    && validWalletSettings(request.resource.data)
                     && profileMembershipValid(uid, request.resource.data)
                     && (request.auth.uid == uid
                         || (isHouseLeader(resource.data.houseId)

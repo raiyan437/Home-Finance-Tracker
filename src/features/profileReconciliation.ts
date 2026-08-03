@@ -1,4 +1,4 @@
-import type { HouseRole, UserProfile } from '../types';
+import type { HouseRole, PersonalWalletSettings, UserProfile } from '../types';
 
 export interface AuthIdentity {
   uid: string;
@@ -9,6 +9,21 @@ export interface AuthIdentity {
 }
 
 const isRole = (value: unknown): value is HouseRole => value === 'leader' || value === 'member';
+
+const normalizeWalletSettings = (value: unknown): PersonalWalletSettings | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const settings: PersonalWalletSettings = {};
+  const copyCents = (key: keyof Pick<PersonalWalletSettings, 'monthlyBudgetCents' | 'cashBalanceCents' | 'cashTrackedExpenseCents'>) => {
+    const amount = raw[key];
+    if (typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0) settings[key] = amount;
+  };
+  copyCents('monthlyBudgetCents');
+  copyCents('cashBalanceCents');
+  copyCents('cashTrackedExpenseCents');
+  if (typeof raw.updatedAt === 'string') settings.updatedAt = raw.updatedAt;
+  return Object.keys(settings).length > 0 ? settings : undefined;
+};
 
 export const createProfileFromIdentity = (
   identity: AuthIdentity,
@@ -35,6 +50,7 @@ export const normalizeCloudProfile = (
   const houseId = typeof rawProfile.houseId === 'string' && rawProfile.houseId.trim()
     ? rawProfile.houseId
     : null;
+  const walletSettings = normalizeWalletSettings(rawProfile.walletSettings);
 
   return {
     uid: identity.uid,
@@ -43,6 +59,7 @@ export const normalizeCloudProfile = (
     ...(rawProfile.avatar || fallback.avatar ? { avatar: rawProfile.avatar || fallback.avatar } : {}),
     houseId,
     role: houseId && isRole(rawProfile.role) ? rawProfile.role : null,
+    ...(walletSettings ? { walletSettings } : {}),
     createdAt: rawProfile.createdAt || fallback.createdAt,
   };
 };

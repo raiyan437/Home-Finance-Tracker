@@ -51,4 +51,23 @@ describe('cross-device profile reconciliation', () => {
 
     expect(mergeProfileIntoCache(staleProfiles, cloudProfile)).toEqual([cloudProfile]);
   });
+
+  it('preserves valid personal wallet settings across devices', () => {
+    const profile = normalizeCloudProfile(identity, {
+      displayName: 'Cloud Person',
+      walletSettings: {
+        monthlyBudgetCents: 150_000,
+        cashBalanceCents: 80_000,
+        cashTrackedExpenseCents: 25_000,
+        updatedAt: '2026-08-03T00:00:00.000Z',
+      },
+    });
+
+    expect(profile.walletSettings).toEqual({
+      monthlyBudgetCents: 150_000,
+      cashBalanceCents: 80_000,
+      cashTrackedExpenseCents: 25_000,
+      updatedAt: '2026-08-03T00:00:00.000Z',
+    });
+  });
 });

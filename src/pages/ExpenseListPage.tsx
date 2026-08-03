@@ -341,7 +341,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {(exp.paidBy === myUid || isLeader) && (
                         <button
-                          className="btn btn-secondary btn-icon-only"
+                          className="btn record-action-button record-action-edit"
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditExpense(exp);
@@ -349,11 +349,12 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                           title="Edit expense"
                         >
                           <Edit size={15} />
+                          <span>Edit</span>
                         </button>
                       )}
                       {(exp.paidBy === myUid || isLeader) && (
                         <button
-                          className="btn btn-danger btn-icon-only"
+                          className="btn record-action-button record-action-delete"
                           onClick={(e) => {
                             e.stopPropagation();
                             onDeleteExpense(exp.id);
@@ -361,6 +362,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                           title="Delete expense"
                         >
                           <Trash2 size={15} />
+                          <span>Delete</span>
                         </button>
                       )}
                       <div style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>

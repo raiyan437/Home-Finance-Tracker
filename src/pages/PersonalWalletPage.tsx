@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { formatCurrency, dollarsToCents } from '../utils/currency';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
-import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, CreditCard, Banknote, Calendar, AlertTriangle } from 'lucide-react';
+import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, CreditCard, Banknote, Calendar, AlertTriangle, Save, CircleDollarSign, CheckCircle2 } from 'lucide-react';
 import { toLocalDateKey, toLocalMonthKey } from '../utils/localDate';
 import { MaterialSelect } from '../components/MaterialSelect';
+import { calculateCashInHandCents, createCashCheckpoint } from '../features/personalWalletLedger';
 
 interface PersonalWalletProps {
   expenses: Expense[];
@@ -17,7 +18,6 @@ interface PersonalWalletProps {
 }
 
 const CATEGORIES: Category[] = ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other'];
-const BUDGET_STORAGE_KEY = 'home_finance_personal_budget_v1';
 
 export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   expenses,
@@ -26,7 +26,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   onDeleteExpense,
   lang = 'en',
 }) => {
-  const { activeUserId, dbUserProfile } = useAuth();
+  const { activeUserId, dbUserProfile, updatePersonalWalletSettings } = useAuth();
   const myUid = dbUserProfile?.uid || activeUserId;
 
   const currentMonthKey = toLocalMonthKey();
@@ -43,18 +43,17 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
   const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [notes, setNotes] = useState('');
 
-  // Persistent budget target (৳15,000.00 default)
-  const [monthlyBudgetTaka, setMonthlyBudgetTaka] = useState<string>(() => {
-    return (
-      localStorage.getItem(`${BUDGET_STORAGE_KEY}_${myUid}`) ||
-      '15000.00'
-    );
-  });
+  const [monthlyBudgetTaka, setMonthlyBudgetTaka] = useState('');
+  const [cashInputTaka, setCashInputTaka] = useState('');
+  const [savingWalletSetting, setSavingWalletSetting] = useState<'cash' | 'budget' | null>(null);
+  const [walletSettingNotice, setWalletSettingNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
 
-  // Save budget targets to localStorage
   useEffect(() => {
-    localStorage.setItem(`${BUDGET_STORAGE_KEY}_${myUid}`, monthlyBudgetTaka);
-  }, [monthlyBudgetTaka, myUid]);
+    const budgetCents = dbUserProfile?.walletSettings?.monthlyBudgetCents;
+    const cashCents = dbUserProfile?.walletSettings?.cashBalanceCents;
+    setMonthlyBudgetTaka(budgetCents === undefined ? '' : (budgetCents / 100).toFixed(2));
+    setCashInputTaka(cashCents === undefined ? '' : (cashCents / 100).toFixed(2));
+  }, [myUid, dbUserProfile?.walletSettings?.monthlyBudgetCents, dbUserProfile?.walletSettings?.cashBalanceCents]);
 
   const userCards = useMemo(() => {
     return cards.filter((c) => c.ownerId === myUid);
@@ -94,9 +93,42 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
 
   // Totals
   const totalPersonalSpentCents = monthPersonalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
+  const allPersonalSpentCents = personalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
-  const monthlyBudgetCents = dollarsToCents(monthlyBudgetTaka);
+  const monthlyBudgetCents = dbUserProfile?.walletSettings?.monthlyBudgetCents ?? 0;
   const budgetRatioPercent = monthlyBudgetCents > 0 ? (totalPersonalSpentCents / monthlyBudgetCents) * 100 : 0;
+  const cashInHandCents = calculateCashInHandCents(dbUserProfile?.walletSettings, allPersonalSpentCents);
+
+  const saveWalletAmount = async (kind: 'cash' | 'budget') => {
+    const rawValue = kind === 'cash' ? cashInputTaka : monthlyBudgetTaka;
+    const parsed = Number(rawValue);
+    if (!rawValue.trim() || !Number.isFinite(parsed) || parsed < 0) {
+      setWalletSettingNotice({ tone: 'error', message: 'Enter a valid amount of zero or more before saving.' });
+      return;
+    }
+
+    setSavingWalletSetting(kind);
+    setWalletSettingNotice(null);
+    try {
+      const cents = dollarsToCents(parsed);
+      await updatePersonalWalletSettings(
+        kind === 'cash'
+          ? createCashCheckpoint(cents, allPersonalSpentCents)
+          : { monthlyBudgetCents: cents }
+      );
+      setWalletSettingNotice({
+        tone: 'success',
+        message: kind === 'cash' ? 'Cash in hand saved.' : 'Monthly budget target saved.',
+      });
+    } catch (error) {
+      setWalletSettingNotice({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Could not save the wallet setting.',
+      });
+    } finally {
+      setSavingWalletSetting(null);
+    }
+  };
 
   const handleOpenAdd = (exp?: Expense) => {
     if (exp) {
@@ -213,6 +245,39 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
           </div>
         </div>
 
+        {/* Cash in hand */}
+        <div className="glass-card summary-card wallet-setting-card">
+          <div className="summary-card-header">
+            <span className="summary-title">Cash in hand</span>
+            <div className="summary-icon-box wallet-cash-icon">
+              <CircleDollarSign size={20} />
+            </div>
+          </div>
+          <div className={`summary-amount tabular-nums wallet-cash-balance ${cashInHandCents !== null && cashInHandCents < 0 ? 'is-negative' : ''}`}>
+            {cashInHandCents === null ? 'Not set' : formatCurrency(cashInHandCents, false, lang)}
+          </div>
+          <p className="wallet-setting-help">Save your current total cash. New personal expenses automatically deduct from this balance.</p>
+          <div className="wallet-setting-form">
+            <div className="wallet-currency-input">
+              <span>৳</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="form-input tabular-nums"
+                placeholder="Enter cash amount"
+                value={cashInputTaka}
+                onChange={(event) => setCashInputTaka(event.target.value)}
+                aria-label="Cash in hand amount"
+              />
+            </div>
+            <button type="button" className="btn btn-primary wallet-save-button" onClick={() => void saveWalletAmount('cash')} disabled={savingWalletSetting !== null || !cashInputTaka.trim()}>
+              <Save size={16} />
+              <span>{savingWalletSetting === 'cash' ? 'Saving…' : 'Save'}</span>
+            </button>
+          </div>
+        </div>
+
         {/* Monthly Budget Target */}
         <div className="glass-card summary-card">
           <div className="summary-card-header">
@@ -221,19 +286,28 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
               <ShieldCheck size={20} />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span className="tabular-nums" style={{ fontSize: '1.85rem', fontWeight: 800 }}>৳</span>
-            <input
-              type="number"
-              step="100"
-              className="form-input tabular-nums"
-              style={{ fontSize: '1.5rem', fontWeight: 800, padding: '4px 8px', width: '150px' }}
-              value={monthlyBudgetTaka}
-              onChange={(e) => setMonthlyBudgetTaka(e.target.value)}
-            />
+          <p className="wallet-setting-help">Set the monthly target used by the budget progress indicator.</p>
+          <div className="wallet-setting-form">
+            <div className="wallet-currency-input">
+              <span>৳</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="form-input tabular-nums"
+                placeholder="Enter monthly budget"
+                value={monthlyBudgetTaka}
+                onChange={(event) => setMonthlyBudgetTaka(event.target.value)}
+                aria-label="Monthly personal budget target"
+              />
+            </div>
+            <button type="button" className="btn btn-primary wallet-save-button" onClick={() => void saveWalletAmount('budget')} disabled={savingWalletSetting !== null || !monthlyBudgetTaka.trim()}>
+              <Save size={16} />
+              <span>{savingWalletSetting === 'budget' ? 'Saving…' : 'Save'}</span>
+            </button>
           </div>
 
-          <div style={{ marginTop: '8px' }}>
+          <div style={{ marginTop: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
               <span>{getTranslation('budgetUsed', lang)}</span>
               <span>{budgetRatioPercent.toFixed(0)}%</span>
@@ -263,6 +337,13 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
           </div>
         </div>
       </div>
+
+      {walletSettingNotice && (
+        <div className={`wallet-setting-message ${walletSettingNotice.tone === 'error' ? 'is-error' : ''}`} role="status">
+          {walletSettingNotice.tone === 'error' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+          <span>{walletSettingNotice.message}</span>
+        </div>
+      )}
 
       {/* History List */}
       <div className="glass-card">
@@ -319,11 +400,13 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
                     <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--accent-purple)' }}>
                       {formatCurrency(exp.amountCents, false, lang)}
                     </div>
-                    <button className="btn btn-secondary btn-icon-only" onClick={() => handleOpenAdd(exp)} title="Edit">
+                    <button className="btn record-action-button record-action-edit" onClick={() => handleOpenAdd(exp)} title="Edit expense">
                       <Edit size={14} />
+                      <span>Edit</span>
                     </button>
-                    <button className="btn btn-danger btn-icon-only" onClick={() => onDeleteExpense(exp.id)} title="Delete">
+                    <button className="btn record-action-button record-action-delete" onClick={() => onDeleteExpense(exp.id)} title="Delete expense">
                       <Trash2 size={14} />
+                      <span>Delete</span>
                     </button>
                   </div>
                 </div>
@@ -420,7 +503,8 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Save Personal Expense
+                  {editingExp ? <Edit size={17} /> : <Plus size={17} />}
+                  <span>{editingExp ? 'Save Changes' : 'Save Personal Expense'}</span>
                 </button>
               </div>
             </form>

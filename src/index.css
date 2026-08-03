@@ -3689,9 +3689,165 @@ button.mobile-add-fab { border-radius: 18px !important; }
   gap: 8px;
 }
 
+/* Consistent framed sidebar and account preferences */
+.sidebar,
+[data-theme='light'] .sidebar {
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-preference-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.settings-preference-copy {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-preference-copy h3 { margin: 0 0 4px; font-size: 1.05rem; }
+.settings-preference-copy p { margin: 0; color: var(--text-muted); font-size: .82rem; }
+.settings-preference-icon {
+  display: grid;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: var(--md-sys-color-on-secondary-container);
+  background: var(--md-sys-color-secondary-container);
+  border-radius: 14px;
+}
+
+.language-segmented-control {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+}
+
+.language-segmented-control button {
+  min-height: 38px;
+  padding: 8px 18px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: color .2s ease, background-color .2s ease, transform .2s var(--ease-md3);
+}
+
+.language-segmented-control button:hover { color: var(--text-primary); }
+.language-segmented-control button:active { transform: scale(.96); }
+.language-segmented-control button.active {
+  color: var(--md-sys-color-on-primary);
+  background: var(--md-sys-color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Shared edit/delete action language */
+.record-action-button {
+  min-height: 36px;
+  padding: 8px 13px;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.record-action-button svg { transition: transform .2s var(--ease-md3); }
+.record-action-button:hover svg { transform: scale(1.12) rotate(-3deg); }
+.record-action-edit {
+  color: var(--md-sys-color-on-secondary-container);
+  background: var(--md-sys-color-secondary-container);
+}
+.record-action-delete {
+  color: var(--md-sys-color-on-error-container);
+  background: var(--md-sys-color-error-container);
+}
+.record-action-button.on-card {
+  color: #fff;
+  background: rgba(255, 255, 255, .18);
+  backdrop-filter: blur(12px);
+}
+.record-action-delete.on-card { background: rgba(127, 29, 29, .48); }
+
+/* Personal wallet settings */
+.wallet-setting-card { overflow: hidden; }
+.wallet-cash-icon {
+  color: var(--md-sys-color-on-tertiary-container) !important;
+  background: var(--md-sys-color-tertiary-container) !important;
+}
+.wallet-cash-balance { margin-top: 16px; color: var(--accent-emerald); }
+.wallet-cash-balance.is-negative { color: var(--accent-rose); }
+.wallet-setting-help {
+  min-height: 38px;
+  margin: 2px 0 14px;
+  color: var(--text-muted);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+.wallet-setting-form {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.wallet-currency-input {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+.wallet-currency-input > span {
+  position: absolute;
+  left: 15px;
+  z-index: 1;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+.wallet-currency-input .form-input {
+  width: 100%;
+  min-width: 0;
+  padding-left: 38px;
+}
+.wallet-save-button { flex: 0 0 auto; padding-inline: 18px; }
+.wallet-setting-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin-top: -20px;
+  padding: 9px 14px;
+  color: var(--accent-emerald);
+  background: color-mix(in srgb, var(--accent-emerald) 10%, transparent);
+  border-radius: var(--radius-full);
+  font-size: .82rem;
+  font-weight: 700;
+  animation: materialSelectOptionIn .24s var(--ease-md3);
+}
+.wallet-setting-message.is-error {
+  color: var(--md-sys-color-on-error-container);
+  background: var(--md-sys-color-error-container);
+}
+
 @media (max-width: 640px) {
   .house-name-edit-form { width: 100%; }
   .house-name-edit-input { flex-basis: 100%; }
+  .settings-preference-card { align-items: stretch; }
+  .language-segmented-control { width: 100%; }
+  .language-segmented-control button { flex: 1; }
+  .wallet-setting-form { flex-direction: column; }
+  .wallet-save-button { width: 100%; }
+  .record-action-button { padding-inline: 11px; }
 }
 
 @media (max-width: 767px) {

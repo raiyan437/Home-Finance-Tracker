@@ -137,7 +137,9 @@ const AppContent: React.FC = () => {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>(() => (
+    localStorage.getItem('home_finance_language') === 'bn' ? 'bn' : 'en'
+  ));
 
   useEffect(() => {
     const retryPendingWrites = () => { void flushSyncOutbox(); };
@@ -336,7 +338,11 @@ const AppContent: React.FC = () => {
   };
 
   const toggleLang = () => {
-    setLang((prev) => (prev === 'en' ? 'bn' : 'en'));
+    setLang((prev) => {
+      const next = prev === 'en' ? 'bn' : 'en';
+      localStorage.setItem('home_finance_language', next);
+      return next;
+    });
   };
 
   // Filter household expenses (shared scope) vs personal expenses (private scope)
@@ -606,7 +612,6 @@ const AppContent: React.FC = () => {
         theme={theme}
         toggleTheme={toggleTheme}
         lang={lang}
-        toggleLang={toggleLang}
         expenseCount={householdExpenses.length}
         settlementCount={simplifiedSettlements.length}
         personalCount={personalExpenses.length}
@@ -731,7 +736,7 @@ const AppContent: React.FC = () => {
             <MonthlyPage expenses={householdExpenses} settlements={houseSettlements} lang={lang} />
           )}
 
-          {activeTab === 'settings' && <SettingsPage lang={lang} />}
+          {activeTab === 'settings' && <SettingsPage lang={lang} toggleLang={toggleLang} />}
 
           {!VALID_TABS.includes(activeTab as TabType) && (
             <NotFoundPage onGoHome={() => handleTabChange('dashboard')} lang={lang} />
