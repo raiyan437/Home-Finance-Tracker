@@ -8,7 +8,7 @@ import { MaterialSelect } from '../components/MaterialSelect';
 import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { toLocalMonthKey } from '../utils/localDate';
-import { Search, Edit, Trash2, Plus, ChevronDown, ChevronUp, FileText, CreditCard, Banknote, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
+import { Search, Edit, Trash2, Plus, ChevronDown, FileText, CreditCard, Banknote, RefreshCw, Paperclip, X, MessageSquare, Send } from 'lucide-react';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -380,55 +380,51 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                   </span>
                   <span className="expense-expand-label">
                     {isExpanded ? 'Hide details' : 'View split & comments'}
-                    {isExpanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                    <ChevronDown className={`expense-expand-chevron ${isExpanded ? 'is-open' : ''}`} size={17} />
                   </span>
                 </button>
 
                 {/* Expanded Details Pane */}
-                {isExpanded && (
-                  <div className="expense-expand-pane" onClick={(e) => e.stopPropagation()}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                      Participant Split Breakdown ({exp.shares.length} Members)
-                    </div>
+                <div
+                  className={`expense-expand-pane ${isExpanded ? 'is-open' : ''}`}
+                  aria-hidden={!isExpanded}
+                  inert={!isExpanded}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="expense-expand-content">
+                    <section className="expense-split-section" aria-labelledby={`expense-split-${exp.id}`}>
+                      <div id={`expense-split-${exp.id}`} className="expense-split-heading">
+                        Participant Split Breakdown ({exp.shares.length} Members)
+                      </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-                      {exp.shares.map((share) => {
-                        const user = houseUsers.find((u) => u.id === share.userId) || USERS[share.userId] || { id: share.userId, name: share.userId, avatar: share.userId?.charAt(0) || 'U', color: '#6750a4' };
-                        return (
-                          <div
-                            key={share.userId}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '10px 14px',
-                              backgroundColor: 'var(--bg-input)',
-                              borderRadius: 'var(--radius-sm)',
-                              border: '1px solid var(--border-subtle)',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <UserAvatar user={user} size={26} />
-                              <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{user.name}</span>
+                      <div className="expense-split-grid">
+                        {exp.shares.map((share) => {
+                          const user = houseUsers.find((u) => u.id === share.userId) || USERS[share.userId] || { id: share.userId, name: share.userId, avatar: share.userId?.charAt(0) || 'U', color: '#6750a4' };
+                          return (
+                            <div key={share.userId} className="expense-split-card">
+                              <div className="expense-split-user">
+                                <UserAvatar user={user} size={26} />
+                                <span>{user.name}</span>
+                              </div>
+                              <span className="tabular-nums expense-split-amount">
+                                {formatCurrency(share.amountCents, false, lang)}
+                              </span>
                             </div>
-                            <span className="tabular-nums" style={{ fontSize: '0.95rem', fontWeight: 800 }}>
-                              {formatCurrency(share.amountCents, false, lang)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    </section>
 
                     {/* Expense Comments Section */}
-                    <div style={{ backgroundColor: 'var(--bg-input)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', marginTop: '4px' }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                        <MessageSquare size={14} style={{ color: 'var(--accent-primary)' }} />
+                    <section className="expense-comments-section" aria-labelledby={`expense-comments-${exp.id}`}>
+                      <div id={`expense-comments-${exp.id}`} className="expense-comments-heading">
+                        <MessageSquare size={14} />
                         <span>In-App Housemate Comments ({commentCount})</span>
                       </div>
 
                       {/* Comment Stream */}
                       {exp.comments && exp.comments.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                        <div className="expense-comment-stream">
                           {exp.comments.map((c) => {
                             const commenter = houseUsers.find(
                               (u) =>
@@ -447,7 +443,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                             const isMyComment = c.userId === activeUserId || c.userId === dbUserProfile?.uid || isLeader;
 
                             return (
-                              <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: 'var(--md-sys-color-surface-container-high)', padding: '10px 12px', borderRadius: 'var(--radius-sm)' }}>
+                              <div key={c.id} className="expense-comment-item">
                                 <UserAvatar user={commenter} size={22} />
                                 <div style={{ flex: 1, fontSize: '0.82rem' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
@@ -457,7 +453,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                                       {isMyComment && onDeleteComment && (
                                         <button
                                           type="button"
-                                          style={{ background: 'none', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', padding: '2px' }}
+                                          className="expense-comment-delete"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             onDeleteComment(exp.id, c.id);
@@ -476,7 +472,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                           })}
                         </div>
                       ) : (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                        <div className="expense-comment-empty">
                           No comments posted yet. Ask a question or leave a note below!
                         </div>
                       )}
@@ -503,9 +499,9 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
                           <span>{getTranslation('postComment', lang)}</span>
                         </button>
                       </div>
-                    </div>
+                    </section>
                   </div>
-                )}
+                </div>
               </div>
             );
           })
