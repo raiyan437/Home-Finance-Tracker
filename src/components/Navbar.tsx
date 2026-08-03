@@ -129,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span className="status-dot animate-pulse-glow" style={{ backgroundColor: currentHouse ? 'var(--accent-emerald)' : 'var(--text-muted)' }} />
                     <span>
                       {currentHouse
-                        ? `${currentHouse.members?.length || 1} Member${(currentHouse.members?.length || 1) === 1 ? '' : 's'} • ${currentHouse.code}`
+                        ? `${currentHouse.members?.length || 1} Member${(currentHouse.members?.length || 1) === 1 ? '' : 's'}`
                         : t('housematesCount')}
                     </span>
                   </div>
