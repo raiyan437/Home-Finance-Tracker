@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserAvatar } from './UserAvatar';
 import { ConfirmModal } from './ConfirmModal';
+import { ThemeSwitch } from './ThemeSwitch';
 import { getTranslation } from '../utils/i18n';
 import type { Language } from '../utils/i18n';
 import {
@@ -10,8 +11,6 @@ import {
   ArrowLeftRight,
   Calendar,
   Plus,
-  Sun,
-  Moon,
   Home,
   Sparkles,
   Wallet,
@@ -331,10 +330,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>{t('appearance')}</span>
               </div>
             )}
-            <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === 'dark' ? t('light') : t('dark')}>
-              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-              {!isCollapsed && <span>{theme === 'dark' ? t('light') : t('dark')}</span>}
-            </button>
+            <ThemeSwitch theme={theme} onToggle={toggleTheme} className={isCollapsed ? 'is-compact' : ''} />
           </div>
 
           <button
@@ -446,7 +442,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <div className="mobile-menu-actions">
-              <button onClick={toggleTheme}>{theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />} {theme === 'dark' ? t('light') : t('dark')}</button>
+              <ThemeSwitch theme={theme} onToggle={toggleTheme} />
               <button onClick={toggleLang}><Languages size={17} /> {lang === 'en' ? 'বাংলা' : 'English'}</button>
               <button className="danger" onClick={handleLogoutClick}><LogOut size={17} /> Log out</button>
             </div>
