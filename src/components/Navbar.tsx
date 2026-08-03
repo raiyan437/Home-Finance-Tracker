@@ -11,7 +11,6 @@ import {
   ArrowLeftRight,
   Calendar,
   Plus,
-  Home,
   Sparkles,
   Wallet,
   UserCheck,
@@ -74,6 +73,16 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
   }, [isMobileMenuOpen]);
 
+  const logoSrc = `${import.meta.env.BASE_URL}${theme === 'dark' ? 'logo-dark.svg' : 'logo-light.svg'}`;
+
+  useEffect(() => {
+    const favicon = document.querySelector<HTMLLinkElement>('#app-favicon');
+    if (favicon) favicon.href = logoSrc;
+
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = theme === 'dark' ? '#211B2B' : '#F1EBFF';
+  }, [logoSrc, theme]);
+
   const handleLogoutClick = () => {
     setIsMobileMenuOpen(false);
     setIsLogoutConfirmOpen(true);
@@ -112,7 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <>
               <div className="brand-identity">
                 <div className="brand-icon" style={{ flexShrink: 0 }}>
-                  <Home size={22} />
+                  <img className="brand-logo" src={logoSrc} alt="Home Finance" />
                 </div>
                 <div className="brand-title-box">
                   <div className="brand-title">{currentHouse?.name || t('appTitle')}</div>

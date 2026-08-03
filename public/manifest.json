@@ -3,15 +3,21 @@
   "name": "Home Finance Tracker",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23121214'/><path fill='%23e4e4e7' d='M256 100L80 240v210h120V320h112v130h120V240z'/></svg>",
-      "sizes": "512x512",
+      "src": "logo-light.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "logo-dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "start_url": "/",
-  "background_color": "#121214",
-  "theme_color": "#121214",
+  "background_color": "#F1EBFF",
+  "theme_color": "#F1EBFF",
   "display": "standalone",
   "orientation": "portrait"
 }

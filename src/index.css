@@ -3778,6 +3778,19 @@ button.mobile-add-fab { border-radius: 18px !important; }
 }
 .record-action-delete.on-card { background: rgba(127, 29, 29, .48); }
 
+/* Theme-aware Home Finance brand mark */
+.brand-icon {
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+}
+
+.brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* Household expense card layout */
 @keyframes expenseDetailsIn {
   from {
