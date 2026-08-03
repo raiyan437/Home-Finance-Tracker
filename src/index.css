@@ -2690,8 +2690,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; transform: none !important
 .mobile-nav {
   left: 12px; right: 12px; bottom: max(10px, env(safe-area-inset-bottom)); height: 70px; border: 1px solid var(--border-medium); border-radius: 24px;
   background: var(--bg-surface-glass); box-shadow: var(--shadow-lg); backdrop-filter: blur(34px) saturate(170%); -webkit-backdrop-filter: blur(34px) saturate(170%);
+  gap: 6px; padding: 8px; justify-content: initial;
 }
-.mobile-nav-item { min-width: 56px; min-height: 52px; gap: 3px; border-radius: 15px; }
+.mobile-nav-item { flex: 1 1 0; width: 100%; min-width: 0; height: 52px; min-height: 52px; gap: 2px; padding: 4px 3px; border-radius: 15px; font-size: .65rem; line-height: 1.05; }
+.mobile-nav-item span { max-width: 100%; text-align: center; }
 .mobile-nav-item svg { transition: transform .28s var(--ease-apple); }
 .mobile-nav-item.active { color: var(--accent-primary); background: var(--accent-primary-glow); }
 .mobile-nav-item.active svg { transform: translateY(-1px) scale(1.08); }

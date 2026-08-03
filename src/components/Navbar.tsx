@@ -10,7 +10,6 @@ import {
   Receipt,
   ArrowLeftRight,
   Calendar,
-  Plus,
   Sparkles,
   Wallet,
   UserCheck,
@@ -29,7 +28,6 @@ export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'per
 interface NavbarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
-  onOpenAddExpense: () => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   lang: Language;
@@ -44,7 +42,6 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
-  onOpenAddExpense,
   theme,
   toggleTheme,
   lang,
@@ -338,8 +335,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>{t('householdExpenses')}</span>
         </button>
 
-        <button className="mobile-add-fab" onClick={onOpenAddExpense} title="Add Expense" aria-label="Add expense">
-          <Plus size={26} />
+        <button
+          className={`mobile-nav-item ${activeTab === 'settlement' ? 'active' : ''}`}
+          onClick={() => navigateMobile('settlement')}
+          aria-current={activeTab === 'settlement' ? 'page' : undefined}
+        >
+          <ArrowLeftRight size={20} />
+          <span>{t('settlements')}</span>
         </button>
 
         <button
@@ -352,7 +354,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
-          className={`mobile-nav-item ${['settlement', 'monthly', 'cards', 'house', 'settings'].includes(activeTab) ? 'active' : ''}`}
+          className={`mobile-nav-item ${['monthly', 'cards', 'house', 'settings'].includes(activeTab) ? 'active' : ''}`}
           onClick={() => setIsMobileMenuOpen(true)}
           aria-expanded={isMobileMenuOpen}
           aria-controls="mobile-more-menu"

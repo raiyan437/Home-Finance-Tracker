@@ -605,10 +605,6 @@ const AppContent: React.FC = () => {
       <Navbar
         activeTab={activeTab === 'notfound' ? 'dashboard' : activeTab}
         setActiveTab={handleTabChange}
-        onOpenAddExpense={() => {
-          setEditingExpense(null);
-          setIsAddExpenseOpen(true);
-        }}
         theme={theme}
         toggleTheme={toggleTheme}
         lang={lang}
