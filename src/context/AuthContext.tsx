@@ -65,6 +65,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ACTIVE_USER_STORAGE_KEY = 'home_finance_active_user_v1';
 
+const applyProfileAvatarToHouse = (house: House, uid: string, avatarUrl: string | null): House | null => {
+  const sourceMembers = getCanonicalHouseMembers(house);
+  if (!sourceMembers.some((member) => member.uid === uid)) return null;
+  const members = sourceMembers.map((member) => {
+    if (member.uid !== uid) return member;
+    const { avatar: _memberAvatar, ...memberWithoutAvatar } = member;
+    return avatarUrl ? { ...memberWithoutAvatar, avatar: avatarUrl } : memberWithoutAvatar;
+  });
+  return {
+    ...house,
+    members,
+    memberUids: house.memberUids?.length ? house.memberUids : members.map((member) => member.uid),
+    memberMap: Object.fromEntries(members.map((member) => [member.uid, member])),
+  };
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeUserId, setActiveUserId] = useState<UserId>(() => {
     const saved = localStorage.getItem(ACTIVE_USER_STORAGE_KEY) as UserId;
@@ -82,6 +98,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (index >= 0) houses[index] = house;
     else houses.push(house);
     saveHousesDB(houses);
+  };
+
+  // A member's profile document is private. Mirror its avatar into the shared
+  // roster whenever that member signs in, so photos uploaded before the roster
+  // finished loading are also repaired for every other household member.
+  const reconcileProfileAvatarInHouse = async (
+    profile: UserProfile,
+    houseId = profile.houseId
+  ): Promise<House | null> => {
+    if (!isFirebaseConfigured || !db || !houseId) return null;
+    let reconciledHouse: House | null = null;
+    await runTransaction(db, async (transaction) => {
+      const houseRef = doc(db!, 'houses', houseId);
+      const snapshot = await transaction.get(houseRef);
+      if (!snapshot.exists()) return;
+      const latest = snapshot.data() as House;
+      const member = getCanonicalHouseMembers(latest).find((candidate) => candidate.uid === profile.uid);
+      if (!member || (member.avatar || null) === (profile.avatar || null)) return;
+      reconciledHouse = applyProfileAvatarToHouse(latest, profile.uid, profile.avatar || null);
+      if (!reconciledHouse) return;
+      transaction.update(houseRef, sanitizeForFirestore({
+        members: reconciledHouse.members,
+        memberMap: reconciledHouse.memberMap,
+      }));
+    });
+    return reconciledHouse;
   };
 
   const recoverRosterMembership = async (
@@ -278,15 +320,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (snap.exists()) {
           const firestoreHouse = snap.data() as House;
           // Verify user is still an active member in this house
-          const isStillMember = firestoreHouse.members && firestoreHouse.members.some((m) => m.uid === profile.uid);
+          const isStillMember = getCanonicalHouseMembers(firestoreHouse).some((member) => member.uid === profile.uid);
           if (isStillMember) {
-            setCurrentHouse({ ...firestoreHouse });
-            cacheHouse(firestoreHouse);
+            const reconciledHouse = await reconcileProfileAvatarInHouse(profile, targetHouseId);
+            const visibleHouse = reconciledHouse || firestoreHouse;
+            setCurrentHouse({ ...visibleHouse });
+            cacheHouse(visibleHouse);
             if (
-              firestoreHouse.leaderUid === profile.uid &&
-              (!firestoreHouse.memberUids || !firestoreHouse.memberMap || firestoreHouse.publicJoin === undefined)
+              visibleHouse.leaderUid === profile.uid &&
+              (!visibleHouse.memberUids || !visibleHouse.memberMap || visibleHouse.publicJoin === undefined)
             ) {
-              syncSaveHouse(firestoreHouse);
+              syncSaveHouse(visibleHouse);
             }
           } else {
             // User was removed / kicked from house
@@ -521,24 +565,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const targetHouseId = currentHouse?.id || dbUserProfile.houseId || null;
     if (targetHouseId) {
       const cachedHouse = currentHouse || loadHousesDB().find((house) => house.id === targetHouseId) || null;
-      const applyRosterAvatar = (house: House): House => {
-        const sourceMembers = getCanonicalHouseMembers(house);
-        const updatedMembers = sourceMembers.map((member) => {
-          if (member.uid !== dbUserProfile.uid) return member;
-          const { avatar: _memberAvatar, ...memberWithoutAvatar } = member;
-          return avatarUrl ? { ...memberWithoutAvatar, avatar: avatarUrl } : memberWithoutAvatar;
-        });
-        return {
-          ...house,
-          members: updatedMembers,
-          memberUids: house.memberUids?.length ? house.memberUids : updatedMembers.map((member) => member.uid),
-          memberMap: Object.fromEntries(updatedMembers.map((member) => [member.uid, member])),
-        };
-      };
 
       // Reflect the change immediately from the local cache while the cloud
       // transaction is committing, including sessions that loaded offline.
-      const locallyUpdatedHouse = cachedHouse ? applyRosterAvatar(cachedHouse) : null;
+      const locallyUpdatedHouse = cachedHouse
+        ? applyProfileAvatarToHouse(cachedHouse, dbUserProfile.uid, avatarUrl)
+        : null;
       if (locallyUpdatedHouse) {
         const houses = loadHousesDB();
         saveHousesDB(houses.some((house) => house.id === targetHouseId)
@@ -548,22 +580,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (isFirebaseConfigured && db) {
-        let cloudUpdatedHouse: House | null = null;
         try {
-          await runTransaction(db, async (transaction) => {
-            const houseRef = doc(db!, 'houses', targetHouseId);
-            const snapshot = await transaction.get(houseRef);
-            if (!snapshot.exists()) return;
-            const latest = snapshot.data() as House;
-            const sourceMembers = getCanonicalHouseMembers(latest);
-            if (!sourceMembers.some((member) => member.uid === dbUserProfile.uid)) return;
-            const updatedHouse = applyRosterAvatar({ ...latest, members: sourceMembers });
-            cloudUpdatedHouse = updatedHouse;
-            transaction.update(houseRef, sanitizeForFirestore({
-              members: updatedHouse.members,
-              memberMap: updatedHouse.memberMap,
-            }));
-          });
+          const cloudUpdatedHouse = await reconcileProfileAvatarInHouse(updatedProfile, targetHouseId);
 
           if (cloudUpdatedHouse) {
             cacheHouse(cloudUpdatedHouse);
