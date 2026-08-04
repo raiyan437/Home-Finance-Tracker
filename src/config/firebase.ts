@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAIycj6LtKtndvgXKkZPa7fNpTdlrByzwc',
@@ -39,3 +40,4 @@ export const app = appInstance;
 export const auth = appInstance ? getAuth(appInstance) : null;
 export const db = appInstance ? getFirestore(appInstance) : null;
 export const fileStorage = appInstance ? getStorage(appInstance) : null;
+export const functions = appInstance ? getFunctions(appInstance) : null;

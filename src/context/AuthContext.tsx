@@ -66,7 +66,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const ACTIVE_USER_STORAGE_KEY = 'home_finance_active_user_v1';
 
 const applyProfileAvatarToHouse = (house: House, uid: string, avatarUrl: string | null): House | null => {
-  const sourceMembers = getCanonicalHouseMembers(house);
+  // Keep the persisted members order stable. The callable comment path and
+  // roster rules treat order as part of the denormalized document shape.
+  const sourceMembers = Array.isArray(house.members) && house.members.length > 0
+    ? house.members
+    : getCanonicalHouseMembers(house);
   if (!sourceMembers.some((member) => member.uid === uid)) return null;
   const members = sourceMembers.map((member) => {
     if (member.uid !== uid) return member;

@@ -123,6 +123,14 @@ export interface Settlement {
   toUserId: UserId;   // Recipient of debt
   amountCents: number;
   status: 'completed' | 'reversed';
+  /** Server-generated recommendation identity for idempotent confirmations. */
+  recommendationId?: string;
+  /** Ledger revision used to calculate the recommendation. */
+  ledgerRevision?: number;
+  /** Server-generated idempotency key for new cloud settlements. */
+  idempotencyKey?: string;
+  /** Auth UID that confirmed the settlement. */
+  confirmedBy?: string;
   reversedAt?: string;
   reversedBy?: string;
   proofUrl?: string;  // Image URL/base64 of payment receipt (bKash/Nagad/bank slip)

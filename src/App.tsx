@@ -36,6 +36,7 @@ import {
   syncDeleteExpense,
   syncDeleteHouseExpense,
   syncSaveSettlement,
+  syncConfirmSettlement,
   syncDeleteSettlement,
   syncDeleteHouseSettlement,
   flushSyncOutbox,
@@ -48,6 +49,7 @@ import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } f
 import { generateDueRecurringExpenses, localDateKey } from './features/recurringEngine';
 import { createId } from './utils/ids';
 import { assertValidExpense, assertValidSettlement } from './features/ledgerValidation';
+import { isFirebaseConfigured } from './config/firebase';
 
 // Code-split heavy views for instant page loads
 const MonthlyPage = lazy(() =>
@@ -492,11 +494,12 @@ const AppContent: React.FC = () => {
   // Save Card Handler
   const handleSaveCard = (cardData: Omit<PaymentCard, 'id' | 'createdAt'>, editingId?: string) => {
     const now = new Date().toISOString();
+    const existingCard = editingId ? cards.find((card) => card.id === editingId) : undefined;
     let targetCard: PaymentCard = {
       ...cardData,
       id: editingId || createId('card'),
       houseId: undefined,
-      createdAt: now,
+      createdAt: existingCard?.createdAt || now,
     };
 
     let updatedCards: PaymentCard[];
@@ -526,7 +529,26 @@ const AppContent: React.FC = () => {
   };
 
   // Mark Settlement as Paid handler
-  const handleMarkSettledConfirm = (transaction: SimplifiedTransaction, proofUrl?: string) => {
+  const handleMarkSettledConfirm = async (transaction: SimplifiedTransaction, proofUrl?: string) => {
+    if (!currentHouse) return;
+    if (isFirebaseConfigured) {
+      const settlement = await syncConfirmSettlement(
+        currentHouse.id,
+        currentHouse.ledgerRevision || 0,
+        {
+          id: transaction.id,
+          fromUserId: String(transaction.fromUser.id),
+          toUserId: String(transaction.toUser.id),
+          amountCents: transaction.amountCents,
+        },
+        proofUrl,
+      );
+      const updatedSettlements = [settlement, ...settlements.filter((item) => item.id !== settlement.id)];
+      setSettlements(updatedSettlements);
+      if (currentHouseScope) saveSettlements(updatedSettlements, currentHouseScope);
+      notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
+      return;
+    }
     const now = new Date().toISOString();
     const newSettlement: Settlement = {
       id: createId('set'),
@@ -541,7 +563,6 @@ const AppContent: React.FC = () => {
       notes: `Direct settlement between ${transaction.fromUser.name} and ${transaction.toUser.name}`,
     };
 
-    if (!currentHouse) return;
     assertValidSettlement(newSettlement, currentHouse);
     const updatedSettlements = [newSettlement, ...settlements];
     setSettlements(updatedSettlements);

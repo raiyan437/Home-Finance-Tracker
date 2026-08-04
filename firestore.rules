@@ -10,14 +10,21 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/houses/$(houseId)).data;
     }
 
+    function houseAfter(houseId) {
+      return getAfter(/databases/$(database)/documents/houses/$(houseId)).data;
+    }
+
     function isHouseMember(houseId) {
       return signedIn()
+             && houseId is string
              && ('memberUids' in houseData(houseId))
              && request.auth.uid in houseData(houseId).memberUids;
     }
 
     function isHouseLeader(houseId) {
-      return signedIn() && houseData(houseId).leaderUid == request.auth.uid;
+      return signedIn()
+             && houseId is string
+             && houseData(houseId).leaderUid == request.auth.uid;
     }
 
     function ledgerAdvanced(houseId) {
@@ -25,93 +32,311 @@ service cloud.firestore {
       return getAfter(/databases/$(database)/documents/houses/$(houseId)).data.ledgerRevision == previousRevision + 1;
     }
 
+    function validUid(value) {
+      return value is string && value.size() > 0 && value.size() <= 128;
+    }
+
+    function validText(value, maximum) {
+      return value is string && value.size() > 0 && value.size() <= maximum;
+    }
+
+    function validTimestamp(value) {
+      return value is timestamp
+             || (value is string
+                 && value.size() == 24
+                 && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$'));
+    }
+
+    // Firestore rules cannot construct Date objects. These branches validate
+    // month lengths and the Gregorian leap-day pattern for four-digit years.
+    function validCalendarDate(value) {
+      return value is string
+             && value.size() == 10
+             && (
+               value.matches('^[0-9]{4}-(01|03|05|07|08|10|12)-(0[1-9]|[12][0-9]|3[01])$')
+               || value.matches('^[0-9]{4}-(04|06|09|11)-(0[1-9]|[12][0-9]|30)$')
+               || value.matches('^[0-9]{4}-02-(0[1-9]|1[0-9]|2[0-8])$')
+               || value.matches('^([0-9]{2}(0[48]|[2468][048]|[13579][26])|(0[48]|[2468][048]|[13579][26])00)-02-29$')
+             );
+    }
+
+    function validImageUrl(value, maximum) {
+      return value is string
+             && value.size() > 0
+             && value.size() <= maximum
+             && (
+               value.matches('https://.*')
+               || value.matches('http://.*')
+               || value.matches('data:image/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+')
+             );
+    }
+
+    function validHouseMember(data) {
+      return data is map
+             && data.keys().hasOnly(['uid', 'displayName', 'email', 'avatar', 'role', 'joinedAt'])
+             && data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'joinedAt'])
+             && validUid(data.uid)
+             && validText(data.displayName, 120)
+             && data.email is string
+             && data.email.size() > 3
+             && data.email.size() <= 254
+             && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+             && data.role in ['leader', 'member']
+             && validTimestamp(data.joinedAt)
+             && (!('avatar' in data) || validImageUrl(data.avatar, 40000));
+    }
+
+    function validRosterMember(data, index) {
+      return data.memberUids.size() <= index
+             || (validHouseMember(data.members[index])
+                 && validUid(data.memberUids[index])
+                 && data.members[index].uid == data.memberUids[index]
+                 && data.memberMap[data.memberUids[index]] == data.members[index]
+                 && data.memberMap[data.memberUids[index]].uid == data.memberUids[index]
+                 && (data.memberUids[index] == data.leaderUid
+                     ? data.members[index].role == 'leader'
+                     : data.members[index].role == 'member'));
+    }
+
+    function validRoster(data) {
+      return data is map
+             && data.keys().hasOnly(['id', 'code', 'name', 'leaderUid', 'members', 'memberUids', 'memberMap', 'publicJoin', 'ledgerRevision', 'createdAt'])
+             && data.keys().hasAll(['id', 'code', 'name', 'leaderUid', 'members', 'memberUids', 'memberMap', 'createdAt'])
+             && validUid(data.id)
+             && data.code is string
+             && data.code.size() >= 4
+             && data.code.size() <= 10
+             && data.code.matches('^[A-Z0-9-]+$')
+             && validText(data.name, 120)
+             && validUid(data.leaderUid)
+             && data.members is list
+             && data.members.size() >= 1
+             && data.members.size() <= 10
+             && data.memberUids is list
+             && data.memberUids.size() == data.members.size()
+             && data.memberUids.toSet().size() == data.memberUids.size()
+             && data.memberMap is map
+             && data.memberMap.keys().size() == data.memberUids.size()
+             && data.memberMap.keys().hasOnly(data.memberUids)
+             && data.memberMap.keys().hasAll(data.memberUids)
+             && data.leaderUid in data.memberUids
+             && data.memberMap[data.leaderUid].uid == data.leaderUid
+             && data.memberMap[data.leaderUid].role == 'leader'
+             && validTimestamp(data.createdAt)
+             && (!('publicJoin' in data) || data.publicJoin is bool)
+             && (!('ledgerRevision' in data) || (data.ledgerRevision is int && data.ledgerRevision >= 0))
+             && validRosterMember(data, 0)
+             && validRosterMember(data, 1)
+             && validRosterMember(data, 2)
+             && validRosterMember(data, 3)
+             && validRosterMember(data, 4)
+             && validRosterMember(data, 5)
+             && validRosterMember(data, 6)
+             && validRosterMember(data, 7)
+             && validRosterMember(data, 8)
+             && validRosterMember(data, 9);
+    }
+
+    function rosterListMatchesMapAt(data, index) {
+      return data.memberUids.size() <= index
+             || (data.members[index].uid == data.memberUids[index]
+                 && data.members[index] == data.memberMap[data.memberUids[index]]);
+    }
+
+    function rosterAvatarOnly(before, after) {
+      return before.diff(after).affectedKeys().hasOnly(['avatar'])
+             && before.uid == after.uid
+             && before.displayName == after.displayName
+             && before.email == after.email
+             && before.role == after.role
+             && before.joinedAt == after.joinedAt;
+    }
+
+    function memberListAvatarOnly(before, after, uid) {
+      return (before.size() < 1 || ((before[0].uid == uid && rosterAvatarOnly(before[0], after[0])) || (before[0].uid != uid && before[0] == after[0])))
+             && (before.size() < 2 || ((before[1].uid == uid && rosterAvatarOnly(before[1], after[1])) || (before[1].uid != uid && before[1] == after[1])))
+             && (before.size() < 3 || ((before[2].uid == uid && rosterAvatarOnly(before[2], after[2])) || (before[2].uid != uid && before[2] == after[2])))
+             && (before.size() < 4 || ((before[3].uid == uid && rosterAvatarOnly(before[3], after[3])) || (before[3].uid != uid && before[3] == after[3])))
+             && (before.size() < 5 || ((before[4].uid == uid && rosterAvatarOnly(before[4], after[4])) || (before[4].uid != uid && before[4] == after[4])))
+             && (before.size() < 6 || ((before[5].uid == uid && rosterAvatarOnly(before[5], after[5])) || (before[5].uid != uid && before[5] == after[5])))
+             && (before.size() < 7 || ((before[6].uid == uid && rosterAvatarOnly(before[6], after[6])) || (before[6].uid != uid && before[6] == after[6])))
+             && (before.size() < 8 || ((before[7].uid == uid && rosterAvatarOnly(before[7], after[7])) || (before[7].uid != uid && before[7] == after[7])))
+             && (before.size() < 9 || ((before[8].uid == uid && rosterAvatarOnly(before[8], after[8])) || (before[8].uid != uid && before[8] == after[8])))
+             && (before.size() < 10 || ((before[9].uid == uid && rosterAvatarOnly(before[9], after[9])) || (before[9].uid != uid && before[9] == after[9])));
+    }
+
+    function validShare(data) {
+      return data is map
+             && data.keys().hasOnly(['userId', 'amountCents', 'percentage'])
+             // The surrounding expense authorization binds every share UID
+             // to the current user (personal) or current household roster
+             // (household), so avoid re-evaluating the same UID bounds here.
+             && data.amountCents is int
+             && data.amountCents >= 0
+             && (!('percentage' in data) || (data.percentage is number && data.percentage >= 0 && data.percentage <= 100));
+    }
+
+    function validPaymentMethod(data) {
+      return !('paymentMethod' in data)
+             || (data.paymentMethod is map
+                 && data.paymentMethod.keys().hasOnly(['type', 'cardId', 'cardName', 'cardType'])
+                 && data.paymentMethod.keys().hasAll(['type'])
+                 && data.paymentMethod.type in ['cash', 'card']
+                 && (!('cardId' in data.paymentMethod) || validUid(data.paymentMethod.cardId))
+                 && (!('cardName' in data.paymentMethod) || validText(data.paymentMethod.cardName, 160))
+                 && (!('cardType' in data.paymentMethod) || data.paymentMethod.cardType in ['debit', 'credit'])
+                 && (data.paymentMethod.type == 'cash'
+                     ? (!('cardId' in data.paymentMethod) && !('cardName' in data.paymentMethod) && !('cardType' in data.paymentMethod))
+                     : true));
+    }
+
+    function validCardReference(data) {
+      return !('paymentMethod' in data)
+             || data.paymentMethod.type == 'cash'
+             || !('cardId' in data.paymentMethod)
+             || (exists(/databases/$(database)/documents/cards/$(data.paymentMethod.cardId))
+                 && get(/databases/$(database)/documents/cards/$(data.paymentMethod.cardId)).data.ownerId == data.paidBy);
+    }
+
     function validExpense(data) {
-      return data.id is string
-             && data.title is string
-             && data.title.size() > 0
-             && data.title.size() <= 160
+      let shareCount = data.shares.size();
+      return data is map
+             && data.keys().hasOnly(['id', 'title', 'amountCents', 'paidBy', 'category', 'date', 'splitMethod', 'shares', 'sharesTotalCents', 'participantUids', 'scope', 'ownerId', 'houseId', 'paymentMethod', 'isRecurring', 'recurringFrequency', 'lastGeneratedDate', 'recurringSourceId', 'receiptUrl', 'comments', 'notes', 'createdAt', 'updatedAt'])
+             && validUid(data.id)
+             && validText(data.title, 160)
              && data.amountCents is int
              && data.amountCents > 0
-             && data.paidBy is string
-             && data.date is string
-             && data.date.size() == 10
+             && data.amountCents <= 100000000000
              && data.category in ['Groceries', 'Household', 'Utilities', 'Food', 'Personal', 'Other']
+             && data.date is string
+             && validCalendarDate(data.date)
              && data.splitMethod in ['equal', 'custom', 'percentage']
              && data.shares is list
-             && data.shares.size() > 0
-             && data.shares.size() <= 10
-             && data.participantUids is list
-             && data.participantUids.size() == data.shares.size()
-             && data.participantUids.toSet().size() == data.participantUids.size()
-             && data.sharesTotalCents is int
+             && shareCount >= 1
+             && shareCount <= 10
+             && (shareCount < 1 || validShare(data.shares[0]))
+             && (shareCount < 2 || validShare(data.shares[1]))
+             && (shareCount < 3 || validShare(data.shares[2]))
+             && (shareCount < 4 || validShare(data.shares[3]))
+             && (shareCount < 5 || validShare(data.shares[4]))
+             && (shareCount < 6 || validShare(data.shares[5]))
+             && (shareCount < 7 || validShare(data.shares[6]))
+             && (shareCount < 8 || validShare(data.shares[7]))
+             && (shareCount < 9 || validShare(data.shares[8]))
+             && (shareCount < 10 || validShare(data.shares[9]))
+              && data.participantUids is list
+              && data.participantUids.size() == shareCount
+              && data.participantUids.toSet().size() == data.participantUids.size()
+              && data.sharesTotalCents is int
              && data.sharesTotalCents == data.amountCents
-             && data.scope in ['household', 'personal'];
+             && data.scope in ['household', 'personal']
+             && (!('ownerId' in data) || validUid(data.ownerId))
+             && (!('houseId' in data) || validUid(data.houseId))
+             && validPaymentMethod(data)
+             && (!('isRecurring' in data) || data.isRecurring is bool)
+             && (!('recurringFrequency' in data) || data.recurringFrequency in ['monthly', 'weekly'])
+             && (!('lastGeneratedDate' in data) || validCalendarDate(data.lastGeneratedDate))
+             && (!('recurringSourceId' in data) || validUid(data.recurringSourceId))
+             && (!('receiptUrl' in data) || validImageUrl(data.receiptUrl, 40000))
+              && (!('comments' in data) || (data.comments is list && data.comments.size() <= 20))
+             && (!('notes' in data) || validText(data.notes, 2000))
+             && validTimestamp(data.createdAt)
+             && validTimestamp(data.updatedAt);
     }
 
     function exactShareTotal(data) {
-      return (data.shares.size() == 1 ? data.shares[0].amountCents
-        : data.shares.size() == 2 ? data.shares[0].amountCents + data.shares[1].amountCents
-        : data.shares.size() == 3 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents
-        : data.shares.size() == 4 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents
-        : data.shares.size() == 5 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents
-        : data.shares.size() == 6 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents
-        : data.shares.size() == 7 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents + data.shares[6].amountCents
-        : data.shares.size() == 8 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents + data.shares[6].amountCents + data.shares[7].amountCents
-        : data.shares.size() == 9 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents + data.shares[6].amountCents + data.shares[7].amountCents + data.shares[8].amountCents
+      let shareCount = data.shares.size();
+      return (shareCount == 1 ? data.shares[0].amountCents
+        : shareCount == 2 ? data.shares[0].amountCents + data.shares[1].amountCents
+        : shareCount == 3 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents
+        : shareCount == 4 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents
+        : shareCount == 5 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents
+        : shareCount == 6 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents
+        : shareCount == 7 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents + data.shares[6].amountCents
+        : shareCount == 8 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents + data.shares[6].amountCents + data.shares[7].amountCents
+        : shareCount == 9 ? data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents + data.shares[6].amountCents + data.shares[7].amountCents + data.shares[8].amountCents
         : data.shares[0].amountCents + data.shares[1].amountCents + data.shares[2].amountCents + data.shares[3].amountCents + data.shares[4].amountCents + data.shares[5].amountCents + data.shares[6].amountCents + data.shares[7].amountCents + data.shares[8].amountCents + data.shares[9].amountCents) == data.amountCents;
     }
 
     function validHouseholdParticipants(data) {
       let members = houseData(data.houseId).memberUids;
+      let shareCount = data.shares.size();
       return data.paidBy in members
-             && data.shares[0].userId == data.participantUids[0] && data.shares[0].userId in members && data.shares[0].amountCents is int && data.shares[0].amountCents >= 0
-             && (data.shares.size() < 2 || (data.shares[1].userId == data.participantUids[1] && data.shares[1].userId in members && data.shares[1].amountCents is int && data.shares[1].amountCents >= 0))
-             && (data.shares.size() < 3 || (data.shares[2].userId == data.participantUids[2] && data.shares[2].userId in members && data.shares[2].amountCents is int && data.shares[2].amountCents >= 0))
-             && (data.shares.size() < 4 || (data.shares[3].userId == data.participantUids[3] && data.shares[3].userId in members && data.shares[3].amountCents is int && data.shares[3].amountCents >= 0))
-             && (data.shares.size() < 5 || (data.shares[4].userId == data.participantUids[4] && data.shares[4].userId in members && data.shares[4].amountCents is int && data.shares[4].amountCents >= 0))
-             && (data.shares.size() < 6 || (data.shares[5].userId == data.participantUids[5] && data.shares[5].userId in members && data.shares[5].amountCents is int && data.shares[5].amountCents >= 0))
-             && (data.shares.size() < 7 || (data.shares[6].userId == data.participantUids[6] && data.shares[6].userId in members && data.shares[6].amountCents is int && data.shares[6].amountCents >= 0))
-             && (data.shares.size() < 8 || (data.shares[7].userId == data.participantUids[7] && data.shares[7].userId in members && data.shares[7].amountCents is int && data.shares[7].amountCents >= 0))
-             && (data.shares.size() < 9 || (data.shares[8].userId == data.participantUids[8] && data.shares[8].userId in members && data.shares[8].amountCents is int && data.shares[8].amountCents >= 0))
-             && (data.shares.size() < 10 || (data.shares[9].userId == data.participantUids[9] && data.shares[9].userId in members && data.shares[9].amountCents is int && data.shares[9].amountCents >= 0));
-    }
-
-    function validReceipt(data) {
-      return !('receiptUrl' in data)
-             || (data.receiptUrl is string && data.receiptUrl.size() < 2048 && data.receiptUrl.matches('https://.*'));
+             && members.hasAll(data.participantUids)
+             && data.participantUids[0] == data.shares[0].userId
+             && (shareCount < 2 || data.participantUids[1] == data.shares[1].userId)
+             && (shareCount < 3 || data.participantUids[2] == data.shares[2].userId)
+             && (shareCount < 4 || data.participantUids[3] == data.shares[3].userId)
+             && (shareCount < 5 || data.participantUids[4] == data.shares[4].userId)
+             && (shareCount < 6 || data.participantUids[5] == data.shares[5].userId)
+             && (shareCount < 7 || data.participantUids[6] == data.shares[6].userId)
+             && (shareCount < 8 || data.participantUids[7] == data.shares[7].userId)
+             && (shareCount < 9 || data.participantUids[8] == data.shares[8].userId)
+             && (shareCount < 10 || data.participantUids[9] == data.shares[9].userId);
     }
 
     function validProof(data) {
-      return !('proofUrl' in data)
-             || (data.proofUrl is string && data.proofUrl.size() < 2048 && data.proofUrl.matches('https://.*'));
-    }
-
-    function validRoster(data) {
-      return data.members is list
-             && data.memberUids is list
-             && data.memberUids.size() <= 10
-             && data.memberMap is map
-             && data.members.size() == data.memberUids.size()
-             && data.memberMap.keys().hasOnly(data.memberUids)
-             && data.memberMap.keys().hasAll(data.memberUids)
-             && data.leaderUid in data.memberUids
-             && data.memberMap[data.leaderUid].uid == data.leaderUid
-             && data.memberMap[data.leaderUid].role == 'leader';
+      return !('proofUrl' in data) || validImageUrl(data.proofUrl, 40000);
     }
 
     function validSettlement(data) {
-      return data.id is string
-             && data.fromUserId is string
-             && data.toUserId is string
+      return data is map
+             && data.keys().hasOnly(['id', 'fromUserId', 'toUserId', 'amountCents', 'status', 'reversedAt', 'reversedBy', 'proofUrl', 'houseId', 'createdAt', 'settledAt', 'notes', 'recommendationId', 'ledgerRevision', 'idempotencyKey', 'confirmedBy'])
+             && data.keys().hasAll(['id', 'fromUserId', 'toUserId', 'amountCents', 'status', 'houseId', 'createdAt', 'settledAt'])
+             && validUid(data.id)
+             && validUid(data.fromUserId)
+             && validUid(data.toUserId)
              && data.fromUserId != data.toUserId
              && data.amountCents is int
              && data.amountCents > 0
-             && data.status in ['completed', 'reversed'];
+             && data.amountCents <= 100000000000
+             && data.status in ['completed', 'reversed']
+             && validUid(data.houseId)
+             && validTimestamp(data.createdAt)
+             && validTimestamp(data.settledAt)
+             && validProof(data)
+             && (!('notes' in data) || validText(data.notes, 512))
+             && (!('reversedAt' in data) || validTimestamp(data.reversedAt))
+             && (!('reversedBy' in data) || validUid(data.reversedBy))
+             && (!('recommendationId' in data) || validUid(data.recommendationId))
+             && (!('ledgerRevision' in data) || (data.ledgerRevision is int && data.ledgerRevision >= 0))
+             && (!('idempotencyKey' in data) || (data.idempotencyKey is string && data.idempotencyKey.size() == 64))
+             && (!('confirmedBy' in data) || validUid(data.confirmedBy))
+             && (data.status == 'completed'
+                 ? (!('reversedAt' in data) && !('reversedBy' in data))
+                 : ('reversedAt' in data && 'reversedBy' in data));
     }
 
-    function commentsUnchanged(before, after) {
-      return (!('comments' in before) && !('comments' in after))
-             || (('comments' in before) && ('comments' in after) && before.comments == after.comments);
+    function validProfileAvatar(data) {
+      return !('avatar' in data) || validImageUrl(data.avatar, 40000);
+    }
+
+    function validWalletSettings(data) {
+      return !('walletSettings' in data)
+             || (data.walletSettings is map
+                 && data.walletSettings.keys().hasOnly(['monthlyBudgetCents', 'cashBalanceCents', 'cashTrackedExpenseCents', 'updatedAt'])
+                 && (!('monthlyBudgetCents' in data.walletSettings) || (data.walletSettings.monthlyBudgetCents is int && data.walletSettings.monthlyBudgetCents >= 0 && data.walletSettings.monthlyBudgetCents <= 100000000000))
+                 && (!('cashBalanceCents' in data.walletSettings) || (data.walletSettings.cashBalanceCents is int && data.walletSettings.cashBalanceCents >= 0 && data.walletSettings.cashBalanceCents <= 100000000000))
+                 && (!('cashTrackedExpenseCents' in data.walletSettings) || (data.walletSettings.cashTrackedExpenseCents is int && data.walletSettings.cashTrackedExpenseCents >= 0 && data.walletSettings.cashTrackedExpenseCents <= 100000000000))
+                 && (!('updatedAt' in data.walletSettings) || validTimestamp(data.walletSettings.updatedAt)));
+    }
+
+    function validProfile(uid, data) {
+      return data is map
+             && data.keys().hasOnly(['uid', 'displayName', 'email', 'avatar', 'houseId', 'role', 'walletSettings', 'createdAt'])
+             && data.keys().hasAll(['uid', 'displayName', 'email', 'houseId', 'role', 'createdAt'])
+             && data.uid == uid
+             && validUid(data.uid)
+             && validText(data.displayName, 120)
+             && data.email is string
+             && data.email.size() > 3
+             && data.email.size() <= 254
+             && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+             && (data.houseId == null || validUid(data.houseId))
+             && (data.role == null || data.role in ['leader', 'member'])
+             && validProfileAvatar(data)
+             && validWalletSettings(data)
+             && validTimestamp(data.createdAt);
     }
 
     function profileMembershipValid(uid, profile) {
@@ -123,55 +348,48 @@ service cloud.firestore {
                          && getAfter(/databases/$(database)/documents/houses/$(profile.houseId)).data.leaderUid == uid)));
     }
 
-    function validProfileAvatar(profile) {
-      return !('avatar' in profile)
-             || (profile.avatar is string
-                 && ((profile.avatar.size() < 2048 && profile.avatar.matches('https://.*'))
-                     || (profile.avatar.size() < 40000
-                         && profile.avatar.matches('data:image/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+'))));
+    function membershipProfileAfter(uid, houseId, role) {
+      return getAfter(/databases/$(database)/documents/users/$(uid)).data.houseId == houseId
+             && getAfter(/databases/$(database)/documents/users/$(uid)).data.role == role;
     }
 
-    function validWalletSettings(profile) {
-      return !('walletSettings' in profile)
-             || (profile.walletSettings is map
-                 && profile.walletSettings.keys().hasOnly([
-                   'monthlyBudgetCents',
-                   'cashBalanceCents',
-                   'cashTrackedExpenseCents',
-                   'updatedAt'
-                 ])
-                 && (!('monthlyBudgetCents' in profile.walletSettings)
-                     || (profile.walletSettings.monthlyBudgetCents is int
-                         && profile.walletSettings.monthlyBudgetCents >= 0
-                         && profile.walletSettings.monthlyBudgetCents <= 100000000000))
-                 && (!('cashBalanceCents' in profile.walletSettings)
-                     || (profile.walletSettings.cashBalanceCents is int
-                         && profile.walletSettings.cashBalanceCents >= 0
-                         && profile.walletSettings.cashBalanceCents <= 100000000000))
-                 && (!('cashTrackedExpenseCents' in profile.walletSettings)
-                     || (profile.walletSettings.cashTrackedExpenseCents is int
-                         && profile.walletSettings.cashTrackedExpenseCents >= 0
-                         && profile.walletSettings.cashTrackedExpenseCents <= 100000000000))
-                 && (!('updatedAt' in profile.walletSettings)
-                     || profile.walletSettings.updatedAt is string));
+    function clearedProfileAfter(uid) {
+      return getAfter(/databases/$(database)/documents/users/$(uid)).data.houseId == null
+             && getAfter(/databases/$(database)/documents/users/$(uid)).data.role == null;
+    }
+
+    function commentsUnchanged(before, after) {
+      return (!('comments' in before) && !('comments' in after))
+             || (('comments' in before) && ('comments' in after) && before.comments == after.comments);
     }
 
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
-      allow create: if signedIn() && request.auth.uid == uid
-                    && !('password' in request.resource.data)
-                    && validProfileAvatar(request.resource.data)
-                    && validWalletSettings(request.resource.data)
-                    && profileMembershipValid(uid, request.resource.data);
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && validProfile(uid, request.resource.data)
+                    && request.resource.data.houseId == null
+                    && request.resource.data.role == null
+                    && !('password' in request.resource.data);
       allow update: if signedIn()
-                    && !('password' in request.resource.data)
-                    && (validProfileAvatar(request.resource.data)
-                        || (('avatar' in resource.data) && request.resource.data.avatar == resource.data.avatar))
-                    && validWalletSettings(request.resource.data)
-                    && profileMembershipValid(uid, request.resource.data)
-                    && (request.auth.uid == uid
-                        || (isHouseLeader(resource.data.houseId)
-                            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['houseId', 'role'])));
+                    && (
+                      (
+                        request.auth.uid == uid
+                        && validProfile(uid, request.resource.data)
+                        && !('password' in request.resource.data)
+                        && profileMembershipValid(uid, request.resource.data)
+                        && (request.resource.data.houseId == resource.data.houseId
+                            || (resource.data.houseId == null && request.resource.data.houseId is string)
+                            || (resource.data.houseId is string && request.resource.data.houseId == null))
+                      )
+                      || (
+                        isHouseLeader(resource.data.houseId)
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['houseId', 'role'])
+                        && (request.resource.data.houseId == null || validUid(request.resource.data.houseId))
+                        && (request.resource.data.role == null || request.resource.data.role in ['leader', 'member'])
+                        && profileMembershipValid(uid, request.resource.data)
+                      )
+                    );
       allow delete: if false;
     }
 
@@ -179,76 +397,174 @@ service cloud.firestore {
       allow get: if signedIn();
       allow list: if false;
       allow create: if signedIn()
+                    && request.resource.data.keys().hasOnly(['houseId', 'name', 'leaderUid'])
+                    && request.resource.data.houseId is string
+                    && validText(request.resource.data.name, 120)
+                    && validUid(request.resource.data.leaderUid)
                     && request.resource.data.leaderUid == request.auth.uid
                     && getAfter(/databases/$(database)/documents/houses/$(request.resource.data.houseId)).data.code == code
                     && getAfter(/databases/$(database)/documents/houses/$(request.resource.data.houseId)).data.leaderUid == request.auth.uid;
       allow update: if signedIn()
+                    && request.resource.data.keys().hasOnly(['houseId', 'name', 'leaderUid'])
                     && resource.data.leaderUid == request.auth.uid
                     && request.resource.data.houseId == resource.data.houseId
+                    && validText(request.resource.data.name, 120)
+                    && validUid(request.resource.data.leaderUid)
                     && getAfter(/databases/$(database)/documents/houses/$(resource.data.houseId)).data.code == code;
       allow delete: if signedIn() && resource.data.leaderUid == request.auth.uid;
     }
 
     match /houses/{houseId} {
       allow get: if signedIn()
-                 && (request.auth.uid in resource.data.memberUids
-                     || resource.data.publicJoin == true);
-      // Supports cross-device recovery when a user's profile document lost its
-      // houseId. Firestore only permits queries constrained to the caller's UID.
+                 && (request.auth.uid in resource.data.memberUids || resource.data.publicJoin == true);
       allow list: if signedIn() && request.auth.uid in resource.data.memberUids;
       allow create: if signedIn()
                     && validRoster(request.resource.data)
+                    && request.resource.data.id == houseId
                     && request.resource.data.leaderUid == request.auth.uid
                     && request.resource.data.memberUids.size() == 1
-                    && request.resource.data.memberMap[request.auth.uid].uid == request.auth.uid
-                    && request.resource.data.memberMap[request.auth.uid].role == 'leader';
-      allow update: if signedIn()
-                    && validRoster(request.resource.data)
-                    && request.resource.data.code == resource.data.code
-                    && request.resource.data.id == resource.data.id
-                    && request.resource.data.leaderUid in request.resource.data.memberUids
-                    && (
-        resource.data.leaderUid == request.auth.uid
-        || (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ledgerRevision'])
-          && request.auth.uid in resource.data.memberUids
-          && request.resource.data.ledgerRevision is int
-          && request.resource.data.ledgerRevision == ('ledgerRevision' in resource.data ? resource.data.ledgerRevision + 1 : 1)
-        )
-        || (
+                    && membershipProfileAfter(request.auth.uid, houseId, 'leader');
+      function nonLedgerHouseUpdateAllowed() {
+        return (
+          resource.data.leaderUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'publicJoin'])
+          && validText(request.resource.data.name, 120)
+          && (!('publicJoin' in request.resource.data) || request.resource.data.publicJoin is bool)
+        ) || (
+          resource.data.leaderUid == request.auth.uid
+          && request.resource.data.leaderUid != resource.data.leaderUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leaderUid', 'members', 'memberMap'])
+          && request.resource.data.memberUids == resource.data.memberUids
+          && request.resource.data.memberMap.diff(resource.data.memberMap).affectedKeys().hasOnly([resource.data.leaderUid, request.resource.data.leaderUid])
+          && request.resource.data.memberMap[resource.data.leaderUid].diff(resource.data.memberMap[resource.data.leaderUid]).affectedKeys().hasOnly(['role'])
+          && request.resource.data.memberMap[request.resource.data.leaderUid].diff(resource.data.memberMap[request.resource.data.leaderUid]).affectedKeys().hasOnly(['role'])
+          && request.resource.data.memberMap[resource.data.leaderUid].uid == resource.data.leaderUid
+          && request.resource.data.memberMap[resource.data.leaderUid].role == 'member'
+          && request.resource.data.memberMap[request.resource.data.leaderUid].uid == request.resource.data.leaderUid
+          && request.resource.data.memberMap[request.resource.data.leaderUid].role == 'leader'
+          && request.resource.data.members.size() == resource.data.members.size()
+          && rosterListMatchesMapAt(request.resource.data, 0)
+          && rosterListMatchesMapAt(request.resource.data, 1)
+          && rosterListMatchesMapAt(request.resource.data, 2)
+          && rosterListMatchesMapAt(request.resource.data, 3)
+          && rosterListMatchesMapAt(request.resource.data, 4)
+          && rosterListMatchesMapAt(request.resource.data, 5)
+          && rosterListMatchesMapAt(request.resource.data, 6)
+          && rosterListMatchesMapAt(request.resource.data, 7)
+          && rosterListMatchesMapAt(request.resource.data, 8)
+          && rosterListMatchesMapAt(request.resource.data, 9)
+          && membershipProfileAfter(resource.data.leaderUid, houseId, 'member')
+          && membershipProfileAfter(request.resource.data.leaderUid, houseId, 'leader')
+        ) || (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberMap'])
           && request.auth.uid in resource.data.memberUids
+          && request.resource.data.leaderUid == resource.data.leaderUid
           && request.resource.data.memberUids == resource.data.memberUids
-          && request.resource.data.members.size() == resource.data.members.size()
           && request.resource.data.memberMap.diff(resource.data.memberMap).affectedKeys().hasOnly([request.auth.uid])
+          && validHouseMember(request.resource.data.memberMap[request.auth.uid])
           && request.resource.data.memberMap[request.auth.uid].uid == request.auth.uid
           && request.resource.data.memberMap[request.auth.uid].role == resource.data.memberMap[request.auth.uid].role
-        )
-        || (
+          && request.resource.data.members.size() == resource.data.members.size()
+          && memberListAvatarOnly(resource.data.members, request.resource.data.members, request.auth.uid)
+        ) || (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberUids', 'memberMap'])
-          && !(request.auth.uid in resource.data.memberUids)
-          && request.auth.uid in request.resource.data.memberUids
-          && request.resource.data.memberUids.hasAll(resource.data.memberUids)
-          && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
-          && request.resource.data.members.hasAll(resource.data.members)
-          && request.resource.data.members.size() == resource.data.members.size() + 1
-          && (!('memberMap' in resource.data)
-              || request.resource.data.memberMap.diff(resource.data.memberMap).affectedKeys().hasOnly([request.auth.uid]))
+           && !(request.auth.uid in resource.data.memberUids)
+           && request.auth.uid in request.resource.data.memberUids
+           && request.resource.data.publicJoin == true
+           && request.resource.data.memberUids.hasAll(resource.data.memberUids)
+           && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
+           && request.resource.data.memberMap.keys().size() == request.resource.data.memberUids.size()
+           && request.resource.data.memberMap.keys().hasOnly(request.resource.data.memberUids)
+           && request.resource.data.memberMap.keys().hasAll(request.resource.data.memberUids)
+           && request.resource.data.members.hasAll(resource.data.members)
+           && request.resource.data.members.size() == resource.data.members.size() + 1
+          && request.resource.data.memberMap.diff(resource.data.memberMap).affectedKeys().hasOnly([request.auth.uid])
+          && validHouseMember(request.resource.data.memberMap[request.auth.uid])
           && request.resource.data.memberMap[request.auth.uid].uid == request.auth.uid
-          && request.resource.data.memberMap[request.auth.uid].role == 'member'
-        )
-        || (
+           && request.resource.data.memberMap[request.auth.uid].role == 'member'
+           && request.resource.data.members.hasAll([request.resource.data.memberMap[request.auth.uid]])
+           && rosterListMatchesMapAt(request.resource.data, 0)
+           && rosterListMatchesMapAt(request.resource.data, 1)
+           && rosterListMatchesMapAt(request.resource.data, 2)
+           && rosterListMatchesMapAt(request.resource.data, 3)
+           && rosterListMatchesMapAt(request.resource.data, 4)
+           && rosterListMatchesMapAt(request.resource.data, 5)
+           && rosterListMatchesMapAt(request.resource.data, 6)
+           && rosterListMatchesMapAt(request.resource.data, 7)
+           && rosterListMatchesMapAt(request.resource.data, 8)
+           && rosterListMatchesMapAt(request.resource.data, 9)
+           && membershipProfileAfter(request.auth.uid, houseId, 'member')
+        ) || (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberUids', 'memberMap'])
           && request.auth.uid in resource.data.memberUids
-          && !(request.auth.uid in request.resource.data.memberUids)
-          && resource.data.memberUids.hasAll(request.resource.data.memberUids)
+           && !(request.auth.uid in request.resource.data.memberUids)
+           && resource.data.leaderUid != request.auth.uid
+           && request.resource.data.leaderUid in request.resource.data.memberUids
+           && resource.data.memberUids.hasAll(request.resource.data.memberUids)
           && request.resource.data.memberUids.size() == resource.data.memberUids.size() - 1
-          && resource.data.members.hasAll(request.resource.data.members)
-          && request.resource.data.members.size() == resource.data.members.size() - 1
-          && (!('memberMap' in resource.data)
-              || request.resource.data.memberMap.diff(resource.data.memberMap).affectedKeys().hasOnly([request.auth.uid]))
-        )
-      );
+           && resource.data.members.hasAll(request.resource.data.members)
+           && request.resource.data.members.size() == resource.data.members.size() - 1
+           && resource.data.memberMap.diff(request.resource.data.memberMap).affectedKeys().hasOnly([request.auth.uid])
+           && request.resource.data.memberMap.keys().size() == request.resource.data.memberUids.size()
+           && request.resource.data.memberMap.keys().hasOnly(request.resource.data.memberUids)
+           && request.resource.data.memberMap.keys().hasAll(request.resource.data.memberUids)
+           && rosterListMatchesMapAt(request.resource.data, 0)
+           && rosterListMatchesMapAt(request.resource.data, 1)
+           && rosterListMatchesMapAt(request.resource.data, 2)
+           && rosterListMatchesMapAt(request.resource.data, 3)
+           && rosterListMatchesMapAt(request.resource.data, 4)
+           && rosterListMatchesMapAt(request.resource.data, 5)
+           && rosterListMatchesMapAt(request.resource.data, 6)
+           && rosterListMatchesMapAt(request.resource.data, 7)
+           && rosterListMatchesMapAt(request.resource.data, 8)
+           && rosterListMatchesMapAt(request.resource.data, 9)
+           && clearedProfileAfter(request.auth.uid)
+        ) || (
+          resource.data.leaderUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberUids', 'memberMap'])
+           && request.resource.data.leaderUid == resource.data.leaderUid
+           && request.resource.data.leaderUid in request.resource.data.memberUids
+           && resource.data.memberUids.hasAll(request.resource.data.memberUids)
+          && request.resource.data.memberUids.size() == resource.data.memberUids.size() - 1
+           && resource.data.members.hasAll(request.resource.data.members)
+           && request.resource.data.members.size() == resource.data.members.size() - 1
+           && resource.data.memberMap.diff(request.resource.data.memberMap).affectedKeys().size() == 1
+           && request.resource.data.memberMap.keys().size() == request.resource.data.memberUids.size()
+           && request.resource.data.memberMap.keys().hasOnly(request.resource.data.memberUids)
+           && request.resource.data.memberMap.keys().hasAll(request.resource.data.memberUids)
+           && rosterListMatchesMapAt(request.resource.data, 0)
+           && rosterListMatchesMapAt(request.resource.data, 1)
+           && rosterListMatchesMapAt(request.resource.data, 2)
+           && rosterListMatchesMapAt(request.resource.data, 3)
+           && rosterListMatchesMapAt(request.resource.data, 4)
+           && rosterListMatchesMapAt(request.resource.data, 5)
+           && rosterListMatchesMapAt(request.resource.data, 6)
+           && rosterListMatchesMapAt(request.resource.data, 7)
+           && rosterListMatchesMapAt(request.resource.data, 8)
+           && rosterListMatchesMapAt(request.resource.data, 9)
+         );
+      }
+      allow update: if signedIn()
+                    && ((resource.data.memberUids.size() <= 9
+                         && request.resource.data.keys().hasOnly(['id', 'code', 'name', 'leaderUid', 'members', 'memberUids', 'memberMap', 'publicJoin', 'ledgerRevision', 'createdAt'])
+                         && request.resource.data.id == resource.data.id
+                         && request.resource.data.code == resource.data.code
+                         && request.resource.data.name == resource.data.name
+                         && request.resource.data.leaderUid == resource.data.leaderUid
+                         && request.resource.data.members == resource.data.members
+                         && request.resource.data.memberUids == resource.data.memberUids
+                         && request.resource.data.memberMap == resource.data.memberMap
+                         && (!('publicJoin' in resource.data)
+                             ? !('publicJoin' in request.resource.data)
+                             : request.resource.data.publicJoin == resource.data.publicJoin)
+                         && request.resource.data.createdAt == resource.data.createdAt
+                         && request.auth.uid in resource.data.memberUids
+                         && request.resource.data.ledgerRevision is int
+                         && request.resource.data.ledgerRevision == ('ledgerRevision' in resource.data ? resource.data.ledgerRevision + 1 : 1))
+                        || ((!('ledgerRevision' in resource.data)
+                             ? !('ledgerRevision' in request.resource.data)
+                             : request.resource.data.ledgerRevision == resource.data.ledgerRevision)
+                            && nonLedgerHouseUpdateAllowed()));
       allow delete: if signedIn() && resource.data.leaderUid == request.auth.uid;
     }
 
@@ -259,69 +575,64 @@ service cloud.firestore {
       function incomingIsPersonal() {
         return request.resource.data.scope == 'personal';
       }
+      function validExpenseUpdate() {
+        return (isPersonal()
+                && resource.data.ownerId == request.auth.uid
+                && request.resource.data.ownerId == resource.data.ownerId
+                && request.resource.data.paidBy == request.auth.uid
+                && request.resource.data.shares.size() == 1
+                && request.resource.data.shares[0].userId == request.auth.uid
+                && request.resource.data.participantUids[0] == request.auth.uid
+                && request.resource.data.scope == 'personal')
+               || (!isPersonal()
+                   && !incomingIsPersonal()
+                   && request.resource.data.houseId == resource.data.houseId
+                   && isHouseMember(resource.data.houseId)
+                   && ledgerAdvanced(resource.data.houseId)
+                   && validHouseholdParticipants(request.resource.data)
+                   && (isHouseLeader(resource.data.houseId)
+                       || (resource.data.paidBy == request.auth.uid && request.resource.data.paidBy == resource.data.paidBy))
+                   );
+      }
+
       allow read: if signedIn() && (
         (isPersonal() && resource.data.ownerId == request.auth.uid)
         || (!isPersonal() && isHouseMember(resource.data.houseId))
       );
-      allow create: if signedIn() && validExpense(request.resource.data) && exactShareTotal(request.resource.data) && validReceipt(request.resource.data) && (
-        (incomingIsPersonal()
-         && request.resource.data.ownerId == request.auth.uid
-         && request.resource.data.paidBy == request.auth.uid
-         && request.resource.data.shares.size() == 1
-         && request.resource.data.shares[0].userId == request.auth.uid
-         && request.resource.data.participantUids[0] == request.auth.uid
-         && !('houseId' in request.resource.data))
-        || (!incomingIsPersonal()
-            && isHouseMember(request.resource.data.houseId)
-            && ledgerAdvanced(request.resource.data.houseId)
-            && validHouseholdParticipants(request.resource.data)
-            && (request.resource.data.paidBy == request.auth.uid
-                || isHouseLeader(request.resource.data.houseId)))
-      );
-      allow update: if signedIn() && validExpense(request.resource.data)
+      // Ten-member household ledger writes are sent through
+      // mutateHouseholdLedger. Keeping the direct path bounded avoids the
+      // Rules evaluator's 1,000-expression ceiling on roster+ledger batches.
+      allow create: if signedIn()
+                    && (request.resource.data.scope == 'personal' || request.resource.data.shares.size() <= 9)
+                    && validExpense(request.resource.data)
+                    && request.resource.data.id == expenseId
+                    && (!('comments' in request.resource.data) || request.resource.data.comments.size() == 0)
                     && exactShareTotal(request.resource.data)
-                    && (validReceipt(request.resource.data)
-                        || (('receiptUrl' in resource.data) && request.resource.data.receiptUrl == resource.data.receiptUrl))
+                    && validCardReference(request.resource.data)
                     && (
-        (isPersonal()
-         && resource.data.ownerId == request.auth.uid
-         && request.resource.data.ownerId == resource.data.ownerId
-         && request.resource.data.paidBy == request.auth.uid
-         && request.resource.data.shares.size() == 1
-         && request.resource.data.shares[0].userId == request.auth.uid
-         && request.resource.data.participantUids[0] == request.auth.uid
-         && request.resource.data.scope == 'personal')
-        || (!isPersonal()
-            && !incomingIsPersonal()
-            && ledgerAdvanced(resource.data.houseId)
-            && validHouseholdParticipants(request.resource.data)
-            && request.resource.data.houseId == resource.data.houseId
-            && isHouseMember(resource.data.houseId) && (
-          ((isHouseLeader(resource.data.houseId)
-            || (resource.data.paidBy == request.auth.uid && request.resource.data.paidBy == resource.data.paidBy))
-           && commentsUnchanged(resource.data, request.resource.data))
-          || (
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments', 'updatedAt', 'sharesTotalCents', 'participantUids'])
-            && request.resource.data.comments is list
-            && (
-              (!('comments' in resource.data)
-               && request.resource.data.comments.size() == 1
-               && request.resource.data.comments[0].userId == request.auth.uid
-               && request.resource.data.comments[0].id is string
-               && request.resource.data.comments[0].text is string)
-              || (resource.data.comments is list
-               && request.resource.data.comments.size() == resource.data.comments.size() + 1
-               && request.resource.data.comments.hasAll(resource.data.comments)
-               && request.resource.data.comments[request.resource.data.comments.size() - 1].userId == request.auth.uid
-               && request.resource.data.comments[request.resource.data.comments.size() - 1].id is string
-               && request.resource.data.comments[request.resource.data.comments.size() - 1].text is string)
-              || (resource.data.comments is list
-                  && resource.data.comments.size() == request.resource.data.comments.size() + 1
-                  && resource.data.comments.hasAll(request.resource.data.comments))
-            )
-          )
-        ))
-      );
+                      (incomingIsPersonal()
+                       && request.resource.data.ownerId == request.auth.uid
+                       && request.resource.data.paidBy == request.auth.uid
+                       && request.resource.data.shares.size() == 1
+                       && request.resource.data.shares[0].userId == request.auth.uid
+                       && request.resource.data.participantUids[0] == request.auth.uid
+                       && !('houseId' in request.resource.data))
+                      || (!incomingIsPersonal()
+                          && request.resource.data.houseId is string
+                          && isHouseMember(request.resource.data.houseId)
+                          && ledgerAdvanced(request.resource.data.houseId)
+                          && validHouseholdParticipants(request.resource.data)
+                          && (request.resource.data.paidBy == request.auth.uid || isHouseLeader(request.resource.data.houseId)))
+                    );
+      allow update: if signedIn()
+                    && (request.resource.data.scope == 'personal' || request.resource.data.shares.size() <= 9)
+                    && commentsUnchanged(resource.data, request.resource.data)
+                    && validExpense(request.resource.data)
+                    && request.resource.data.id == expenseId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && exactShareTotal(request.resource.data)
+                    && validCardReference(request.resource.data)
+                    && validExpenseUpdate();
       allow delete: if signedIn() && (
         (isPersonal() && resource.data.ownerId == request.auth.uid)
         || (!isPersonal() && ledgerAdvanced(resource.data.houseId) && (isHouseLeader(resource.data.houseId) || resource.data.paidBy == request.auth.uid))
@@ -330,33 +641,49 @@ service cloud.firestore {
 
     match /settlements/{settlementId} {
       allow read: if signedIn() && isHouseMember(resource.data.houseId);
-      allow create: if signedIn() && validSettlement(request.resource.data)
-                    && validProof(request.resource.data)
-                    && isHouseMember(request.resource.data.houseId)
-                    && ledgerAdvanced(request.resource.data.houseId)
-                    && request.resource.data.toUserId == request.auth.uid
-                    && request.resource.data.fromUserId in houseData(request.resource.data.houseId).memberUids
-                    && request.resource.data.toUserId in houseData(request.resource.data.houseId).memberUids
-                    && request.resource.data.status == 'completed'
-                    && !('reversedAt' in request.resource.data)
-                    && !('reversedBy' in request.resource.data);
-      allow update: if signedIn() && validSettlement(request.resource.data) && isHouseMember(resource.data.houseId)
+      // Completed settlements are written only by confirmSettlement after it
+      // recalculates the ledger and applies the idempotency key.
+      allow create: if false;
+      allow update: if signedIn()
+                    && validSettlement(request.resource.data)
+                    && validSettlement(resource.data)
+                    && request.resource.data.id == resource.data.id
+                    && request.resource.data.houseId == resource.data.houseId
+                    && isHouseMember(resource.data.houseId)
                     && ledgerAdvanced(resource.data.houseId)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reversedAt', 'reversedBy'])
                     && resource.data.status == 'completed'
                     && request.resource.data.status == 'reversed'
                     && request.resource.data.reversedBy == request.auth.uid
-                    && request.resource.data.reversedAt is string
                     && (resource.data.toUserId == request.auth.uid || isHouseLeader(resource.data.houseId));
       allow delete: if signedIn() && ledgerAdvanced(resource.data.houseId) && isHouseLeader(resource.data.houseId);
     }
 
     match /cards/{cardId} {
+      function validCard(data) {
+        return data is map
+               && data.keys().hasOnly(['id', 'bankName', 'cardType', 'color', 'ownerId', 'houseId', 'createdAt'])
+               && data.keys().hasAll(['id', 'bankName', 'color', 'ownerId', 'createdAt'])
+               && data.id == cardId
+               && validUid(data.id)
+               && validText(data.bankName, 160)
+               && (!('cardType' in data) || data.cardType in ['debit', 'credit'])
+               && validText(data.color, 512)
+               && validUid(data.ownerId)
+               && (!('houseId' in data) || validUid(data.houseId))
+               && validTimestamp(data.createdAt);
+      }
+
       allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn()
+                    && validCard(request.resource.data)
+                    && request.resource.data.ownerId == request.auth.uid;
       allow update: if signedIn()
+                    && validCard(request.resource.data)
+                    && validCard(resource.data)
                     && resource.data.ownerId == request.auth.uid
-                    && request.resource.data.ownerId == resource.data.ownerId;
+                    && request.resource.data.ownerId == resource.data.ownerId
+                    && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
     }
   }

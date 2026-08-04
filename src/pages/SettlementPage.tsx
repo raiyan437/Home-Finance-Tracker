@@ -13,7 +13,7 @@ import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Im
 interface SettlementViewProps {
   expenses: Expense[];
   settlements: Settlement[];
-  onMarkSettled: (transaction: SimplifiedTransaction, proofUrl?: string) => void;
+  onMarkSettled: (transaction: SimplifiedTransaction, proofUrl?: string) => void | Promise<void>;
   onReverseSettlement?: (settlementId: string) => void;
   onClearSettlements?: () => void;
   lang?: Language;
@@ -52,6 +52,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
+  const [isConfirmingSettlement, setIsConfirmingSettlement] = useState(false);
 
   const userBalances = useMemo(
     () => calculateNetBalances(expenses, settlements, houseUsers),
@@ -395,17 +396,21 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
                 className="btn btn-primary"
                 onClick={async () => {
                   try {
+                    setIsConfirmingSettlement(true);
                     const persistedProof = proofFile ? await saveAttachment(proofFile, 'settlement-proofs', currentHouse?.id) : (proofUrl || undefined);
-                    onMarkSettled(confirmingTx, persistedProof);
+                    await onMarkSettled(confirmingTx, persistedProof);
                     setConfirmingTx(null);
                     setProofFile(null);
                     setProofUrl('');
                   } catch (error) {
                     setShareFeedback(error instanceof Error ? error.message : 'Unable to upload payment proof.');
+                  } finally {
+                    setIsConfirmingSettlement(false);
                   }
                 }}
+                disabled={isConfirmingSettlement}
               >
-                Confirm Payment
+                {isConfirmingSettlement ? 'Confirming…' : 'Confirm Payment'}
               </button>
             </div>
           </div>

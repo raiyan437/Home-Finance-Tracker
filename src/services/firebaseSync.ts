@@ -1,5 +1,6 @@
-import { collection, onSnapshot, doc, setDoc, deleteDoc, query, where, deleteField, writeBatch, runTransaction, increment } from 'firebase/firestore';
-import { auth, db, isFirebaseConfigured } from '../config/firebase';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, query, where, deleteField, writeBatch } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth, db, functions, isFirebaseConfigured } from '../config/firebase';
 import type { Expense, ExpenseComment, Settlement, PaymentCard, UserProfile, House } from '../types';
 
 type SyncCollection = 'users' | 'houses' | 'houseCodes' | 'expenses' | 'settlements' | 'cards';
@@ -40,11 +41,15 @@ const performMutation = async (mutation: PendingMutation): Promise<void> => {
   const houseId = typeof mutation.data?.houseId === 'string' ? mutation.data.houseId : null;
   const affectsLedger = Boolean(houseId) && (mutation.collection === 'expenses' || mutation.collection === 'settlements');
   if (affectsLedger) {
-    const batch = writeBatch(db);
-    if (mutation.operation === 'delete') batch.delete(reference);
-    else batch.set(reference, sanitizeForFirestore(mutation.data ?? {}), { merge: true });
-    batch.update(doc(db, 'houses', houseId!), { ledgerRevision: increment(1) });
-    await batch.commit();
+    const callable = callableFunctions();
+    if (!callable) throw new Error('Cloud ledger functions are unavailable.');
+    await httpsCallable(callable, 'mutateHouseholdLedger')({
+      collection: mutation.collection,
+      operation: mutation.operation,
+      id: mutation.id,
+      houseId,
+      ...(mutation.operation === 'set' ? { data: sanitizeForFirestore(mutation.data ?? {}) } : {}),
+    });
   } else if (mutation.operation === 'delete') await deleteDoc(reference);
   else await setDoc(reference, sanitizeForFirestore(mutation.data ?? {}), { merge: true });
 };
@@ -275,54 +280,39 @@ export const syncDeleteExpense = async (expenseId: string) => {
 export const syncDeleteHouseExpense = async (expenseId: string, houseId: string) =>
   syncMutation({ collection: 'expenses', id: expenseId, operation: 'delete', data: { houseId } });
 
+type CallableCommentResult = { synced: boolean };
+
+const callableFunctions = () => {
+  if (functions) return functions;
+  if (auth?.app) return getFunctions(auth.app);
+  return null;
+};
+
+/**
+ * Embedded comments are mutated by the callable function so a client cannot
+ * reorder or rewrite the surrounding expense while appending a comment.
+ */
 export const syncAddExpenseComment = async (expense: Expense, comment: ExpenseComment): Promise<SyncResult> => {
   if (!isFirebaseConfigured || !db) return { synced: false, queued: false };
   if (!auth?.currentUser || auth.currentUser.uid !== comment.userId) throw new Error('Comment author does not match the signed-in user.');
-  try {
-    await runTransaction(db, async (transaction) => {
-      const reference = doc(db!, 'expenses', expense.id);
-      const snapshot = await transaction.get(reference);
-      if (!snapshot.exists()) throw new Error('Expense no longer exists.');
-      const latest = snapshot.data() as Expense;
-      if ((latest.comments ?? []).some((item) => item.id === comment.id)) return;
-      transaction.update(reference, {
-        comments: [...(latest.comments ?? []), sanitizeForFirestore(comment)],
-        sharesTotalCents: latest.shares.reduce((sum, share) => sum + share.amountCents, 0),
-        participantUids: latest.shares.map((share) => share.userId),
-        updatedAt: expense.updatedAt,
-      });
-      if (latest.houseId) transaction.update(doc(db!, 'houses', latest.houseId), { ledgerRevision: increment(1) });
-    });
-    return { synced: true, queued: false };
-  } catch (error) {
-    enqueue({ collection: 'expenses', id: expense.id, operation: 'set', data: sanitizeForFirestore(expense) as unknown as Record<string, unknown> });
-    console.error('Comment sync queued for retry.', error);
-    return { synced: false, queued: true };
-  }
+  const callable = callableFunctions();
+  if (!callable) throw new Error('Cloud functions are unavailable.');
+  await httpsCallable<{ expenseId: string; comment: ExpenseComment }, CallableCommentResult>(callable, 'addExpenseComment')({
+    expenseId: expense.id,
+    comment: sanitizeForFirestore(comment),
+  });
+  return { synced: true, queued: false };
 };
 
 export const syncDeleteExpenseComment = async (expense: Expense, commentId: string): Promise<SyncResult> => {
   if (!isFirebaseConfigured || !db) return { synced: false, queued: false };
-  try {
-    await runTransaction(db, async (transaction) => {
-      const reference = doc(db!, 'expenses', expense.id);
-      const snapshot = await transaction.get(reference);
-      if (!snapshot.exists()) throw new Error('Expense no longer exists.');
-      const latest = snapshot.data() as Expense;
-      transaction.update(reference, {
-        comments: (latest.comments ?? []).filter((comment) => comment.id !== commentId),
-        sharesTotalCents: latest.shares.reduce((sum, share) => sum + share.amountCents, 0),
-        participantUids: latest.shares.map((share) => share.userId),
-        updatedAt: expense.updatedAt,
-      });
-      if (latest.houseId) transaction.update(doc(db!, 'houses', latest.houseId), { ledgerRevision: increment(1) });
-    });
-    return { synced: true, queued: false };
-  } catch (error) {
-    enqueue({ collection: 'expenses', id: expense.id, operation: 'set', data: sanitizeForFirestore(expense) as unknown as Record<string, unknown> });
-    console.error('Comment deletion queued for retry.', error);
-    return { synced: false, queued: true };
-  }
+  const callable = callableFunctions();
+  if (!callable) throw new Error('Cloud functions are unavailable.');
+  await httpsCallable<{ expenseId: string; commentId: string }, CallableCommentResult>(callable, 'deleteExpenseComment')({
+    expenseId: expense.id,
+    commentId,
+  });
+  return { synced: true, queued: false };
 };
 
 /**
@@ -361,8 +351,40 @@ export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => vo
  * Saves a settlement in Firestore.
  */
 export const syncSaveSettlement = async (settlement: Settlement, houseId?: string | null) => {
+  // Completed settlements must come from the server-authoritative recommender.
+  // This function remains for authorized reversal updates and offline mode.
+  if (settlement.status === 'completed' && isFirebaseConfigured) return { synced: false, queued: false } satisfies SyncResult;
   const dataToSave = houseId ? { ...settlement, houseId } : settlement;
   return syncMutation({ collection: 'settlements', id: settlement.id, operation: 'set', data: sanitizeForFirestore(dataToSave) as unknown as Record<string, unknown> });
+};
+
+export const syncConfirmSettlement = async (
+  houseId: string,
+  ledgerRevision: number,
+  transaction: { id: string; fromUserId: string; toUserId: string; amountCents: number },
+  proofUrl?: string
+): Promise<Settlement> => {
+  if (!isFirebaseConfigured || !db) throw new Error('Cloud settlement confirmation is unavailable.');
+  const callable = callableFunctions();
+  if (!callable) throw new Error('Cloud functions are unavailable.');
+  const result = await httpsCallable<{
+    houseId: string;
+    expectedLedgerRevision: number;
+    recommendationId: string;
+    fromUserId: string;
+    toUserId: string;
+    amountCents: number;
+    proofUrl?: string;
+  }, { settlement: Settlement }>(callable, 'confirmSettlement')({
+    houseId,
+    expectedLedgerRevision: ledgerRevision,
+    recommendationId: transaction.id,
+    fromUserId: transaction.fromUserId,
+    toUserId: transaction.toUserId,
+    amountCents: transaction.amountCents,
+    ...(proofUrl ? { proofUrl } : {}),
+  });
+  return result.data.settlement;
 };
 
 /**

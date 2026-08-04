@@ -2,25 +2,63 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function supportedImage() {
+      return request.resource.contentType is string
+             && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
+    function validUpload() {
+      return request.resource.size is int
+             && request.resource.size <= 5 * 1024 * 1024
+             && supportedImage()
+             && request.resource.name is string
+             && request.resource.name.size() <= 512;
+    }
+
+    function ownedBy(uid) {
+      return request.resource.metadata is map
+             && 'ownerUid' in request.resource.metadata
+             && request.resource.metadata.ownerUid is string
+             && request.resource.metadata.ownerUid == uid;
+    }
+
+    function isHouseMember(houseId) {
+      return signedIn()
+             && firestore.exists(/databases/(default)/documents/houses/$(houseId))
+             && firestore.get(/databases/(default)/documents/houses/$(houseId)).data.memberUids is list
+             && request.auth.uid in firestore.get(/databases/(default)/documents/houses/$(houseId)).data.memberUids;
+    }
+
     match /users/{uid}/{kind}/{fileName} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if request.auth != null
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn()
                    && request.auth.uid == uid
                    && kind in ['avatars', 'receipts', 'settlement-proofs']
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && fileName.size() > 0
+                   && fileName.size() <= 128
+                   && validUpload()
+                   && ownedBy(request.auth.uid);
+      allow delete: if signedIn()
+                    && request.auth.uid == uid
+                    && kind in ['avatars', 'receipts', 'settlement-proofs'];
     }
 
     match /houses/{houseId}/{kind}/{fileName} {
-      function isMember() {
-        return request.auth != null
-               && request.auth.uid in firestore.get(/databases/(default)/documents/houses/$(houseId)).data.memberUids;
-      }
-      allow read: if isMember();
-      allow write: if isMember()
+      allow read: if isHouseMember(houseId);
+      allow write: if isHouseMember(houseId)
                    && kind in ['receipts', 'settlement-proofs']
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && fileName.size() > 0
+                   && fileName.size() <= 128
+                   && validUpload()
+                   && ownedBy(request.auth.uid);
+      // Household members may remove a shared receipt/proof from their house;
+      // the path remains bound to the household and cannot cross owners.
+      allow delete: if isHouseMember(houseId)
+                    && kind in ['receipts', 'settlement-proofs'];
     }
   }
 }

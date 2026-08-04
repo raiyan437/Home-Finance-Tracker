@@ -7,6 +7,9 @@ const CLOUD_MAX_BYTES = 5 * 1024 * 1024;
 const OFFLINE_MAX_BYTES = 300 * 1024;
 const PROFILE_PHOTO_MAX_BYTES = 28 * 1024;
 const UPLOAD_TIMEOUT_MS = 20_000;
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const isSupportedImage = (file: File): boolean => SUPPORTED_IMAGE_TYPES.has(file.type.toLowerCase());
 
 const asDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -42,7 +45,7 @@ const uploadImageWithTimeout = async (path: string, file: File, ownerUid: string
 
 /** Downsizes profile photos before upload so mobile uploads remain quick and reliable. */
 export const prepareProfilePhoto = async (file: File): Promise<File> => {
-  if (!file.type.startsWith('image/')) throw new Error('Only image files can be used as profile pictures.');
+  if (!isSupportedImage(file)) throw new Error('Only JPG, PNG, or WebP images can be used as profile pictures.');
   if (file.size > CLOUD_MAX_BYTES) throw new Error('Image must be 5 MB or smaller.');
 
   const imageUrl = URL.createObjectURL(file);
@@ -89,7 +92,7 @@ export const prepareProfilePhoto = async (file: File): Promise<File> => {
 };
 
 export const saveAttachment = async (file: File, kind: AttachmentKind, houseId?: string): Promise<string> => {
-  if (!file.type.startsWith('image/')) throw new Error('Only image attachments are supported.');
+  if (!isSupportedImage(file)) throw new Error('Only JPG, PNG, or WebP image attachments are supported.');
   if (file.size > CLOUD_MAX_BYTES) throw new Error('Image must be 5 MB or smaller.');
 
   if (kind === 'avatars') {
