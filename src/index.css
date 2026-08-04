@@ -761,6 +761,58 @@ button, input, select, textarea {
   color: var(--accent-cyan);
 }
 
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  margin: 6px 12px 2px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sync-indicator-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--accent-emerald);
+}
+
+.sync-indicator-saving .sync-indicator-dot { background: var(--accent-primary); }
+.sync-indicator-offline-queued .sync-indicator-dot { background: var(--accent-amber); }
+.sync-indicator-failed .sync-indicator-dot,
+.sync-indicator-auth-required .sync-indicator-dot { background: var(--accent-rose); }
+
+.sync-retry-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sync-retry-button:hover { color: var(--text-primary); background: var(--surface-hover); }
+
+.sync-action-alert {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 24px 0;
+}
+
 /* Sidebar Footer Section */
 .sidebar-footer {
   margin-top: auto;

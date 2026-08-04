@@ -1,5 +1,5 @@
 /* oxlint-disable react/only-export-components */
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { User, UserId, UserProfile, House, HouseMember, Expense, Settlement, PersonalWalletSettings } from '../types';
 import { USERS, calculateNetBalances, getCanonicalHouseMembers, getHouseUsers } from '../features/settlementEngine';
 import { loadExpenses, loadSettlements, houseStorageScope } from '../services/storage';
@@ -15,14 +15,16 @@ import {
   verifyLocalCredential,
 } from '../services/mockAuthDatabase';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot, runTransaction, setDoc, deleteField } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import {
   syncSaveUser,
+  syncSaveUserAvatar,
+  syncSaveUserWalletSettings,
   syncSaveHouse,
   subscribeHouse,
   hasPendingLedgerMutations,
   sanitizeForFirestore,
-  discardPendingUserProfileMutation,
+  getPendingProfileOverlay,
 } from '../services/firebaseSync';
 import { createProfileFromIdentity, normalizeCloudProfile } from '../features/profileReconciliation';
 import {
@@ -95,6 +97,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentHouse, setCurrentHouse] = useState<House | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+  const sessionVersionRef = useRef(0);
+  const houseRefreshVersionRef = useRef(0);
+  const houseSnapshotVersionRef = useRef(0);
+  const dbUserProfileRef = useRef(dbUserProfile);
+  dbUserProfileRef.current = dbUserProfile;
+
+  const isSessionCurrent = (version: number, uid: string): boolean => (
+    mountedRef.current
+    && sessionVersionRef.current === version
+    && (!auth?.currentUser || auth.currentUser.uid === uid)
+  );
 
   const cacheHouse = (house: House): void => {
     const houses = loadHousesDB();
@@ -178,8 +192,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resolveFirebaseProfile = async (
     user: FirebaseUser,
-    suppliedCloudProfile?: Partial<UserProfile> | null
-  ): Promise<UserProfile> => {
+    suppliedCloudProfile?: Partial<UserProfile> | null,
+    sessionVersion = sessionVersionRef.current,
+  ): Promise<UserProfile | null> => {
     const cached = loadUsersDB().find((candidate) => candidate.uid === user.uid);
     let cloudProfile = suppliedCloudProfile;
     let cloudDocumentExists = suppliedCloudProfile !== null;
@@ -198,6 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           photoURL: user.photoURL,
           creationTime: user.metadata.creationTime,
         });
+        if (!isSessionCurrent(sessionVersion, user.uid)) return null;
         cacheUserProfile(offlineProfile);
         setActiveSession(offlineProfile);
         setDbUserProfile(offlineProfile);
@@ -221,11 +237,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...(cached?.walletSettings ? { walletSettings: cached.walletSettings } : {}),
           ...(cached?.createdAt ? { createdAt: cached.createdAt } : {}),
         };
-    const resolvedProfile = await recoverRosterMembership(baseProfile, cached?.houseId);
-
-    // A successful cloud read supersedes any stale full-profile write queued by
-    // another browser session. This prevents a delayed houseId:null replay.
-    discardPendingUserProfileMutation(user.uid);
+    const resolvedBaseProfile = await recoverRosterMembership(baseProfile, cached?.houseId);
+    // Identity, avatar, and wallet mutations are independent optimistic fields.
+    // A profile snapshot may be older than one of those writes, so overlay only
+    // those pending fields. Membership remains cloud/roster canonical.
+    const resolvedProfile = getPendingProfileOverlay(user.uid, resolvedBaseProfile);
+    if (!isSessionCurrent(sessionVersion, user.uid)) return null;
     cacheUserProfile(resolvedProfile);
     setActiveSession(resolvedProfile);
     setDbUserProfile(resolvedProfile);
@@ -237,6 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Connect Firebase Auth Listener & Realtime Profile Sync from Firestore
   useEffect(() => {
+    mountedRef.current = true;
     if (!auth) {
       setLoading(false);
       return;
@@ -244,6 +262,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let unsubUserDoc: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      const sessionVersion = ++sessionVersionRef.current;
+      houseRefreshVersionRef.current += 1;
       setFirebaseUser(user);
       if (unsubUserDoc) {
         unsubUserDoc();
@@ -256,9 +276,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unsubUserDoc = onSnapshot(
             userDocRef,
             (snap) => {
-              void resolveFirebaseProfile(user, snap.exists() ? snap.data() as Partial<UserProfile> : null)
-                .then((profile) => syncHouseForUser(profile))
-                .finally(() => setLoading(false));
+              void resolveFirebaseProfile(user, snap.exists() ? snap.data() as Partial<UserProfile> : null, sessionVersion)
+                .then((profile) => profile ? syncHouseForUser(profile, sessionVersion) : undefined)
+                .then(() => { if (isSessionCurrent(sessionVersion, user.uid)) setLoading(false); })
+                .catch((error) => {
+                  if (isSessionCurrent(sessionVersion, user.uid)) {
+                    console.warn('Firestore profile reconciliation notice:', error);
+                    setLoading(false);
+                  }
+                });
             },
             (err) => {
               console.warn('Firestore User Profile Sync Warning:', err);
@@ -278,15 +304,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
+      mountedRef.current = false;
+      sessionVersionRef.current += 1;
+      houseRefreshVersionRef.current += 1;
+      houseSnapshotVersionRef.current += 1;
       unsubscribeAuth();
       if (unsubUserDoc) unsubUserDoc();
     };
   }, []);
 
   // Helper: Refresh house object from DB based on user profile (with Firestore cloud sync & auto-healing fallback)
-  const syncHouseForUser = async (profile: UserProfile | null) => {
+  const syncHouseForUser = async (profile: UserProfile | null, sessionVersion = sessionVersionRef.current) => {
+    const refreshVersion = ++houseRefreshVersionRef.current;
     if (!profile) {
-      setCurrentHouse(null);
+      if (mountedRef.current) setCurrentHouse(null);
       return;
     }
 
@@ -300,21 +331,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (matchedLocal) {
         targetHouseId = matchedLocal.id;
         const healedProfile = { ...profile, houseId: targetHouseId };
+        if (!isSessionCurrent(sessionVersion, profile.uid) || refreshVersion !== houseRefreshVersionRef.current) return;
         setDbUserProfile(healedProfile);
         setActiveSession(healedProfile);
-        syncSaveUser(healedProfile);
+        await syncSaveUser(healedProfile);
       }
     }
 
     if (!targetHouseId) {
-      setCurrentHouse(null);
+      if (isSessionCurrent(sessionVersion, profile.uid) && refreshVersion === houseRefreshVersionRef.current) setCurrentHouse(null);
       return;
     }
 
     const houses = loadHousesDB();
     const house = houses.find((h) => h.id === targetHouseId) || null;
     if (house) {
-      setCurrentHouse({ ...house });
+      if (isSessionCurrent(sessionVersion, profile.uid) && refreshVersion === houseRefreshVersionRef.current) setCurrentHouse({ ...house });
     }
 
     if (isFirebaseConfigured && db && targetHouseId) {
@@ -328,16 +360,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (isStillMember) {
             const reconciledHouse = await reconcileProfileAvatarInHouse(profile, targetHouseId);
             const visibleHouse = reconciledHouse || firestoreHouse;
+            if (!isSessionCurrent(sessionVersion, profile.uid) || refreshVersion !== houseRefreshVersionRef.current) return;
             setCurrentHouse({ ...visibleHouse });
             cacheHouse(visibleHouse);
             if (
               visibleHouse.leaderUid === profile.uid &&
               (!visibleHouse.memberUids || !visibleHouse.memberMap || visibleHouse.publicJoin === undefined)
             ) {
-              syncSaveHouse(visibleHouse);
+              await syncSaveHouse(visibleHouse);
             }
           } else {
             // User was removed / kicked from house
+            if (!isSessionCurrent(sessionVersion, profile.uid) || refreshVersion !== houseRefreshVersionRef.current) return;
             setCurrentHouse(null);
             const purgedProfile = { ...profile, houseId: null, role: null };
             setDbUserProfile(purgedProfile);
@@ -346,6 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await syncSaveUser(purgedProfile);
           }
         } else {
+          if (!isSessionCurrent(sessionVersion, profile.uid) || refreshVersion !== houseRefreshVersionRef.current) return;
           setCurrentHouse(null);
           const purgedProfile = { ...profile, houseId: null, role: null };
           setDbUserProfile(purgedProfile);
@@ -361,17 +396,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sync House state whenever dbUserProfile reference or values change
   useEffect(() => {
-    syncHouseForUser(dbUserProfile);
-  }, [dbUserProfile]);
+    void syncHouseForUser(dbUserProfileRef.current).catch((error) => console.warn('House reconciliation notice:', error));
+  }, [dbUserProfile?.uid, dbUserProfile?.houseId]);
 
   // Realtime House Roster Listener (Live multi-user roster updates across devices)
   useEffect(() => {
-    const targetHouseId = dbUserProfile?.houseId || currentHouse?.id;
+    const targetHouseId = dbUserProfile?.houseId;
     if (!targetHouseId) return;
+    const sessionVersion = sessionVersionRef.current;
+    const snapshotVersion = ++houseSnapshotVersionRef.current;
 
     const unsub = subscribeHouse(targetHouseId, (updatedHouse) => {
+      if (!isSessionCurrent(sessionVersion, dbUserProfile?.uid || '') || snapshotVersion !== houseSnapshotVersionRef.current) return;
       if (updatedHouse) {
-        const myUid = dbUserProfile?.uid || activeUserId;
+        const myUid = dbUserProfile?.uid || '';
         const amIMember = updatedHouse.members && updatedHouse.members.some((m) => m.uid === myUid);
 
         if (!amIMember) {
@@ -404,7 +442,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (purged) {
             setActiveSession(purged);
             cacheUserProfile(purged);
-            void syncSaveUser(purged);
+            void syncSaveUser(purged).catch((error) => console.warn('Membership profile cleanup notice:', error));
           }
           return purged;
         });
@@ -414,7 +452,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Live household updates are temporarily unavailable.', error);
     });
     return () => unsub();
-  }, [dbUserProfile?.houseId, dbUserProfile?.uid, currentHouse?.id, activeUserId]);
+    }, [dbUserProfile?.houseId, dbUserProfile?.uid]);
 
   const switchProfile = (userId: UserId) => {
     if (USERS[userId]) {
@@ -535,8 +573,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!auth) await saveLocalCredential(newUser.uid, cleanEmail, pass);
     setActiveSession(newUser);
     setDbUserProfile(newUser);
-    syncHouseForUser(newUser);
-    syncSaveUser(newUser);
+    await syncHouseForUser(newUser);
+    await syncSaveUser(newUser);
     setLoading(false);
   };
 
@@ -544,23 +582,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserProfilePhoto = async (avatarUrl: string | null) => {
     if (!dbUserProfile) throw new Error('You must be logged in to update profile photo.');
 
+    const previousProfile = dbUserProfile;
     const { avatar: _previousAvatar, ...profileWithoutAvatar } = dbUserProfile;
     const updatedProfile = avatarUrl ? { ...profileWithoutAvatar, avatar: avatarUrl } : profileWithoutAvatar;
-
-    if (isFirebaseConfigured && db) {
-      try {
-        await setDoc(doc(db, 'users', dbUserProfile.uid), {
-          avatar: avatarUrl ?? deleteField(),
-        }, { merge: true });
-      } catch (error) {
-        console.error('Profile photo cloud save failed.', error);
-        throw new Error('Profile photo could not be saved to the live account. Please try again.');
-      }
-    }
 
     cacheUserProfile(updatedProfile);
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
+
+    if (isFirebaseConfigured && db) {
+      const result = await syncSaveUserAvatar(dbUserProfile.uid, avatarUrl);
+      if (result.failed) {
+        cacheUserProfile(previousProfile);
+        setActiveSession(previousProfile);
+        setDbUserProfile(previousProfile);
+        throw new Error(result.error?.userMessage || 'Profile photo could not be saved to the live account.');
+      }
+    }
 
     // Keep the denormalized household roster in sync as well. The profile
     // document is private to its owner, so other household members can only
@@ -615,6 +653,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updatePersonalWalletSettings = async (settings: Partial<PersonalWalletSettings>) => {
     if (!dbUserProfile) throw new Error('You must be logged in to update wallet settings.');
+    const previousProfile = dbUserProfile;
     const updatedProfile: UserProfile = {
       ...dbUserProfile,
       walletSettings: {
@@ -624,22 +663,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     };
 
-    if (isFirebaseConfigured && db) {
-      try {
-        await setDoc(doc(db, 'users', dbUserProfile.uid), {
-          walletSettings: updatedProfile.walletSettings,
-        }, { merge: true });
-      } catch (error) {
-        console.error('Wallet settings cloud save failed.', error);
-        throw new Error('Wallet settings could not be saved to the live account. Please try again.');
-      }
-    } else {
-      await syncSaveUser(updatedProfile);
-    }
-
     cacheUserProfile(updatedProfile);
     setActiveSession(updatedProfile);
     setDbUserProfile(updatedProfile);
+
+    if (isFirebaseConfigured && db) {
+      const result = await syncSaveUserWalletSettings(dbUserProfile.uid, updatedProfile.walletSettings);
+      if (result.failed) {
+        cacheUserProfile(previousProfile);
+        setActiveSession(previousProfile);
+        setDbUserProfile(previousProfile);
+        throw new Error(result.error?.userMessage || 'Wallet settings could not be saved to the live account.');
+      }
+    }
   };
 
   // Change User Password Handler
@@ -673,6 +709,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Logout Handler
   const logout = async () => {
+    sessionVersionRef.current += 1;
+    houseRefreshVersionRef.current += 1;
+    houseSnapshotVersionRef.current += 1;
     if (auth) {
       try {
         await signOut(auth);
@@ -908,7 +947,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
     saveHousesDB(updatedHouses);
     setCurrentHouse(updatedHouse);
-    if (!isFirebaseConfigured) syncSaveHouse(updatedHouse);
+    if (!isFirebaseConfigured) await syncSaveHouse(updatedHouse);
   };
 
   // Kick Member Handler (Leader Power with settlement balance check)
@@ -998,7 +1037,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedHouses = houses.map((h) => (h.id === currentHouse.id ? updatedHouse : h));
     saveHousesDB(updatedHouses);
     setCurrentHouse(updatedHouse);
-    if (!isFirebaseConfigured) syncSaveHouse(updatedHouse);
+    if (!isFirebaseConfigured) await syncSaveHouse(updatedHouse);
 
     const users = loadUsersDB();
     const updatedUsers = users.map((u) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import type { TabType } from './components/Navbar';
@@ -44,12 +44,18 @@ import {
   syncDeleteCard,
   syncAddExpenseComment,
   syncDeleteExpenseComment,
+  classifyFirebaseError,
+  getSyncState,
+  retryFailedSyncMutations,
+  subscribeSyncState,
 } from './services/firebaseSync';
+import type { SyncState } from './services/firebaseSync';
 import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from './features/settlementEngine';
 import { generateDueRecurringExpenses, localDateKey } from './features/recurringEngine';
 import { createId } from './utils/ids';
 import { assertValidExpense, assertValidSettlement } from './features/ledgerValidation';
 import { isFirebaseConfigured } from './config/firebase';
+import { rollbackOptimisticEntity } from './services/optimisticState';
 
 // Code-split heavy views for instant page loads
 const MonthlyPage = lazy(() =>
@@ -117,6 +123,8 @@ const AppContent: React.FC = () => {
   const currentUserId = dbUserProfile?.uid || activeUserId;
   const currentHouseScope = currentHouse?.id ? houseStorageScope(currentHouse.id) : undefined;
   const currentPersonalScope = personalStorageScope(currentUserId);
+  const currentHouseMembersRef = useRef(currentHouse?.members);
+  currentHouseMembersRef.current = currentHouse?.members;
 
   const persistExpenses = useCallback((allExpenses: Expense[]) => {
     if (currentHouseScope && currentHouse?.id) {
@@ -138,17 +146,24 @@ const AppContent: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [cards, setCards] = useState<PaymentCard[]>([]);
+  const [syncState, setSyncState] = useState<SyncState>(() => getSyncState(currentUserId));
+  const [actionError, setActionError] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [lang, setLang] = useState<Language>(() => (
     localStorage.getItem('home_finance_language') === 'bn' ? 'bn' : 'en'
   ));
 
   useEffect(() => {
-    const retryPendingWrites = () => { void flushSyncOutbox(); };
+    const retryPendingWrites = () => { void flushSyncOutbox().catch((error) => console.warn('Outbox retry notice:', error)); };
     window.addEventListener('online', retryPendingWrites);
     retryPendingWrites();
     return () => window.removeEventListener('online', retryPendingWrites);
   }, []);
+
+  useEffect(() => {
+    setSyncState(getSyncState(currentUserId));
+    return subscribeSyncState((nextState) => setSyncState(nextState));
+  }, [currentUserId]);
 
   const handleTabChange = (nextTab: TabType) => {
     setActiveTabState(nextTab);
@@ -208,7 +223,7 @@ const AppContent: React.FC = () => {
       const legacyExpenses = loadExpenses();
       const legacySettlements = loadSettlements();
       const memberIdentitySet = new Set(
-        (currentHouse?.members || []).map((member) => member.uid.toLowerCase())
+        (currentHouseMembersRef.current || []).map((member) => member.uid.toLowerCase())
       );
       const identityBelongsToHouse = (identity: string) => memberIdentitySet.has(identity.toLowerCase().trim());
 
@@ -293,7 +308,7 @@ const AppContent: React.FC = () => {
       if (currentHouseScope) saveSettlements(fbSettlements, currentHouseScope);
     }, houseId);
 
-    const cardOwnerId = dbUserProfile?.uid || activeUserId;
+    const cardOwnerId = currentUserId;
     const unsubCards = subscribeCards(
       (fbCards) => {
         setCards(fbCards);
@@ -309,7 +324,7 @@ const AppContent: React.FC = () => {
       unsubSt();
       unsubCards();
     };
-  }, [currentHouse?.id, currentHouse?.members, currentHouseScope, currentPersonalScope, currentUserId, activeUserId, dbUserProfile?.uid, persistExpenses]);
+  }, [currentHouse?.id, currentHouseScope, currentPersonalScope, currentUserId, persistExpenses]);
 
   // Generate every due occurrence exactly once using deterministic IDs.
   useEffect(() => {
@@ -324,11 +339,27 @@ const AppContent: React.FC = () => {
         dbUserProfile?.role === 'leader'
     );
     if (result.generated.length > 0 || result.updatedTemplates.length > 0) {
+      const previousExpenses = expenses;
       setExpenses(result.expenses);
       persistExpenses(result.expenses);
-      [...result.generated, ...result.updatedTemplates].forEach((expense) =>
-        syncSaveExpense(expense, expense.scope === 'personal' ? undefined : expense.houseId || currentHouse?.id)
-      );
+      void Promise.all(
+        [...result.generated, ...result.updatedTemplates].map((expense) =>
+          syncSaveExpense(expense, expense.scope === 'personal' ? undefined : expense.houseId || currentHouse?.id)
+        )
+      ).then((results) => {
+        const failedIds = new Set(results.filter((item) => item.failed).map((_, index) => (
+          [...result.generated, ...result.updatedTemplates][index].id
+        )));
+        if (failedIds.size === 0) return;
+        const restored = result.expenses.filter((expense) => !failedIds.has(expense.id));
+        const previousById = new Map(previousExpenses.map((expense) => [expense.id, expense]));
+        const rolledBack = [
+          ...restored,
+          ...[...failedIds].map((id) => previousById.get(id)).filter((expense): expense is Expense => Boolean(expense)),
+        ];
+        setExpenses(rolledBack);
+        persistExpenses(rolledBack);
+      }).catch((error) => setActionError(classifyFirebaseError(error).userMessage));
     }
   }, [expenses, currentHouse?.id, currentUserId, dbUserProfile?.role, persistExpenses]);
 
@@ -386,10 +417,11 @@ const AppContent: React.FC = () => {
   );
 
   // Add / Edit expense handler
-  const handleSaveExpense = (
+  const handleSaveExpense = async (
     expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>,
     editingId?: string
-  ) => {
+  ): Promise<void> => {
+    setActionError(null);
     const now = new Date().toISOString();
     let updatedExpenses: Expense[];
 
@@ -421,24 +453,54 @@ const AppContent: React.FC = () => {
 
     setExpenses(updatedExpenses);
     persistExpenses(updatedExpenses);
-    syncSaveExpense(targetExpense, isPersonal ? undefined : currentHouse?.id);
-    notifyNewExpense(targetExpense.title, formatCurrency(targetExpense.amountCents), dbUserProfile?.displayName || activeUserId);
+
+    const result = await syncSaveExpense(targetExpense, isPersonal ? undefined : currentHouse?.id);
+    if (result.failed) {
+      setExpenses((current) => {
+        const rolledBack = rollbackOptimisticEntity(
+          current,
+          targetExpense.id,
+          existingExpense || undefined,
+          (expense) => expense.updatedAt === targetExpense.updatedAt,
+        );
+        if (rolledBack === current) return current;
+        persistExpenses(rolledBack);
+        return rolledBack;
+      });
+      setActionError(result.error?.userMessage || 'The expense was not saved to the cloud.');
+      return;
+    }
+    if (result.synced || !isFirebaseConfigured) {
+      notifyNewExpense(targetExpense.title, formatCurrency(targetExpense.amountCents), dbUserProfile?.displayName || activeUserId);
+    }
   };
 
   // Delete expense handler
-  const handleConfirmDeleteExpense = () => {
+  const handleConfirmDeleteExpense = async (): Promise<void> => {
     if (!deletingExpenseId) return;
+    setActionError(null);
+    const deletedExpense = expenses.find((expense) => expense.id === deletingExpenseId);
     const updated = expenses.filter((e) => e.id !== deletingExpenseId);
     setExpenses(updated);
     persistExpenses(updated);
-    const deletingExpense = expenses.find((expense) => expense.id === deletingExpenseId);
-    if (deletingExpense?.scope === 'personal' || !currentHouse?.id) syncDeleteExpense(deletingExpenseId);
-    else syncDeleteHouseExpense(deletingExpenseId, currentHouse.id);
+    const result = deletedExpense?.scope === 'personal' || !currentHouse?.id
+      ? await syncDeleteExpense(deletingExpenseId)
+      : await syncDeleteHouseExpense(deletingExpenseId, currentHouse.id);
+    if (result.failed && deletedExpense) {
+      setExpenses((current) => {
+        const restored = rollbackOptimisticEntity(current, deletedExpense.id, deletedExpense);
+        if (restored === current) return current;
+        persistExpenses(restored);
+        return restored;
+      });
+      setActionError(result.error?.userMessage || 'The expense was not deleted from the cloud.');
+    }
     setDeletingExpenseId(null);
   };
 
   // Add Comment Handler
-  const handleAddComment = (expenseId: string, text: string) => {
+  const handleAddComment = async (expenseId: string, text: string): Promise<void> => {
+    setActionError(null);
     const now = new Date().toISOString();
     const commentAuthorId = dbUserProfile?.uid || activeUserId;
     const newComment = {
@@ -464,12 +526,25 @@ const AppContent: React.FC = () => {
     setExpenses(updated);
     persistExpenses(updated);
     if (updatedExp) {
-      syncAddExpenseComment(updatedExp, newComment);
+      const result = await syncAddExpenseComment(updatedExp, newComment);
+      if (result.failed) {
+        setExpenses((current) => {
+          const optimistic = current.find((expense) => expense.id === updatedExp?.id);
+          if (!optimistic || !optimistic.comments?.some((comment) => comment.id === newComment.id)) return current;
+          const rolledBack = current.map((expense) => expense.id === updatedExp?.id
+            ? { ...expense, comments: expense.comments?.filter((comment) => comment.id !== newComment.id) }
+            : expense);
+          persistExpenses(rolledBack);
+          return rolledBack;
+        });
+        setActionError(result.error?.userMessage || 'The comment was not saved to the cloud.');
+      }
     }
   };
 
   // Delete Comment Handler
-  const handleDeleteComment = (expenseId: string, commentId: string) => {
+  const handleDeleteComment = async (expenseId: string, commentId: string): Promise<void> => {
+    setActionError(null);
     const now = new Date().toISOString();
     let updatedExp: Expense | undefined;
     const updated = expenses.map((e) => {
@@ -487,12 +562,27 @@ const AppContent: React.FC = () => {
     setExpenses(updated);
     persistExpenses(updated);
     if (updatedExp) {
-      syncDeleteExpenseComment(updatedExp, commentId);
+      const result = await syncDeleteExpenseComment(updatedExp, commentId);
+      if (result.failed) {
+        setExpenses((current) => {
+          const optimistic = current.find((expense) => expense.id === updatedExp?.id);
+          if (!optimistic) return current;
+          const previousComment = expenses.find((expense) => expense.id === updatedExp?.id)?.comments?.find((comment) => comment.id === commentId);
+          if (!previousComment || optimistic.comments?.some((comment) => comment.id === commentId)) return current;
+          const rolledBack = current.map((expense) => expense.id === updatedExp?.id
+            ? { ...expense, comments: [...(expense.comments || []), previousComment] }
+            : expense);
+          persistExpenses(rolledBack);
+          return rolledBack;
+        });
+        setActionError(result.error?.userMessage || 'The comment was not deleted from the cloud.');
+      }
     }
   };
 
   // Save Card Handler
-  const handleSaveCard = (cardData: Omit<PaymentCard, 'id' | 'createdAt'>, editingId?: string) => {
+  const handleSaveCard = async (cardData: Omit<PaymentCard, 'id' | 'createdAt'>, editingId?: string): Promise<void> => {
+    setActionError(null);
     const now = new Date().toISOString();
     const existingCard = editingId ? cards.find((card) => card.id === editingId) : undefined;
     let targetCard: PaymentCard = {
@@ -516,37 +606,62 @@ const AppContent: React.FC = () => {
 
     setCards(updatedCards);
     saveCards(updatedCards, currentPersonalScope);
-    syncSaveCard(targetCard);
+    const result = await syncSaveCard(targetCard);
+    if (result.failed) {
+      setCards((current) => {
+        const rolledBack = rollbackOptimisticEntity(current, targetCard.id, existingCard || undefined);
+        if (rolledBack === current) return current;
+        saveCards(rolledBack, currentPersonalScope);
+        return rolledBack;
+      });
+      setActionError(result.error?.userMessage || 'The payment card was not saved to the cloud.');
+    }
   };
 
   // Deleting a card must not rewrite historical payment records.
-  const handleDeleteCard = (cardId: string) => {
+  const handleDeleteCard = async (cardId: string): Promise<void> => {
+    setActionError(null);
+    const deletedCard = cards.find((card) => card.id === cardId);
     const updatedCards = cards.filter((c) => c.id !== cardId);
     setCards(updatedCards);
     saveCards(updatedCards, currentPersonalScope);
-    syncDeleteCard(cardId);
+    const result = await syncDeleteCard(cardId);
+    if (result.failed && deletedCard) {
+      setCards((current) => {
+        const restored = rollbackOptimisticEntity(current, deletedCard.id, deletedCard);
+        if (restored === current) return current;
+        saveCards(restored, currentPersonalScope);
+        return restored;
+      });
+      setActionError(result.error?.userMessage || 'The payment card was not deleted from the cloud.');
+    }
 
   };
 
   // Mark Settlement as Paid handler
   const handleMarkSettledConfirm = async (transaction: SimplifiedTransaction, proofUrl?: string) => {
     if (!currentHouse) return;
+    setActionError(null);
     if (isFirebaseConfigured) {
-      const settlement = await syncConfirmSettlement(
-        currentHouse.id,
-        currentHouse.ledgerRevision || 0,
-        {
-          id: transaction.id,
-          fromUserId: String(transaction.fromUser.id),
-          toUserId: String(transaction.toUser.id),
-          amountCents: transaction.amountCents,
-        },
-        proofUrl,
-      );
-      const updatedSettlements = [settlement, ...settlements.filter((item) => item.id !== settlement.id)];
-      setSettlements(updatedSettlements);
-      if (currentHouseScope) saveSettlements(updatedSettlements, currentHouseScope);
-      notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
+      try {
+        const settlement = await syncConfirmSettlement(
+          currentHouse.id,
+          currentHouse.ledgerRevision || 0,
+          {
+            id: transaction.id,
+            fromUserId: String(transaction.fromUser.id),
+            toUserId: String(transaction.toUser.id),
+            amountCents: transaction.amountCents,
+          },
+          proofUrl,
+        );
+        const updatedSettlements = [settlement, ...settlements.filter((item) => item.id !== settlement.id)];
+        setSettlements(updatedSettlements);
+        if (currentHouseScope) saveSettlements(updatedSettlements, currentHouseScope);
+        notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
+      } catch (error) {
+        setActionError(classifyFirebaseError(error).userMessage);
+      }
       return;
     }
     const now = new Date().toISOString();
@@ -567,12 +682,22 @@ const AppContent: React.FC = () => {
     const updatedSettlements = [newSettlement, ...settlements];
     setSettlements(updatedSettlements);
     if (currentHouseScope) saveSettlements(updatedSettlements, currentHouseScope);
-    syncSaveSettlement(newSettlement, currentHouse?.id);
-    notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
+    const result = await syncSaveSettlement(newSettlement, currentHouse?.id);
+    if (result.failed) {
+      setSettlements((current) => {
+        const rolledBack = current.filter((settlement) => settlement.id !== newSettlement.id);
+        if (currentHouseScope) saveSettlements(rolledBack, currentHouseScope);
+        return rolledBack;
+      });
+      setActionError(result.error?.userMessage || 'The settlement was not saved to the cloud.');
+    } else if (!isFirebaseConfigured || result.synced) {
+      notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
+    }
   };
 
   // Reverse Settlement Handler
-  const handleReverseSettlement = (settlementId: string) => {
+  const handleReverseSettlement = async (settlementId: string): Promise<void> => {
+    setActionError(null);
     let targetSt: Settlement | undefined;
     const now = new Date().toISOString();
     const updated = settlements.map((st) => {
@@ -591,15 +716,37 @@ const AppContent: React.FC = () => {
     setSettlements(updated);
     if (currentHouseScope) saveSettlements(updated, currentHouseScope);
     if (targetSt) {
-      syncSaveSettlement(targetSt, currentHouse?.id);
+      const result = await syncSaveSettlement(targetSt, currentHouse?.id);
+      if (result.failed) {
+        setSettlements((current) => {
+          const rolledBack = current.map((settlement) => settlement.id === targetSt?.id ? (settlements.find((item) => item.id === targetSt?.id) || settlement) : settlement);
+          if (currentHouseScope) saveSettlements(rolledBack, currentHouseScope);
+          return rolledBack;
+        });
+        setActionError(result.error?.userMessage || 'The settlement reversal was not saved to the cloud.');
+      }
     }
   };
 
   // Clear All Settlements & Audit Log Handler
-  const handleClearSettlements = () => {
-    settlements.forEach((s) => currentHouse?.id ? syncDeleteHouseSettlement(s.id, currentHouse.id) : syncDeleteSettlement(s.id));
+  const handleClearSettlements = async (): Promise<void> => {
+    setActionError(null);
+    const previousSettlements = [...settlements];
     setSettlements([]);
     if (currentHouseScope) saveSettlements([], currentHouseScope);
+    const results = await Promise.all(previousSettlements.map(async (settlement) => ({
+      settlement,
+      result: currentHouse?.id
+        ? await syncDeleteHouseSettlement(settlement.id, currentHouse.id)
+        : await syncDeleteSettlement(settlement.id),
+    })));
+    const failedIds = new Set(results.filter(({ result }) => result.failed).map(({ settlement }) => settlement.id));
+    if (failedIds.size > 0) {
+      const restored = previousSettlements.filter((settlement) => failedIds.has(settlement.id));
+      setSettlements(restored);
+      if (currentHouseScope) saveSettlements(restored, currentHouseScope);
+      setActionError('Some settlement records could not be deleted from the cloud.');
+    }
   };
 
   // Reset Data handler — clears financial data only, preserves user accounts and house membership
@@ -635,6 +782,8 @@ const AppContent: React.FC = () => {
         cardsCount={userCards.length}
         isCollapsed={isSidebarCollapsed}
         toggleCollapse={toggleSidebarCollapse}
+        syncState={syncState}
+        onRetrySync={() => { void retryFailedSyncMutations(); }}
       />
 
       {/* Main Content Viewport — sidebar is desktop-only; on mobile no offset needed */}
@@ -650,6 +799,12 @@ const AppContent: React.FC = () => {
             : { marginLeft: 0, width: '100%' }
         }
       >
+        {actionError && (
+          <div className="alert alert-error sync-action-alert" role="alert">
+            <span>{actionError}</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setActionError(null)}>Dismiss</button>
+          </div>
+        )}
         {/* First-Time User House Onboarding Banner */}
         {!currentHouse && (
           <div

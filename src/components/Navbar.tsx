@@ -5,6 +5,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { ThemeSwitch } from './ThemeSwitch';
 import { getTranslation } from '../utils/i18n';
 import type { Language } from '../utils/i18n';
+import type { SyncState } from '../services/firebaseSync';
 import {
   LayoutDashboard,
   Receipt,
@@ -21,6 +22,7 @@ import {
   PanelLeft,
   MoreHorizontal,
   X,
+  RefreshCw,
 } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'expenses' | 'settlement' | 'monthly' | 'personal' | 'cards' | 'house' | 'settings';
@@ -37,6 +39,8 @@ interface NavbarProps {
   cardsCount?: number;
   isCollapsed?: boolean;
   toggleCollapse?: () => void;
+  syncState?: SyncState;
+  onRetrySync?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -51,6 +55,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   cardsCount,
   isCollapsed = false,
   toggleCollapse,
+  syncState = { status: 'synced', pendingCount: 0, failedCount: 0, canRetry: false },
+  onRetrySync,
 }) => {
   const { userProfile, dbUserProfile, firebaseUser, currentHouse, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -102,6 +108,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === firebaseUser?.uid))
   );
 
+  const syncLabel = syncState.status === 'saving'
+    ? 'Saving'
+    : syncState.status === 'offline-queued'
+      ? `Offline, queued${syncState.pendingCount > 0 ? ` (${syncState.pendingCount})` : ''}`
+      : syncState.status === 'failed'
+        ? 'Failed, action required'
+        : syncState.status === 'auth-required' ? 'Sign in to sync' : 'Synced';
+
   return (
     <>
       {/* Desktop Sidebar */}
@@ -138,6 +152,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
             </>
+          )}
+        </div>
+
+        <div className={`sync-indicator sync-indicator-${syncState.status}`} title={syncState.message || syncLabel}>
+          <span className="sync-indicator-dot" aria-hidden="true" />
+          {!isCollapsed && <span>{syncLabel}</span>}
+          {syncState.canRetry && onRetrySync && (
+            <button
+              type="button"
+              className="sync-retry-button"
+              onClick={onRetrySync}
+              aria-label="Retry cloud sync"
+              title="Retry cloud sync"
+            >
+              <RefreshCw size={13} />
+            </button>
           )}
         </div>
 
