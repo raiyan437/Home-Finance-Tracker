@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Expense, Settlement } from '../types';
-import { filterDashboardMonth, getDashboardMonths, getSettlementMonthKey } from './monthlyDashboard';
+import { filterDashboardMonth, getDashboardMonths, getHouseholdLedgerAsOfMonth, getSettlementMonthKey } from './monthlyDashboard';
+import { calculateNetBalances } from './settlementEngine';
 
 const expense = (id: string, date: string): Expense => ({
   id,
@@ -50,5 +51,49 @@ describe('dashboard month selection', () => {
     expect(getDashboardMonths([expense('may', '2026-05-01')], [], '2026-08').slice(0, 4)).toEqual([
       '2026-08', '2026-07', '2026-06', '2026-05',
     ]);
+  });
+
+  it('keeps monthly spend separate from cumulative debt across July and August', () => {
+    const julyExpense = expense('july-debt', '2026-07-15');
+    const sharedJulyExpense: Expense = {
+      ...julyExpense,
+      amountCents: 10_000,
+      paidBy: 'user-a',
+      shares: [
+        { userId: 'user-a', amountCents: 5_000 },
+        { userId: 'user-b', amountCents: 5_000 },
+      ],
+    };
+    const augustPayment = settlement('august-payment', '2026-08-03T10:00:00.000Z');
+
+    const july = getHouseholdLedgerAsOfMonth([sharedJulyExpense], [{ ...augustPayment, fromUserId: 'user-b', toUserId: 'user-a', amountCents: 5_000 }], '2026-07');
+    const august = getHouseholdLedgerAsOfMonth([sharedJulyExpense], [{ ...augustPayment, fromUserId: 'user-b', toUserId: 'user-a', amountCents: 5_000 }], '2026-08');
+
+    const julyBalances = calculateNetBalances(july.expenses, july.settlements, [
+      { id: 'user-a', name: 'A', color: '#000' },
+      { id: 'user-b', name: 'B', color: '#111' },
+    ]);
+    const augustBalances = calculateNetBalances(august.expenses, august.settlements, [
+      { id: 'user-a', name: 'A', color: '#000' },
+      { id: 'user-b', name: 'B', color: '#111' },
+    ]);
+
+    expect(july.expenses).toHaveLength(1);
+    expect(july.settlements).toHaveLength(0);
+    expect(julyBalances['user-a'].netBalanceCents).toBe(5_000);
+    expect(julyBalances['user-b'].netBalanceCents).toBe(-5_000);
+    expect(august.settlements).toHaveLength(1);
+    expect(augustBalances['user-a'].netBalanceCents).toBe(0);
+    expect(augustBalances['user-b'].netBalanceCents).toBe(0);
+  });
+
+  it('applies a settlement reversal exactly once at its effective timestamp', () => {
+    const payment = {
+      ...settlement('payment', '2026-08-03T10:00:00.000Z'),
+      reversedAt: '2026-09-02T10:00:00.000Z',
+      status: 'reversed' as const,
+    };
+    expect(getHouseholdLedgerAsOfMonth([], [payment], '2026-08').settlements).toHaveLength(1);
+    expect(getHouseholdLedgerAsOfMonth([], [payment], '2026-09').settlements).toHaveLength(0);
   });
 });

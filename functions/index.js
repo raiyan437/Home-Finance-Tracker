@@ -97,8 +97,7 @@ exports.mutateHouseholdLedger = onCall(async (request) => {
       const existing = targetSnapshot.data();
       if (existing.houseId !== houseId) throw new HttpsError('failed-precondition', 'Settlement does not belong to this household.');
       if (operation === 'delete') {
-        if (house.leaderUid !== request.auth.uid) throw new HttpsError('permission-denied', 'Only the household leader can delete a settlement audit record.');
-        transaction.delete(targetRef);
+        throw new HttpsError('failed-precondition', 'Completed settlement audit records cannot be deleted. Reverse the payment instead.');
       } else {
         if (existing.status !== 'completed') throw new HttpsError('failed-precondition', 'Only a completed household settlement can be reversed.');
         if (existing.toUserId !== request.auth.uid && house.leaderUid !== request.auth.uid) throw new HttpsError('permission-denied', 'Only the settlement recipient or household leader can reverse it.');

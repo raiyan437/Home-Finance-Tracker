@@ -14,13 +14,15 @@ const normalizeWalletSettings = (value: unknown): PersonalWalletSettings | undef
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const raw = value as Record<string, unknown>;
   const settings: PersonalWalletSettings = {};
-  const copyCents = (key: keyof Pick<PersonalWalletSettings, 'monthlyBudgetCents' | 'cashBalanceCents' | 'cashTrackedExpenseCents'>) => {
+  const copyCents = (key: keyof Pick<PersonalWalletSettings, 'monthlyBudgetCents' | 'cashOpeningBalanceCents' | 'cashBalanceCents' | 'cashTrackedExpenseCents'>) => {
     const amount = raw[key];
     if (typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0) settings[key] = amount;
   };
   copyCents('monthlyBudgetCents');
+  copyCents('cashOpeningBalanceCents');
   copyCents('cashBalanceCents');
   copyCents('cashTrackedExpenseCents');
+  if (typeof raw.cashOpeningAt === 'string') settings.cashOpeningAt = raw.cashOpeningAt;
   if (typeof raw.updatedAt === 'string') settings.updatedAt = raw.updatedAt;
   return Object.keys(settings).length > 0 ? settings : undefined;
 };

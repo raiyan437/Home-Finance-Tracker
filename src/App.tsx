@@ -37,8 +37,6 @@ import {
   syncDeleteHouseExpense,
   syncSaveSettlement,
   syncConfirmSettlement,
-  syncDeleteSettlement,
-  syncDeleteHouseSettlement,
   flushSyncOutbox,
   syncSaveCard,
   syncDeleteCard,
@@ -660,7 +658,15 @@ const AppContent: React.FC = () => {
         if (currentHouseScope) saveSettlements(updatedSettlements, currentHouseScope);
         notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
       } catch (error) {
-        setActionError(classifyFirebaseError(error).userMessage);
+        const classified = classifyFirebaseError(error);
+        const rawCode = typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: unknown }).code || '')
+          : '';
+        const message = rawCode.endsWith('aborted')
+          ? 'Another device changed the household ledger. Recalculate the recommendation and try again.'
+          : classified.userMessage;
+        setActionError(message);
+        throw new Error(message);
       }
       return;
     }
@@ -689,7 +695,9 @@ const AppContent: React.FC = () => {
         if (currentHouseScope) saveSettlements(rolledBack, currentHouseScope);
         return rolledBack;
       });
-      setActionError(result.error?.userMessage || 'The settlement was not saved to the cloud.');
+      const message = result.error?.userMessage || 'The settlement was not saved to the cloud.';
+      setActionError(message);
+      throw new Error(message);
     } else if (!isFirebaseConfigured || result.synced) {
       notifyPendingSettlement(transaction.fromUser.name, transaction.toUser.name, formatCurrency(transaction.amountCents));
     }
@@ -725,27 +733,6 @@ const AppContent: React.FC = () => {
         });
         setActionError(result.error?.userMessage || 'The settlement reversal was not saved to the cloud.');
       }
-    }
-  };
-
-  // Clear All Settlements & Audit Log Handler
-  const handleClearSettlements = async (): Promise<void> => {
-    setActionError(null);
-    const previousSettlements = [...settlements];
-    setSettlements([]);
-    if (currentHouseScope) saveSettlements([], currentHouseScope);
-    const results = await Promise.all(previousSettlements.map(async (settlement) => ({
-      settlement,
-      result: currentHouse?.id
-        ? await syncDeleteHouseSettlement(settlement.id, currentHouse.id)
-        : await syncDeleteSettlement(settlement.id),
-    })));
-    const failedIds = new Set(results.filter(({ result }) => result.failed).map(({ settlement }) => settlement.id));
-    if (failedIds.size > 0) {
-      const restored = previousSettlements.filter((settlement) => failedIds.has(settlement.id));
-      setSettlements(restored);
-      if (currentHouseScope) saveSettlements(restored, currentHouseScope);
-      setActionError('Some settlement records could not be deleted from the cloud.');
     }
   };
 
@@ -877,7 +864,6 @@ const AppContent: React.FC = () => {
               settlements={houseSettlements}
               onMarkSettled={handleMarkSettledConfirm}
               onReverseSettlement={handleReverseSettlement}
-              onClearSettlements={handleClearSettlements}
               lang={lang}
             />
           )}

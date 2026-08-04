@@ -10,6 +10,79 @@ const monthKeyFromDate = (value?: string): string | null => {
 export const getSettlementMonthKey = (settlement: Settlement): string | null =>
   monthKeyFromDate(settlement.settledAt || settlement.createdAt);
 
+const parseMonthKey = (monthKey: string): { year: number; month: number } | null => {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  return { year, month };
+};
+
+/** The final calendar date used for an inclusive month-end ledger query. */
+export const getMonthEndDateKey = (monthKey: string): string => {
+  const parsed = parseMonthKey(monthKey);
+  if (!parsed) return monthKey;
+  const lastDay = new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate();
+  return `${parsed.year}-${String(parsed.month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+};
+
+export const getMonthEndTimestamp = (monthKey: string): number => {
+  const dateKey = getMonthEndDateKey(monthKey);
+  const timestamp = Date.parse(`${dateKey}T23:59:59.999Z`);
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+};
+
+export const getSettlementCompletionTimestamp = (settlement: Settlement): number => {
+  const timestamp = Date.parse(settlement.settledAt || settlement.createdAt || '');
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+};
+
+/**
+ * A completed payment affects the ledger from its completion time until its
+ * reversal time. Reversed records remain in the audit log but are not applied
+ * after the reversal became effective. Legacy reversed records without a
+ * reversal timestamp are conservatively excluded from every as-of ledger.
+ */
+export const settlementWasActiveAt = (settlement: Settlement, boundaryTimestamp: number): boolean => {
+  if (getSettlementCompletionTimestamp(settlement) > boundaryTimestamp) return false;
+  if (settlement.status === 'reversed') {
+    const reversedAt = Date.parse(settlement.reversedAt || '');
+    return Number.isFinite(reversedAt) && reversedAt > boundaryTimestamp;
+  }
+  const reversedAt = Date.parse(settlement.reversedAt || '');
+  return !Number.isFinite(reversedAt) || reversedAt > boundaryTimestamp;
+};
+
+export interface AsOfLedgerData {
+  expenses: Expense[];
+  settlements: Settlement[];
+  boundaryDate: string;
+}
+
+/**
+ * Returns the household ledger that was true at the end of the selected
+ * month. This is intentionally different from the selected-month spend view:
+ * old expenses remain part of cumulative debt while only period expenses are
+ * shown in monthly cards and charts.
+ */
+export const getHouseholdLedgerAsOfMonth = (
+  expenses: Expense[],
+  settlements: Settlement[],
+  selectedMonth: string,
+): AsOfLedgerData => {
+  const boundaryDate = getMonthEndDateKey(selectedMonth);
+  const boundaryTimestamp = getMonthEndTimestamp(selectedMonth);
+  return {
+    expenses: expenses.filter((expense) => {
+      if (expense.scope === 'personal') return false;
+      return Boolean(expense.date) && expense.date <= boundaryDate;
+    }),
+    settlements: settlements.filter((settlement) => settlementWasActiveAt(settlement, boundaryTimestamp)),
+    boundaryDate,
+  };
+};
+
 export const getDashboardMonths = (
   expenses: Expense[],
   settlements: Settlement[],
@@ -23,6 +96,8 @@ export const getDashboardMonths = (
   settlements.forEach((settlement) => {
     const month = getSettlementMonthKey(settlement);
     if (month) months.add(month);
+    const reversalMonth = monthKeyFromDate(settlement.reversedAt);
+    if (reversalMonth) months.add(reversalMonth);
   });
   const ordered = [...months].sort();
   const first = ordered[0];

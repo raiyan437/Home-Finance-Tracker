@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import type { Expense, Settlement } from '../types';
-import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers, LEGACY_USER } from '../features/settlementEngine';
+import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 import { toLocalMonthKey } from '../utils/localDate';
-import { filterDashboardMonth, getDashboardMonths } from '../features/monthlyDashboard';
+import { filterDashboardMonth, getDashboardMonths, getHouseholdLedgerAsOfMonth } from '../features/monthlyDashboard';
 import { CategoryChart, PayerContributionCard } from '../components/CategoryChart';
 import { CategoryPieChart } from '../components/CategoryPieChart';
 import { UserAvatar } from '../components/UserAvatar';
@@ -42,10 +42,14 @@ export const DashboardPage: React.FC<DashboardProps> = ({
   );
   const monthExpenses = selectedData.expenses;
   const monthSettlements = selectedData.settlements;
+  const asOfData = useMemo(
+    () => getHouseholdLedgerAsOfMonth(expenses, settlements, selectedMonth),
+    [expenses, settlements, selectedMonth]
+  );
 
   const userBalances = useMemo(
-    () => calculateNetBalances(monthExpenses, monthSettlements, houseUsers),
-    [monthExpenses, monthSettlements, houseUsers]
+    () => calculateNetBalances(asOfData.expenses, asOfData.settlements, houseUsers),
+    [asOfData, houseUsers]
   );
 
   const simplifiedSettlements = useMemo(
@@ -77,6 +81,15 @@ export const DashboardPage: React.FC<DashboardProps> = ({
   const memberCount = Math.max(1, houseUsers.length);
   const selectedMonthAveragePerMemberCents = Math.round(selectedMonthSpentCents / memberCount);
   const memberNamesText = houseUsers.map((u) => u.name).join(', ');
+  const balanceUsers = useMemo(() => {
+    const activeIds = new Set(houseUsers.map((user) => user.id));
+    return [
+      ...houseUsers,
+      ...Object.values(userBalances)
+        .map((balance) => balance.user)
+        .filter((user) => !activeIds.has(user.id)),
+    ];
+  }, [houseUsers, userBalances]);
 
   const recentExpenses = [...monthExpenses]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -178,7 +191,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
         {/* Metric 3: Total Outstanding Debt */}
         <div className="glass-card summary-card animate-stagger-3">
           <div className="summary-card-header">
-            <span className="summary-title">Outstanding Debt</span>
+            <span className="summary-title">Outstanding Debt (Cumulative)</span>
             <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
               <Activity size={22} />
             </div>
@@ -187,7 +200,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
             {formatCurrency(totalPendingDebtCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>{simplifiedSettlements.length} active settlement transfers needed</span>
+            <span>{simplifiedSettlements.length} active transfers as of {selectedMonthLabel} month-end</span>
           </div>
         </div>
 
@@ -203,7 +216,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
             {formatCurrency(selectedMonthAveragePerMemberCents, false, lang)}
           </div>
           <div className="summary-footer">
-            <span>Fair share target for {selectedMonthLabel}</span>
+            <span>Descriptive average of {selectedMonthLabel} shared spending; actual assigned shares are shown below</span>
           </div>
         </div>
       </div>
@@ -218,15 +231,15 @@ export const DashboardPage: React.FC<DashboardProps> = ({
           <div>
             <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Users size={18} style={{ color: 'var(--accent-primary)' }} />
-              <span>Housemate Net Balances ({houseUsers.length})</span>
+              <span>Housemate Net Balances as of {selectedMonthLabel} month-end ({balanceUsers.length})</span>
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-              {houseUsers.map((user) => {
+              {balanceUsers.map((user) => {
                 const netCents = userBalances[user.id]?.netBalanceCents || 0;
                 const isCreditor = netCents > 0;
                 const isDebtor = netCents < 0;
                 const paidCents = monthExpenses
-                  .filter((e) => e.paidBy === user.id || e.paidBy.toLowerCase() === user.name.toLowerCase())
+                    .filter((e) => e.paidBy === user.id)
                   .reduce((sum, e) => sum + e.amountCents, 0);
 
                 return (
@@ -271,24 +284,6 @@ export const DashboardPage: React.FC<DashboardProps> = ({
                 );
               })}
 
-              {userBalances[LEGACY_USER.id] && (userBalances[LEGACY_USER.id].totalPaidCents > 0 || userBalances[LEGACY_USER.id].totalShareCents > 0) && (
-                <div className="glass-card balance-card" style={{ opacity: 0.85, borderStyle: 'dashed' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <UserAvatar user={userBalances[LEGACY_USER.id].user} size={42} />
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem' }}>
-                        {userBalances[LEGACY_USER.id].user.name}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        Isolated legacy member balance pool
-                      </div>
-                    </div>
-                  </div>
-                  <div className="tabular-nums" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-muted)' }}>
-                    {formatCurrency(userBalances[LEGACY_USER.id].netBalanceCents, false, lang)}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 

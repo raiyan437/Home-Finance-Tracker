@@ -144,17 +144,20 @@ export const calculateNetBalances = (
   // intentionally not aliases because they are mutable and may not be unique.
   const findUserKey = (targetIdStr: string): string => {
     const rawIdentity = targetIdStr?.trim() || 'unknown';
-    const legacyKey = `departed:${rawIdentity}`;
+    const departedIdentity = rawIdentity.startsWith('departed:')
+      ? rawIdentity.slice('departed:'.length)
+      : rawIdentity;
     if (totals[targetIdStr]) return targetIdStr;
-    if (!totals[legacyKey]) {
-      totals[legacyKey] = { paid: 0, share: 0, settlementDelta: 0 };
-      usersMap[legacyKey] = {
+    const canonicalLegacyKey = `departed:${departedIdentity}`;
+    if (!totals[canonicalLegacyKey]) {
+      totals[canonicalLegacyKey] = { paid: 0, share: 0, settlementDelta: 0 };
+      usersMap[canonicalLegacyKey] = {
         ...LEGACY_USER,
-        id: legacyKey,
-        name: rawIdentity === 'unknown' ? 'Unknown departed member' : `Departed: ${rawIdentity}`,
+        id: canonicalLegacyKey,
+        name: departedIdentity === 'unknown' ? 'Unknown departed member' : `Departed: ${departedIdentity}`,
       };
     }
-    return legacyKey;
+    return canonicalLegacyKey;
   };
 
   // 1. Process active expenses strictly by UID / ID
@@ -207,7 +210,17 @@ export const calculateNetBalances = (
       }
     });
 
+  assertZeroSumBalances(result);
+
   return result;
+};
+
+/** Every payment is a transfer, so the household net ledger must sum to zero. */
+export const assertZeroSumBalances = (balances: Record<UserId, UserBalance>): void => {
+  const total = Object.values(balances).reduce((sum, balance) => sum + balance.netBalanceCents, 0);
+  if (!Number.isSafeInteger(total) || total !== 0) {
+    throw new Error('Household balances must preserve a zero-sum integer-cent invariant.');
+  }
 };
 
 /**
@@ -254,7 +267,7 @@ export const calculateSimplifiedSettlements = (
       id: `sim-${step++}-${maxDebtor.userId}-${maxCreditor.userId}`,
       fromUser: maxDebtor.user,
       toUser: maxCreditor.user,
-      amountCents: Math.round(transferAmount),
+      amountCents: transferAmount,
     });
 
     maxDebtor.net += transferAmount;

@@ -8,14 +8,14 @@ import type { Language } from '../utils/i18n';
 import { getTranslation } from '../utils/i18n';
 import { shareSettlementInstructions } from '../utils/share';
 import { saveAttachment } from '../services/attachments';
-import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Image as ImageIcon, X, Trash2, Share2, Paperclip } from 'lucide-react';
+import { ArrowRight, CheckCircle2, History, Check, ArrowLeftRight, RotateCcw, Image as ImageIcon, X, Share2, Paperclip } from 'lucide-react';
+import { getSettlementMonthKey } from '../features/monthlyDashboard';
 
 interface SettlementViewProps {
   expenses: Expense[];
   settlements: Settlement[];
   onMarkSettled: (transaction: SimplifiedTransaction, proofUrl?: string) => void | Promise<void>;
   onReverseSettlement?: (settlementId: string) => void;
-  onClearSettlements?: () => void;
   lang?: Language;
 }
 
@@ -24,7 +24,6 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   settlements,
   onMarkSettled,
   onReverseSettlement,
-  onClearSettlements,
   lang = 'en',
 }) => {
   const { currentHouse, dbUserProfile, activeUserId } = useAuth();
@@ -51,8 +50,9 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
-  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [isConfirmingSettlement, setIsConfirmingSettlement] = useState(false);
+  const [historyStatus, setHistoryStatus] = useState<'all' | 'completed' | 'reversed'>('all');
+  const [historyMonth, setHistoryMonth] = useState('all');
 
   const userBalances = useMemo(
     () => calculateNetBalances(expenses, settlements, houseUsers),
@@ -67,6 +67,14 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
   const allSettlements = [...settlements].sort(
     (a, b) => new Date(b.settledAt || b.createdAt).getTime() - new Date(a.settledAt || a.createdAt).getTime()
   );
+  const historyMonths = useMemo(
+    () => Array.from(new Set(allSettlements.map(getSettlementMonthKey).filter((month): month is string => Boolean(month)))).sort().reverse(),
+    [allSettlements]
+  );
+  const visibleSettlements = allSettlements.filter((settlement) => (
+    (historyStatus === 'all' || settlement.status === historyStatus)
+      && (historyMonth === 'all' || getSettlementMonthKey(settlement) === historyMonth)
+  ));
 
   const getUser = (userId: string): UserType => {
     const found = houseUsers.find((u) => u.id === userId || u.uid === userId);
@@ -131,17 +139,9 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
           </button>
         </div>
 
-        {isLeader && onClearSettlements && (allSettlements.length > 0 || simplifiedTransactions.length > 0) && (
-          <button
-            className="btn btn-secondary btn-sm"
-            style={{ color: 'var(--accent-rose)', borderColor: 'rgba(244, 63, 94, 0.3)' }}
-            onClick={() => setIsConfirmClearOpen(true)}
-            title="Clear all recommendations and audit logs"
-          >
-            <Trash2 size={14} />
-            <span>Clear Audit Data</span>
-          </button>
-        )}
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          Completed payments are immutable audit records. Use the history filters to hide older entries.
+        </span>
       </div>
 
       {shareFeedback && (
@@ -244,7 +244,24 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
       {/* TAB 2: SETTLEMENT AUDIT LOG */}
       {activeTab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {allSettlements.length === 0 ? (
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Status
+              <select className="form-input" value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value as typeof historyStatus)} style={{ marginLeft: '6px', width: 'auto' }}>
+                <option value="all">All records</option>
+                <option value="completed">Completed</option>
+                <option value="reversed">Reversed</option>
+              </select>
+            </label>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Completion month
+              <select className="form-input" value={historyMonth} onChange={(event) => setHistoryMonth(event.target.value)} style={{ marginLeft: '6px', width: 'auto' }}>
+                <option value="all">All months</option>
+                {historyMonths.map((month) => <option key={month} value={month}>{month}</option>)}
+              </select>
+            </label>
+          </div>
+          {visibleSettlements.length === 0 ? (
             <div className="glass-card empty-state">
               <History className="empty-icon" />
               <h3>{getTranslation('noSettlementsYet', lang)}</h3>
@@ -252,7 +269,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
             </div>
           ) : (
             <div>
-              {allSettlements.map((st) => {
+              {visibleSettlements.map((st) => {
                 const fromUser = getUser(st.fromUserId);
                 const toUser = getUser(st.toUserId);
                 const isReversed = st.status === 'reversed';
@@ -437,37 +454,6 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
             <button className="btn btn-secondary" onClick={() => setPreviewProofUrl(null)} style={{ margin: '0 auto' }}>
               Close Preview
             </button>
-          </div>
-        </div>
-      )}
-      {/* Confirmation Modal for Clear Audit Data */}
-      {isConfirmClearOpen && (
-        <div className="modal-overlay" onClick={() => setIsConfirmClearOpen(false)}>
-          <div className="modal-card" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Clear All Settlement Data</h3>
-              <button className="close-btn" onClick={() => setIsConfirmClearOpen(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: '1.5', margin: '10px 0' }}>
-              This will permanently delete all settlement records and audit logs for this household. This action <strong>cannot be undone</strong>.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
-              <button className="btn btn-secondary" onClick={() => setIsConfirmClearOpen(false)}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-danger"
-                onClick={() => {
-                  if (onClearSettlements) onClearSettlements();
-                  setIsConfirmClearOpen(false);
-                }}
-              >
-                <Trash2 size={16} />
-                <span>Clear All Data</span>
-              </button>
-            </div>
           </div>
         </div>
       )}

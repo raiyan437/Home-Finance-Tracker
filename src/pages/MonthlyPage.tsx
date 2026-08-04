@@ -11,6 +11,7 @@ import { Calendar, Users, Download, Printer } from 'lucide-react';
 
 import type { Language } from '../utils/i18n';
 import { toLocalMonthKey } from '../utils/localDate';
+import { filterDashboardMonth, getDashboardMonths } from '../features/monthlyDashboard';
 
 interface MonthlySummaryProps {
   expenses: Expense[];
@@ -25,33 +26,32 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
   const currentMonthKey = toLocalMonthKey();
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthKey);
 
-  const availableMonths = useMemo(() => {
-    const months = new Set<string>();
-    months.add(currentMonthKey);
-    expenses.forEach((exp) => {
-      if (exp.date) {
-        months.add(exp.date.slice(0, 7));
-      }
-    });
-    return Array.from(months).sort().reverse();
-  }, [expenses, currentMonthKey]);
+  const availableMonths = useMemo(
+    () => getDashboardMonths(expenses, settlements, currentMonthKey),
+    [expenses, settlements, currentMonthKey]
+  );
 
-  const monthExpenses = useMemo(() => {
-    return expenses.filter((exp) => exp.date.startsWith(selectedMonth));
-  }, [expenses, selectedMonth]);
-
-  const monthSettlements = useMemo(() => {
-    return settlements.filter((s) => {
-      const dateStr = s.settledAt || s.createdAt;
-      return dateStr ? dateStr.startsWith(selectedMonth) : false;
-    });
-  }, [settlements, selectedMonth]);
+  const selectedData = useMemo(
+    () => filterDashboardMonth(expenses, settlements, selectedMonth),
+    [expenses, settlements, selectedMonth]
+  );
+  const monthExpenses = selectedData.expenses;
+  const monthSettlements = selectedData.settlements;
 
   // Accrual performance is based on expenses incurred in the selected month.
   // Cash settlements remain in the audit export but do not distort that month's spend split.
   const monthBalances = useMemo(() => {
     return calculateNetBalances(monthExpenses, [], houseUsers);
   }, [monthExpenses, houseUsers]);
+  const balanceUsers = useMemo(() => {
+    const activeIds = new Set(houseUsers.map((user) => user.id));
+    return [
+      ...houseUsers,
+      ...Object.values(monthBalances)
+        .map((balance) => balance.user)
+        .filter((user) => !activeIds.has(user.id)),
+    ];
+  }, [houseUsers, monthBalances]);
 
   const totalMonthSpentCents = monthExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
@@ -139,7 +139,7 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
           <span>{formattedMonthLabel} Housemate Performance</span>
         </div>
         <div className="grid-3">
-          {houseUsers.map((user) => {
+          {balanceUsers.map((user) => {
             const b = monthBalances[user.id] || { totalPaidCents: 0, totalShareCents: 0, netBalanceCents: 0 };
             const net = b.netBalanceCents;
 
@@ -160,7 +160,7 @@ export const MonthlyPage: React.FC<MonthlySummaryProps> = ({ expenses, settlemen
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Target Fair Share:</span>
+                    <span style={{ color: 'var(--text-muted)' }}>Assigned Share:</span>
                     <strong className="tabular-nums">{formatCurrency(b.totalShareCents)}</strong>
                   </div>
 

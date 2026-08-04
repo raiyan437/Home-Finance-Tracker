@@ -45,6 +45,7 @@ import {
   syncSaveCard,
   syncSaveExpense,
   syncSaveUserAvatar,
+  syncSaveUserWalletSettings,
 } from './firebaseSync';
 
 class MemoryStorage implements Storage {
@@ -228,6 +229,13 @@ describe('Firebase sync reliability policy', () => {
     await syncSaveUserAvatar('user-a', null);
     const [, payload, options] = setDocMock.mock.calls[0];
     expect(payload.avatar).toEqual({ __deleteField: true });
+    expect(options).toEqual({ merge: true });
+  });
+
+  it('writes wallet fields independently so concurrent settings survive', async () => {
+    await syncSaveUserWalletSettings('user-a', { monthlyBudgetCents: 5_000 });
+    const [, payload, options] = setDocMock.mock.calls[0];
+    expect(payload).toEqual({ 'walletSettings.monthlyBudgetCents': 5_000 });
     expect(options).toEqual({ merge: true });
   });
 });

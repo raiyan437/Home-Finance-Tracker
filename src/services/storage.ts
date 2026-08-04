@@ -182,10 +182,11 @@ export const importBackupJSON = (jsonStr: string, houseId?: string, userId?: str
     if (!Array.isArray(data.cards) || !data.cards.every(validBackupCard)) return { ok: false, error: 'Backup contains invalid cards.' };
     if (data.walletSettings && (
       !isRecord(data.walletSettings)
-      || ['monthlyBudgetCents', 'cashBalanceCents', 'cashTrackedExpenseCents'].some((key) => {
+      || ['monthlyBudgetCents', 'cashOpeningBalanceCents', 'cashBalanceCents', 'cashTrackedExpenseCents'].some((key) => {
         const value = data.walletSettings?.[key as keyof PersonalWalletSettings];
         return value !== undefined && (!Number.isSafeInteger(value) || Number(value) < 0);
       })
+      || (data.walletSettings.cashOpeningAt !== undefined && typeof data.walletSettings.cashOpeningAt !== 'string')
     )) return { ok: false, error: 'Backup contains invalid wallet settings.' };
 
     const scopedExpenses = data.expenses.filter((expense) =>

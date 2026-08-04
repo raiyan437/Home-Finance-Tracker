@@ -7,7 +7,8 @@ import { getTranslation } from '../utils/i18n';
 import { Wallet, Plus, TrendingUp, ShieldCheck, Trash2, Edit, X, CreditCard, Banknote, Calendar, AlertTriangle, Save, CircleDollarSign, CheckCircle2 } from 'lucide-react';
 import { toLocalDateKey, toLocalMonthKey } from '../utils/localDate';
 import { MaterialSelect } from '../components/MaterialSelect';
-import { calculateCashInHandCents, createCashCheckpoint } from '../features/personalWalletLedger';
+import { calculateCashInHandCents, createCashOpeningBalance } from '../features/personalWalletLedger';
+import { calculatePersonalBudgetUsage } from '../features/personalBudget';
 
 interface PersonalWalletProps {
   expenses: Expense[];
@@ -50,10 +51,16 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
 
   useEffect(() => {
     const budgetCents = dbUserProfile?.walletSettings?.monthlyBudgetCents;
-    const cashCents = dbUserProfile?.walletSettings?.cashBalanceCents;
+    const cashCents = dbUserProfile?.walletSettings?.cashOpeningBalanceCents
+      ?? dbUserProfile?.walletSettings?.cashBalanceCents;
     setMonthlyBudgetTaka(budgetCents === undefined ? '' : (budgetCents / 100).toFixed(2));
     setCashInputTaka(cashCents === undefined ? '' : (cashCents / 100).toFixed(2));
-  }, [myUid, dbUserProfile?.walletSettings?.monthlyBudgetCents, dbUserProfile?.walletSettings?.cashBalanceCents]);
+  }, [
+    myUid,
+    dbUserProfile?.walletSettings?.monthlyBudgetCents,
+    dbUserProfile?.walletSettings?.cashOpeningBalanceCents,
+    dbUserProfile?.walletSettings?.cashBalanceCents,
+  ]);
 
   const userCards = useMemo(() => {
     return cards.filter((c) => c.ownerId === myUid);
@@ -93,11 +100,12 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
 
   // Totals
   const totalPersonalSpentCents = monthPersonalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
-  const allPersonalSpentCents = personalExpenses.reduce((sum, e) => sum + e.amountCents, 0);
 
-  const monthlyBudgetCents = dbUserProfile?.walletSettings?.monthlyBudgetCents ?? 0;
-  const budgetRatioPercent = monthlyBudgetCents > 0 ? (totalPersonalSpentCents / monthlyBudgetCents) * 100 : 0;
-  const cashInHandCents = calculateCashInHandCents(dbUserProfile?.walletSettings, allPersonalSpentCents);
+  const monthlyBudgetCents = dbUserProfile?.walletSettings?.monthlyBudgetCents;
+  const budgetUsage = calculatePersonalBudgetUsage(personalExpenses, selectedMonth, monthlyBudgetCents);
+  const budgetIsSet = budgetUsage.isSet;
+  const budgetRatioPercent = budgetUsage.ratioPercent;
+  const cashInHandCents = calculateCashInHandCents(dbUserProfile?.walletSettings, personalExpenses);
 
   const saveWalletAmount = async (kind: 'cash' | 'budget') => {
     const rawValue = kind === 'cash' ? cashInputTaka : monthlyBudgetTaka;
@@ -113,7 +121,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
       const cents = dollarsToCents(parsed);
       await updatePersonalWalletSettings(
         kind === 'cash'
-          ? createCashCheckpoint(cents, allPersonalSpentCents)
+          ? createCashOpeningBalance(cents)
           : { monthlyBudgetCents: cents }
       );
       setWalletSettingNotice({
@@ -256,7 +264,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
           <div className={`summary-amount tabular-nums wallet-cash-balance ${cashInHandCents !== null && cashInHandCents < 0 ? 'is-negative' : ''}`}>
             {cashInHandCents === null ? 'Not set' : formatCurrency(cashInHandCents, false, lang)}
           </div>
-          <p className="wallet-setting-help">Save your current total cash. New personal expenses automatically deduct from this balance.</p>
+          <p className="wallet-setting-help">Set an opening cash balance. Only cash purchases on or after that opening date deduct from it; card purchases do not.</p>
           <div className="wallet-setting-form">
             <div className="wallet-currency-input">
               <span>৳</span>
@@ -286,7 +294,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
               <ShieldCheck size={20} />
             </div>
           </div>
-          <p className="wallet-setting-help">Set the monthly target used by the budget progress indicator.</p>
+          <p className="wallet-setting-help">Set the monthly target used by the selected-month budget progress indicator. Cash and card purchases both count.</p>
           <div className="wallet-setting-form">
             <div className="wallet-currency-input">
               <span>৳</span>
@@ -310,14 +318,14 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
           <div style={{ marginTop: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
               <span>{getTranslation('budgetUsed', lang)}</span>
-              <span>{budgetRatioPercent.toFixed(0)}%</span>
+              <span>{budgetIsSet ? `${budgetRatioPercent.toFixed(0)}%` : 'Not set'}</span>
             </div>
 
             <div className="progress-bar-bg" style={{ height: '8px' }}>
               <div
                 className="progress-bar-fill"
                 style={{
-                  width: `${Math.min(100, budgetRatioPercent)}%`,
+                  width: budgetIsSet ? `${Math.min(100, budgetRatioPercent)}%` : '0%',
                   backgroundColor:
                     budgetRatioPercent >= 100
                       ? 'var(--accent-rose)'
@@ -328,10 +336,15 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
               />
             </div>
 
-            {budgetRatioPercent >= 80 && (
+            {budgetIsSet && budgetRatioPercent >= 80 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '0.75rem', color: budgetRatioPercent >= 100 ? 'var(--accent-rose)' : 'var(--accent-amber)', fontWeight: 700 }}>
                 <AlertTriangle size={14} />
                 <span>{budgetRatioPercent >= 100 ? getTranslation('overBudgetWarning', lang) : getTranslation('nearBudgetWarning', lang)}</span>
+              </div>
+            )}
+            {budgetIsSet && monthlyBudgetCents === 0 && totalPersonalSpentCents > 0 && (
+              <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--accent-rose)', fontWeight: 700 }}>
+                Budget target is ৳0.00; selected-month spending exceeds the target.
               </div>
             )}
           </div>

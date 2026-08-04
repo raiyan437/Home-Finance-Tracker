@@ -3,9 +3,14 @@
  */
 
 export const dollarsToCents = (takaStr: number | string): number => {
-  const parsed = typeof takaStr === 'string' ? parseFloat(takaStr) : takaStr;
-  if (isNaN(parsed)) return 0;
-  return Math.round(parsed * 100);
+  const raw = String(takaStr).trim();
+  const match = /^([+-]?)(?:(\d+)(?:\.(\d{0,2}))?|\.(\d{1,2}))$/.exec(raw);
+  if (!match) return 0;
+  const sign = match[1] === '-' ? -1 : 1;
+  const whole = match[2] || '0';
+  const fractional = (match[3] ?? match[4] ?? '').padEnd(2, '0');
+  const cents = Number(whole) * 100 + Number(fractional || '0');
+  return Number.isSafeInteger(cents) ? sign * cents : 0;
 };
 
 export const toBengaliDigits = (str: string): string => {

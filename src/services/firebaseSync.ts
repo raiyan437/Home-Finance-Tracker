@@ -385,6 +385,15 @@ const callableFunctions = () => {
 const performMergeWrite = async (mutation: PendingMutation, reference: ReturnType<typeof doc>): Promise<void> => {
   const cleanData = sanitizeForFirestore(mutation.data ?? {});
   const payload: Record<string, unknown> = { ...(cleanData as Record<string, unknown>) };
+  if (mutation.mutationType === 'profile-wallet' && isRecord(payload.walletSettings)) {
+    // Wallet settings are independent fields. A pending budget update must
+    // not replace a newer cash opening value written on another device.
+    const walletFields = payload.walletSettings;
+    delete payload.walletSettings;
+    Object.entries(walletFields).forEach(([field, value]) => {
+      payload[`walletSettings.${field}`] = value;
+    });
+  }
   mutation.deleteFields?.forEach((field) => { payload[field] = deleteField(); });
   await setDoc(reference, payload, { merge: true });
 };
@@ -521,12 +530,14 @@ export const syncSaveUserAvatar = async (uid: string, avatarUrl: string | null):
   avatarUrl ? [] : ['avatar'],
 );
 
-export const syncSaveUserWalletSettings = async (uid: string, walletSettings: UserProfile['walletSettings']): Promise<SyncResult> => profilePatch(
-  uid,
-  'profile-wallet',
-  walletSettings ? { walletSettings } : {},
-  walletSettings ? [] : ['walletSettings'],
-);
+export const syncSaveUserWalletSettings = async (uid: string, walletSettings: UserProfile['walletSettings']): Promise<SyncResult> => {
+  if (!walletSettings) return profilePatch(uid, 'profile-wallet', {}, ['walletSettings']);
+  const fields = Object.entries(walletSettings).filter(([key]) => key !== 'updatedAt');
+  const data = fields.length > 0
+    ? { walletSettings: Object.fromEntries(fields) }
+    : {};
+  return profilePatch(uid, 'profile-wallet', data, []);
+};
 
 export const syncSaveUserMembership = async (uid: string, houseId: string | null, role: UserProfile['role']): Promise<SyncResult> => profilePatch(
   uid,
@@ -582,7 +593,21 @@ export const getPendingProfileOverlay = (uid: string, profile: UserProfile): Use
         const { walletSettings: _walletSettings, ...withoutWallet } = result;
         result = withoutWallet;
       } else if (mutation.data?.walletSettings && isRecord(mutation.data.walletSettings)) {
-        result = { ...result, walletSettings: mutation.data.walletSettings as UserProfile['walletSettings'] };
+        result = {
+          ...result,
+          walletSettings: {
+            ...(result.walletSettings || {}),
+            ...(mutation.data.walletSettings as UserProfile['walletSettings']),
+          },
+        };
+      }
+      const walletDeletes = (mutation.deleteFields || [])
+        .filter((field) => field.startsWith('walletSettings.'))
+        .map((field) => field.slice('walletSettings.'.length));
+      if (walletDeletes.length > 0 && result.walletSettings) {
+        const nextWallet = { ...result.walletSettings };
+        walletDeletes.forEach((field) => { delete nextWallet[field as keyof typeof nextWallet]; });
+        result = { ...result, walletSettings: nextWallet };
       }
     }
   }

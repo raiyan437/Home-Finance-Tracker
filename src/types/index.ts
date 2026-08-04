@@ -4,6 +4,10 @@ export type HouseRole = 'leader' | 'member';
 
 export interface PersonalWalletSettings {
   monthlyBudgetCents?: number;
+  /** New auditable cash checkpoint. Expenses before this date are excluded. */
+  cashOpeningBalanceCents?: number;
+  cashOpeningAt?: string;
+  /** Legacy fields retained so existing profiles remain readable. */
   cashBalanceCents?: number;
   cashTrackedExpenseCents?: number;
   updatedAt?: string;
