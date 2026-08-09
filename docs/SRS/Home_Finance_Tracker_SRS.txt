@@ -1,0 +1,497 @@
+================================================================================
+                    SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
+                           FOR HOME FINANCE TRACKER
+================================================================================
+
+Document Title  : Software Requirements Specification (SRS) - Home Finance Tracker
+Project Name    : Home Finance Tracker (Shared & Personal Household Expense Engine)
+Document Version: 1.0.0
+Author          : GEMINI AI Assistant & Core Engineering Team
+Date            : 2026-08-05
+Status          : Production Baseline Specification
+Target System   : Live Production App (https://home-finance-tracker-kappa.vercel.app/)
+Repository      : https://github.com/raiyan437/Home-Finance-Tracker
+
+================================================================================
+                               TABLE OF CONTENTS
+================================================================================
+
+1. INTRODUCTION
+   1.1 Purpose
+   1.2 Document Conventions
+   1.3 Intended Audience and Reading Suggestions
+   1.4 Product Scope
+   1.5 References
+
+2. OVERALL DESCRIPTION
+   2.1 Product Perspective
+   2.2 Product Functions
+   2.3 User Classes and Characteristics
+   2.4 Operating Environment
+   2.5 Design and Implementation Constraints
+   2.6 User Documentation
+   2.7 Assumptions and Dependencies
+
+3. SYSTEM FEATURES & FUNCTIONAL REQUIREMENTS
+   3.1 User Authentication and Account Security
+   3.2 Multi-Tenant Household Management (House Codes & Leadership)
+   3.3 Household Expense Logging and Dynamic Split Allocations
+   3.4 Minimum Cash Flow Debt Settlement Minimizer (N-1 Solver)
+   3.5 Private Personal Wallet & Monthly Budget Engine
+   3.6 Payment Card & Channel Management
+   3.7 Cloud Real-Time Database Synchronization (Firebase Firestore)
+   3.8 AI Receipt Scanner & OCR Parsing (Tesseract.js)
+   3.9 Expense Discussion Threads & Housemate Comments
+   3.10 Monthly Analytics, Visualizations, and CSV Reports
+   3.11 Bilingual Localization Engine (English & Bengali bn-BD)
+   3.12 Single Page Application (SPA) HTML5 Routing & PWA Capability
+
+4. EXTERNAL INTERFACE REQUIREMENTS
+   4.1 User Interfaces
+   4.2 Hardware Interfaces
+   4.3 Software Interfaces
+   4.4 Communications Interfaces
+
+5. SYSTEM DATA MODELS & ARCHITECTURE
+   5.1 Primary Entity Schemas (User, House, Expense, Settlement, PaymentCard)
+   5.2 Financial Precision Standard (Integer Cent Arithmetic - amountCents)
+   5.3 Partitioned Local-First Storage & Offline Cache Architecture
+
+6. NON-FUNCTIONAL REQUIREMENTS
+   6.1 Performance Requirements
+   6.2 Safety & Financial Integrity Requirements
+   6.3 Security & Authorization Requirements
+   6.4 Software Quality Attributes (Availability, Usability, Maintainability)
+
+7. VERIFICATION MATRIX & ACCEPTANCE CRITERIA
+   7.1 Automated Verification Commands
+   7.2 Manual Acceptance Test Scenarios
+
+================================================================================
+1. INTRODUCTION
+================================================================================
+
+1.1 PURPOSE
+The purpose of this Software Requirements Specification (SRS) document is to 
+provide a complete, formal, and definitive specification for the Home Finance 
+Tracker web application. It specifies all functional capabilities, non-functional 
+quality attributes, mathematical debt settlement algorithms, data persistence 
+architecture, and user interface contracts of the live system.
+
+1.2 DOCUMENT CONVENTIONS
+- Monetary Figures: Stored internally as integer cents (amountCents) to prevent 
+  floating-point rounding inaccuracies. Displayed in Bangladeshi Taka (৳) with 2 
+  decimal places.
+- Priority Definitions:
+  * [HIGH]: Core mandatory requirement required for system operation.
+  * [MEDIUM]: Important feature providing enhanced user capability.
+  * [LOW]: Optional extension or future roadmap enhancement.
+
+1.3 INTENDED AUDIENCE AND READING SUGGESTIONS
+This document is written for:
+- Quality Assurance (QA) and Software Testing Engineers designing test suites.
+- Full-Stack Developers maintaining or extending application functionality.
+- AI Agent Systems (Gemini, Claude, Copilot, Codex) contextually operating on 
+  this repository.
+- System Architects evaluating security, scalability, and multi-tenant scoping.
+
+1.4 PRODUCT SCOPE
+Home Finance Tracker is a reactive single-page web application engineered to solve 
+the financial complexity of shared household living. It enables roommates and 
+family members to:
+- Track shared household outlays with flexible split methods (Equal, Custom ৳, 
+  Percentage %, and Individual Adjustments).
+- Solve multi-party debt cycles automatically, collapsing complex debt graphs into 
+  a minimal set of direct peer-to-peer transfers (at most N-1 transactions).
+- Track private individual outlays separately in a Personal Wallet without 
+  contaminating shared household settlement balances.
+- Manage credit and debit bank cards with strict card-owner scoping.
+- Sync data in real time across mobile phones, tablets, and desktop computers 
+  via Cloud Firestore with partitioned LocalStorage offline fallbacks.
+
+1.5 REFERENCES
+- IEEE Std 830-1998 / ISO/IEC/IEEE 29148:2018 - Systems and Software Engineering 
+  Requirements Specifications.
+- React 19 / TypeScript 5 / Vite 8 Specification Documentation.
+- Firebase Web SDK v12 Architecture & Cloud Firestore Security Rules.
+- Minimum Cash Flow Greedy Algorithm Specification (Graph Debt Reduction).
+
+================================================================================
+2. OVERALL DESCRIPTION
+================================================================================
+
+2.1 PRODUCT PERSPECTIVE
+The application operates as a client-side Single Page Application (SPA) with 
+real-time cloud synchronization. It interfaces directly with browser storage API 
+(LocalStorage) for instant local responsiveness and Cloud Firestore for multi-device 
+live snapshot events.
+
+[User Device Browser] <---> [React 19 SPA & LocalStorage Cache] <---> [Firebase Cloud Firestore]
+
+2.2 PRODUCT FUNCTIONS
+- User Authentication: Email/password registration, secure login, profile picture 
+  updates, and credential verification.
+- Household Governance: Create households, generate 6-character custom codes 
+  (e.g., HM-8823), join existing households, kick members (Leader only), and 
+  transfer House Leader status.
+- Shared Expense Tracking: Log transactions with receipt photos, categorize items, 
+  select payment channels (Cash vs specific Bank Cards), and allocate participant 
+  shares.
+- Debt Minimization Engine: Solve net debt balances dynamically and present step-by-step 
+  transfer recommendations with payment proof upload capabilities.
+- Personal Wallet: Manage private personal expenses with custom monthly budget limits 
+  and alert thresholds (80% Amber, 100% Rose).
+- Payment Cards Deck: Create and manage debit/credit cards with customizable color 
+  gradients and spent totals.
+- Analytics & Reports: Filter expenses by month, view category distribution donut 
+  charts, inspect housemate contribution ratios, and export formatted CSV reports.
+- Localization: Toggle dynamically between English and Bangladeshi Bengali (bn-BD) 
+  languages with native Bengali numeral rendering (০-৯).
+
+2.3 USER CLASSES AND CHARACTERISTICS
+- House Leader [👑]: Creator of the household or designated successor. Possesses 
+  administrative privileges to update house names, kick members, transfer 
+  leadership, and manage household settings.
+- House Member [👤]: Registered user belonging to an active household. Can log shared 
+  expenses, confirm settlements, comment on transactions, and manage cards.
+- Guest / Unassigned User: Registered user not currently enrolled in a household. 
+  Can use the Private Personal Wallet and create or join a household via code.
+
+2.4 OPERATING ENVIRONMENT
+- Client OS: Any modern operating system (Windows 10/11, macOS, Linux, iOS, Android).
+- Browser Compatibility: Chrome 90+, Edge 90+, Safari 14+, Firefox 88+, Opera 76+.
+- Production Web Server: Vercel Edge Network (Single Page Application rewriting all 
+  paths `/.*` to `/index.html`).
+
+2.5 DESIGN AND IMPLEMENTATION CONSTRAINTS
+- Integer-Cent Currency Constraint: All internal values MUST be stored as integer 
+  cents (`amountCents`). Floating-point arithmetic for balances is strictly forbidden.
+- Payer-Scoped Bank Card Constraint: When logging an expense, payment card selection 
+  MUST strictly filter to cards owned by the selected payer (`card.ownerId === paidBy`).
+- Scope Isolation Constraint: Household expenses (`scope: 'household'`) and Personal 
+  Wallet expenses (`scope: 'personal'`) MUST remain strictly isolated.
+
+2.6 USER DOCUMENTATION
+- System Documentation: `/docs/Project-Handover.md` and `/docs/gemini/` documentation 
+  suite.
+- Interactive UI Tooltips and guidance banners throughout all views.
+
+2.7 ASSUMPTIONS AND DEPENDENCIES
+- Internet connectivity is recommended for real-time Cloud Firestore synchronization; 
+  however, full offline capability is maintained via LocalStorage fallback.
+- Node.js runtime environment (v20+) is required for building production static assets.
+
+================================================================================
+3. SYSTEM FEATURES & FUNCTIONAL REQUIREMENTS
+================================================================================
+
+3.1 USER AUTHENTICATION AND ACCOUNT SECURITY [HIGH]
+3.1.1 Description: Manages user registration, credential verification, profile updates, 
+      and session persistence.
+3.1.2 Functional Requirements:
+      - FR-3.1.1: The system shall allow new users to register using Email, Password 
+        (minimum 6 characters), and Display Name.
+      - FR-3.1.2: The system shall reject duplicate registration attempts for an 
+        already registered email.
+      - FR-3.1.3: The system shall verify credentials upon login. Invalid emails or 
+        passwords shall display a clear error message.
+      - FR-3.1.4: All password input fields across Login, Sign Up, and Settings pages 
+        shall feature an inline Show/Hide eye icon toggle button.
+      - FR-3.1.5: Users shall be able to update their password in Settings by providing 
+        their current password, new password, and password confirmation.
+      - FR-3.1.6: Users shall be able to upload custom avatar photos (Base64 / URL, 
+        <2MB), falling back to dynamic HSL gradient initial badges.
+
+3.2 MULTI-TENANT HOUSEHOLD MANAGEMENT [HIGH]
+3.2.1 Description: Supports multi-tenant house isolation, membership codes, and 
+      leadership permissions.
+3.2.2 Functional Requirements:
+      - FR-3.2.1: Any registered user can create a new household by specifying a 
+        House Name and a custom 6-character House Code (e.g., HM-8823).
+      - FR-3.2.2: The system shall enforce global uniqueness for custom House Codes, 
+        rejecting duplicates with a warning.
+      - FR-3.2.3: Users can join an existing household by entering a valid 6-character 
+        House Code.
+      - FR-3.2.4: The House Leader [👑] can update the house name, kick members, or 
+        transfer leadership to another active member.
+      - FR-3.2.5: All house members shall receive real-time updates when roster 
+        changes occur (joins, kicks, leadership transfers).
+
+3.3 HOUSEHOLD EXPENSE LOGGING AND DYNAMIC SPLIT ALLOCATIONS [HIGH]
+3.3.1 Description: Captures out-of-pocket shared outlays and divides shares among 
+      beneficiary participants.
+3.3.2 Functional Requirements:
+      - FR-3.3.1: Users shall be able to log shared expenses with Title, Amount (৳), 
+        Payer (`paidBy`), Category, Date, Payment Channel (Cash vs Bank Card), and 
+        Notes.
+      - FR-3.3.2: The system shall support four Split Allocation Methods:
+        a) Equal Split: Divides total cents evenly, allocating remainder cents 1-by-1 
+           deterministically across participants.
+        b) Custom Taka (৳) Split: Allows typing explicit Taka amounts per person, 
+           validating that the sum matches total expense cents exactly.
+        c) Percentage (%) Split: Allows typing percentage shares per person, normalizing 
+           floating totals to 100% within a 0.5% tolerance.
+        d) Adjustment Split: Allows applying individual +/- offset adjustments to 
+           equal base shares.
+      - FR-3.3.3: In expense logging, card selection shall strictly filter to cards 
+        owned by the selected payer (`card.ownerId === paidBy`).
+      - FR-3.3.4: Users shall be able to filter household expense lists by Search 
+        Query, Category, Participant, Payment Channel, Month/Year, and Sort Order 
+        (New-to-Old vs Old-to-New).
+
+3.4 MINIMUM CASH FLOW DEBT SETTLEMENT MINIMIZER (N-1 SOLVER) [HIGH]
+3.4.1 Description: Solves graph debt simplification to collapse multi-party debts 
+      into minimal direct peer-to-peer transfers.
+3.4.2 Functional Requirements:
+      - FR-3.4.1: The system shall compute net balances for all house members using:
+        Net_u = Sum(Paid_u) - Sum(Shares_u) + Sum(SettlementsPaid_u) - Sum(SettlementsReceived_u)
+      - FR-3.4.2: The system shall execute a greedy priority queue algorithm matching 
+        top Debtors and top Creditors, yielding at most N-1 direct transfer recommendations.
+      - FR-3.4.3: Debt settlement calculations shall ALWAYS use all cumulative historical 
+        un-settled expenses and completed settlements, preserving carry-over debts 
+        across billing months.
+      - FR-3.4.4: Debtors can mark settlement recommendations as paid, optionally 
+        attaching proof of payment screenshots (bKash, Nagad, bank transfer slip).
+      - FR-3.4.5: Only the recipient creditor of a settlement is authorized to confirm 
+        and finalize the payment.
+      - FR-3.4.6: Completed settlements can be reversed by authorized members, 
+        creating a counter-entry (`status: 'reversed'`) that restores pre-settlement 
+        balances cleanly.
+
+3.5 PRIVATE PERSONAL WALLET & MONTHLY BUDGET ENGINE [HIGH]
+3.5.1 Description: Tracks individual private expenses separately from shared 
+      household accounting.
+3.5.2 Functional Requirements:
+      - FR-3.5.1: Expenses logged with `scope: 'personal'` shall be strictly isolated 
+        to the active user's Personal Wallet.
+      - FR-3.5.2: Users can set a custom monthly personal budget limit (default ৳15,000.00) 
+        and individual category budget limits.
+      - FR-3.5.3: The system shall render real-time budget utilization progress bars 
+        displaying warning alerts at 80% (Amber) and 100% (Rose) thresholds.
+      - FR-3.5.4: Budget settings shall persist across browser sessions in storage.
+
+3.6 PAYMENT CARD & CHANNEL MANAGEMENT [MEDIUM]
+3.6.1 Description: Manages credit and debit bank cards for payment channel tracking.
+3.6.2 Functional Requirements:
+      - FR-3.6.1: Users can create Credit and Debit bank cards specifying Bank Name, 
+        Card Type, and selecting from 9 curated gradient themes.
+      - FR-3.6.2: Payment cards shall be strictly scoped to their owner (`ownerId`). 
+        Users cannot view or select payment cards belonging to other housemates.
+      - FR-3.6.3: Deleting a card shall prompt confirmation and scrub linked expense 
+        references to cash or display a `(Deleted Card)` tag.
+
+3.7 CLOUD REAL-TIME DATABASE SYNCHRONIZATION [HIGH]
+3.7.1 Description: Provides instant multi-device synchronization via Cloud Firestore.
+3.7.2 Functional Requirements:
+      - FR-3.7.1: The system shall attach realtime `onSnapshot` listeners to 
+        Firestore collections (`expenses`, `settlements`, `cards`, `houses`).
+      - FR-3.7.2: Database operations performed on one device (e.g., adding an expense, 
+        confirming a settlement, joining a house) shall update all connected 
+        housemates' screens live in real time.
+      - FR-3.7.3: When offline or unconfigured, the system shall fall back 
+        seamlessly to partitioned LocalStorage without breaking functionality.
+
+3.8 AI RECEIPT SCANNER & OCR PARSING [MEDIUM]
+3.8.1 Description: Parses uploaded receipt photos to extract receipt metadata.
+3.8.2 Functional Requirements:
+      - FR-3.8.1: Users can upload receipt images (<3MB, `image/*`).
+      - FR-3.8.2: The system shall execute canvas processing and Tesseract.js text 
+        extraction to auto-fill title, date, and total amount in Taka (৳).
+
+3.9 EXPENSE DISCUSSION THREADS & HOUSEMATE COMMENTS [LOW]
+3.9.1 Description: Supports in-app discussion threads under shared expenses.
+3.9.2 Functional Requirements:
+      - FR-3.9.1: Users can post comments under any shared household expense.
+      - FR-3.9.2: Comments shall display commenter avatars, names, and timestamps.
+      - FR-3.9.3: Comment authors and House Leaders can delete posted comments.
+
+3.10 MONTHLY ANALYTICS, VISUALIZATIONS, AND CSV REPORTS [MEDIUM]
+3.10.1 Description: Renders visual analytics and generates downloadable CSV statements.
+3.10.2 Functional Requirements:
+       - FR-3.10.1: The system shall render SVG Category Donut Pie Charts and category 
+         spending progress bars.
+       - FR-3.10.2: The system shall render a multi-segmented housemate out-of-pocket 
+         contribution ratio bar.
+       - FR-3.10.3: Users can export formatted `.csv` audit statements for any month 
+         or lifetime history.
+
+3.11 BILINGUAL LOCALIZATION ENGINE [MEDIUM]
+3.11.1 Description: Provides dynamic bilingual localization between English and 
+       Bengali (bn-BD).
+3.11.2 Functional Requirements:
+       - FR-3.11.1: Users can toggle language between English (`en`) and Bengali (`bn`).
+       - FR-3.11.2: When Bengali is selected, all UI labels, button titles, and monetary 
+         digits shall render using native Bengali numerals (০, ১, ২, ৩, ৪, ৫, ৬, ৭, ৮, ৯).
+
+3.12 SINGLE PAGE APPLICATION (SPA) HTML5 ROUTING & PWA CAPABILITY [HIGH]
+3.12.1 Description: Provides clean URL navigation and mobile installability.
+3.12.2 Functional Requirements:
+       - FR-3.12.1: Navigation shall use clean HTML5 history paths (`/dashboard`, 
+         `/expenses`, `/settlement`, `/personal`, `/cards`, `/monthly`, `/house`, `/settings`).
+       - FR-3.12.2: Page refreshes (F5) shall restore the exact active view without 404 
+         errors via `vercel.json` SPA rewrite rules.
+       - FR-3.12.3: The system shall include a PWA Web App Manifest (`manifest.json`) 
+         allowing installation on mobile home screens.
+
+================================================================================
+4. EXTERNAL INTERFACE REQUIREMENTS
+================================================================================
+
+4.1 USER INTERFACE
+- Design Language: Midnight Slate Glassmorphic Theme with custom CSS color tokens.
+- Navigation Layout: Collapsible Desktop Sidebar + Mobile Bottom Navigation Bar.
+- Typography: Plus Jakarta Sans with tabular number formatting (`tabular-nums`).
+
+4.2 HARDWARE INTERFACES
+- No specialized hardware required. Compatible with touchscreens, mice, keyboards, 
+  and camera inputs for receipt capture.
+
+4.3 SOFTWARE INTERFACES
+- React 19 Client Runtime.
+- Firebase Auth API & Cloud Firestore REST/Websocket API.
+- Tesseract.js OCR Engine.
+- Web Share API (`navigator.share`) & Clipboard API (`navigator.clipboard`).
+
+4.4 COMMUNICATIONS INTERFACES
+- HTTPS / TLS 1.3 encryption for all client-to-server data transmission.
+- WSS (WebSockets Secure) protocol for real-time Cloud Firestore snapshot listeners.
+
+================================================================================
+5. SYSTEM DATA MODELS & ARCHITECTURE
+================================================================================
+
+5.1 PRIMARY ENTITY SCHEMAS
+
+5.1.1 User Profile Entity (UserProfile):
+      {
+        uid: string;
+        displayName: string;
+        email: string;
+        avatar?: string;
+        houseId?: string | null;
+        role?: 'leader' | 'member' | null;
+        createdAt: string;
+      }
+
+5.1.2 House Entity (House):
+      {
+        id: string;
+        code: string; // 6-character code e.g., 'HM-8823'
+        name: string;
+        leaderUid: string;
+        members: HouseMember[];
+        createdAt: string;
+      }
+
+5.1.3 Expense Entity (Expense):
+      {
+        id: string;
+        title: string;
+        amountCents: number; // Integer cents
+        paidBy: string; // User UID
+        category: 'Groceries' | 'Household' | 'Utilities' | 'Food' | 'Personal' | 'Other';
+        date: string; // YYYY-MM-DD
+        splitMethod: 'equal' | 'custom' | 'percentage' | 'adjustment';
+        shares: Share[];
+        scope: 'household' | 'personal';
+        ownerId?: string;
+        houseId?: string;
+        paymentMethod?: { type: 'cash' | 'card'; cardId?: string };
+        isRecurring?: boolean;
+        recurringFrequency?: 'monthly' | 'weekly';
+        receiptUrl?: string;
+        comments?: ExpenseComment[];
+        notes?: string;
+        createdAt: string;
+        updatedAt: string;
+      }
+
+5.1.4 Settlement Entity (Settlement):
+      {
+        id: string;
+        fromUserId: string; // Debtor UID
+        toUserId: string;   // Creditor UID
+        amountCents: number;
+        status: 'completed' | 'reversed';
+        houseId?: string;
+        proofUrl?: string;
+        createdAt: string;
+        settledAt: string;
+        notes?: string;
+      }
+
+5.1.5 Payment Card Entity (PaymentCard):
+      {
+        id: string;
+        bankName: string;
+        cardType: 'credit' | 'debit';
+        color: string; // CSS gradient string
+        ownerId: string; // User UID
+        houseId?: string;
+        createdAt: string;
+      }
+
+5.2 FINANCIAL PRECISION STANDARD
+All financial transactions MUST be stored as integer cents (`amountCents`). 
+Calculations MUST avoid floating-point math:
+- Input Conversion: `amountCents = Math.round(parseFloat(inputTaka) * 100)`
+- Output Rendering: `displayTaka = (amountCents / 100).toFixed(2)`
+
+5.3 PARTITIONED LOCAL-FIRST STORAGE
+Data is cached locally under partitioned keys:
+- `home_finance_expenses_v1`
+- `home_finance_settlements_v1`
+- `home_finance_cards_v1`
+- `home_finance_users_db_v3`
+- `home_finance_houses_db_v3`
+- `home_finance_personal_budget_v1`
+
+================================================================================
+6. NON-FUNCTIONAL REQUIREMENTS
+================================================================================
+
+6.1 PERFORMANCE REQUIREMENTS
+- Initial Page Load Time: Under 1.5 seconds on 3G network connections.
+- Initial JS Bundle Size: Under 150 kB gzipped (achieved via code-splitting).
+- UI Frame Rate: Consistent 60 FPS during animations and page transitions.
+
+6.2 SAFETY & FINANCIAL INTEGRITY REQUIREMENTS
+- Net Balance Conservation: The sum of all net balances across active members MUST 
+  always equal zero: Sum(Net_u) = 0.
+- Carry-Over Integrity: Un-settled debts MUST carry over indefinitely until paid.
+
+6.3 SECURITY & AUTHORIZATION REQUIREMENTS
+- House Data Isolation: Firestore security rules MUST restrict house data access 
+  strictly to authenticated members of that `houseId`.
+- Personal Data Isolation: Personal Wallet expenses MUST be readable only by their 
+  `ownerId`.
+- Leader Authorization: Leadership actions (kicking members, changing house names) 
+  MUST require `role === 'leader'` or matching `leaderUid`.
+
+6.4 SOFTWARE QUALITY ATTRIBUTES
+- Availability: 99.9% uptime hosted on Vercel Global Edge Network.
+- Usability: Fully responsive layout adapting across Mobile (<480px), Tablet (<768px), 
+  and Desktop (>1024px) viewports.
+- Maintainability: Strict TypeScript type checking (`tsc -b`) and linter compliance (`oxlint`).
+
+================================================================================
+7. VERIFICATION MATRIX & ACCEPTANCE CRITERIA
+================================================================================
+
+7.1 AUTOMATED VERIFICATION COMMANDS
+- Type Check: `npx tsc --noEmit` (Must pass with 0 errors)
+- Automated Unit Tests: `npm test` (Must pass all test suites)
+- Production Build: `npm run build` (Must complete cleanly)
+
+7.2 MANUAL ACCEPTANCE TEST SCENARIOS
+- Scenario 1: User registers, creates a household, and receives a unique code (HM-8823).
+- Scenario 2: Second user registers on another device and joins the house via code; 
+  roster updates in real time.
+- Scenario 3: User logs a ৳900.00 grocery expense split equally among 3 members; 
+  net balances reflect +৳600.00 for payer and -৳300.00 for each roommate.
+- Scenario 4: Debtor pays creditor ৳300.00 and attaches payment proof; creditor 
+  confirms settlement, bringing net balances to ৳0.00.
+
+================================================================================
+                              END OF SRS DOCUMENT
+================================================================================
