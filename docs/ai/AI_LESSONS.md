@@ -10,6 +10,13 @@ Record only reusable, evidence-backed lessons. Include the date and affected are
 - Security-rule and trusted-function tests are configured separately from the root CI path. Do not assume a green GitHub Pages workflow proves emulator rules or function logic passed.
 - Financial, auth/household lifecycle, and synchronization changes cross several boundaries (`App.tsx`, `AuthContext.tsx`, domain engines, sync services, rules, and functions); route them at L3 when integrity or authorization is involved.
 
+## 2026-08-10 ? Authenticated browser testing
+
+- FACT: The dummy credentials documented in `Tester.md` returned HTTP 400 from the default Firebase Identity Toolkit project during the responsive dashboard smoke test.
+- Evidence: Desktop and 390x844 browser sessions loaded the unauthenticated shell without runtime errors or overflow, but Firebase rejected `raiyan@gmail.com` / `dummy123`.
+- Consequence: Revalidate documented test accounts before relying on them for authenticated UI verification; do not create external Firebase accounts as an implicit testing workaround.
+- Failed approach: The repository's documented dummy login could not unlock the authenticated dashboard, so this run verified the responsive public shell plus lint, tests, type-check, and production build instead.
+
 ## Entry template
 
 ```text

@@ -1,14 +1,30 @@
 import React, { useMemo, useState } from 'react';
-import type { Expense, Settlement } from '../types';
+import type { Category, Expense, Settlement, User } from '../types';
 import { calculateNetBalances, calculateSimplifiedSettlements, getHouseUsers } from '../features/settlementEngine';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 import { toLocalMonthKey } from '../utils/localDate';
 import { filterDashboardMonth, getDashboardMonths, getHouseholdLedgerAsOfMonth } from '../features/monthlyDashboard';
-import { CategoryChart, PayerContributionCard } from '../components/CategoryChart';
-import { CategoryPieChart } from '../components/CategoryPieChart';
 import { UserAvatar } from '../components/UserAvatar';
-import { TrendingUp, ArrowRight, CheckCircle2, Receipt, Activity, CreditCard, Banknote, Users, PieChart, CalendarDays } from 'lucide-react';
+import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  Banknote,
+  CalendarDays,
+  Check,
+  CreditCard,
+  Home,
+  Plus,
+  Receipt,
+  Shapes,
+  ShoppingBasket,
+  Sparkles,
+  Utensils,
+  UserRound,
+  WalletCards,
+  Zap,
+} from 'lucide-react';
 import type { Language } from '../utils/i18n';
 import { MaterialSelect } from '../components/MaterialSelect';
 
@@ -19,6 +35,23 @@ interface DashboardProps {
   onNavigateToExpenses: () => void;
   lang?: Language;
 }
+
+const categoryIcons: Record<Category, React.ComponentType<{ size?: number; 'aria-hidden'?: React.AriaAttributes['aria-hidden'] }>> = {
+  Groceries: ShoppingBasket,
+  Household: Home,
+  Utilities: Zap,
+  Food: Utensils,
+  Personal: UserRound,
+  Other: Shapes,
+};
+
+const resolvePayer = (expense: Expense, users: User[]): User =>
+  users.find((user) => user.id === expense.paidBy || user.name.toLowerCase() === expense.paidBy.toLowerCase()) || {
+    id: expense.paidBy,
+    name: expense.paidBy,
+    avatar: expense.paidBy,
+    color: '#13a383',
+  };
 
 export const DashboardPage: React.FC<DashboardProps> = ({
   expenses,
@@ -51,7 +84,6 @@ export const DashboardPage: React.FC<DashboardProps> = ({
     () => calculateNetBalances(asOfData.expenses, asOfData.settlements, houseUsers),
     [asOfData, houseUsers]
   );
-
   const simplifiedSettlements = useMemo(
     () => calculateSimplifiedSettlements(userBalances, houseUsers),
     [userBalances, houseUsers]
@@ -67,20 +99,81 @@ export const DashboardPage: React.FC<DashboardProps> = ({
       .reduce((sum, settlement) => sum + settlement.amountCents, 0),
     [monthSettlements]
   );
+  const totalPendingDebtCents = useMemo(
+    () => simplifiedSettlements.reduce((sum, settlement) => sum + settlement.amountCents, 0),
+    [simplifiedSettlements]
+  );
 
   const selectedMonthLabel = useMemo(() => {
-    const d = new Date(selectedMonth + '-01');
-    return isNaN(d.getTime())
+    const date = new Date(`${selectedMonth}-01`);
+    return Number.isNaN(date.getTime())
       ? selectedMonth
-      : d.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' });
+      : date.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' });
   }, [selectedMonth, lang]);
 
-  // Calculate total pending debt in household
-  const totalPendingDebtCents = simplifiedSettlements.reduce((sum, st) => sum + st.amountCents, 0);
+  const previousMonthSpentCents = useMemo(() => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const previousMonthKey = toLocalMonthKey(new Date(year, month - 2, 1));
+    return expenses
+      .filter((expense) => expense.date.startsWith(previousMonthKey))
+      .reduce((sum, expense) => sum + expense.amountCents, 0);
+  }, [expenses, selectedMonth]);
+
+  const monthChange = previousMonthSpentCents > 0
+    ? Math.round(((selectedMonthSpentCents - previousMonthSpentCents) / previousMonthSpentCents) * 100)
+    : null;
+
+  const dailyTrend = useMemo(() => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const totals = Array.from({ length: daysInMonth }, () => 0);
+    monthExpenses.forEach((expense) => {
+      const day = Number(expense.date.slice(8, 10));
+      if (day >= 1 && day <= daysInMonth) totals[day - 1] += expense.amountCents;
+    });
+    const max = Math.max(...totals, 1);
+    const points = totals.map((value, index) => {
+      const x = totals.length === 1 ? 300 : (index / (totals.length - 1)) * 600;
+      const y = 158 - (value / max) * 126;
+      return { x, y, value };
+    });
+    return {
+      totals,
+      points,
+      line: points.map((point) => `${point.x},${point.y}`).join(' '),
+      area: `0,170 ${points.map((point) => `${point.x},${point.y}`).join(' ')} 600,170`,
+      max,
+    };
+  }, [monthExpenses, selectedMonth]);
+
+  const categoryStats = useMemo(() => {
+    const totals = new Map<Category, number>();
+    monthExpenses.forEach((expense) => totals.set(expense.category, (totals.get(expense.category) || 0) + expense.amountCents));
+    const sorted = Array.from(totals.entries())
+      .map(([category, amountCents]) => ({ category, amountCents }))
+      .sort((a, b) => b.amountCents - a.amountCents);
+    const max = sorted[0]?.amountCents || 1;
+    return sorted.map((item) => ({ ...item, percentage: (item.amountCents / max) * 100 }));
+  }, [monthExpenses]);
+
+  const paymentChannelStats = useMemo(() => {
+    let cardCents = 0;
+    let cashCents = 0;
+    monthExpenses.forEach((expense) => {
+      if (expense.paymentMethod?.type === 'card' || expense.paymentMethod?.cardId) cardCents += expense.amountCents;
+      else cashCents += expense.amountCents;
+    });
+    const total = cardCents + cashCents;
+    return {
+      cardCents,
+      cashCents,
+      cardPercentage: total > 0 ? Math.round((cardCents / total) * 100) : 0,
+      cashPercentage: total > 0 ? Math.round((cashCents / total) * 100) : 0,
+    };
+  }, [monthExpenses]);
 
   const memberCount = Math.max(1, houseUsers.length);
-  const selectedMonthAveragePerMemberCents = Math.round(selectedMonthSpentCents / memberCount);
-  const memberNamesText = houseUsers.map((u) => u.name).join(', ');
+  const averagePerMemberCents = Math.round(selectedMonthSpentCents / memberCount);
   const balanceUsers = useMemo(() => {
     const activeIds = new Set(houseUsers.map((user) => user.id));
     return [
@@ -90,45 +183,40 @@ export const DashboardPage: React.FC<DashboardProps> = ({
         .filter((user) => !activeIds.has(user.id)),
     ];
   }, [houseUsers, userBalances]);
-
+  const currentUserId = dbUserProfile?.uid;
+  const youOweCents = simplifiedSettlements
+    .filter((settlement) => settlement.fromUser.id === currentUserId)
+    .reduce((sum, settlement) => sum + settlement.amountCents, 0);
+  const youAreOwedCents = simplifiedSettlements
+    .filter((settlement) => settlement.toUser.id === currentUserId)
+    .reduce((sum, settlement) => sum + settlement.amountCents, 0);
+  const settlementTotal = selectedMonthSettledCents + totalPendingDebtCents;
+  const settlementProgress = settlementTotal > 0
+    ? Math.round((selectedMonthSettledCents / settlementTotal) * 100)
+    : 100;
   const recentExpenses = [...monthExpenses]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
-  // Calculate Payment Channel Ratios (Bank Cards vs Cash)
-  const paymentChannelStats = useMemo(() => {
-    let cardCents = 0;
-    let cashCents = 0;
-
-    monthExpenses.forEach((exp) => {
-      if (exp.paymentMethod?.type === 'card' || exp.paymentMethod?.cardId) {
-        cardCents += exp.amountCents;
-      } else {
-        cashCents += exp.amountCents;
-      }
-    });
-
-    const grandTotal = cardCents + cashCents;
-    const cardPercentage = grandTotal > 0 ? (cardCents / grandTotal) * 100 : 0;
-    const cashPercentage = grandTotal > 0 ? (cashCents / grandTotal) * 100 : 0;
-
-    return { cardCents, cashCents, cardPercentage, cashPercentage };
-  }, [monthExpenses]);
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      {/* Top Banner & Quick Metrics Header */}
-      <div className="page-header">
-        <div className="page-title-group">
-          <h1 className="page-title">Household Financial Dashboard</h1>
-          <p className="page-description">
-            Monthly overview of household expenses, balances, and settlements for {memberNamesText}
-          </p>
+    <div className="dashboard-v2">
+      <div className="dashboard-mobile-brand" aria-hidden="true">
+        <span className="dashboard-mobile-brand-mark"><Home size={19} /></span>
+        <span>Home Finance</span>
+      </div>
+
+      <header className="dashboard-v2-header">
+        <div className="dashboard-v2-heading">
+          <nav className="dashboard-breadcrumb" aria-label="Breadcrumb">
+            <span>Home</span><ArrowRight size={13} aria-hidden="true" /><span aria-current="page">Overview</span>
+          </nav>
+          <h1>Household overview</h1>
+          <p>A clear view of spending, balances, and what comes next.</p>
         </div>
 
-        <div className="dashboard-header-actions">
-          <div className="dashboard-month-selector">
-            <CalendarDays size={18} aria-hidden="true" />
+        <div className="dashboard-v2-actions">
+          <div className="dashboard-month-selector dashboard-month-selector-v2">
+            <CalendarDays size={17} aria-hidden="true" />
             <MaterialSelect
               compact
               value={selectedMonth}
@@ -136,386 +224,212 @@ export const DashboardPage: React.FC<DashboardProps> = ({
               ariaLabel="Dashboard month"
               options={availableMonths.map((monthKey) => {
                 const date = new Date(`${monthKey}-01`);
-                const label = isNaN(date.getTime())
+                const label = Number.isNaN(date.getTime())
                   ? monthKey
                   : date.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' });
                 return { value: monthKey, label };
               })}
             />
           </div>
-          <button className="btn btn-primary" onClick={onNavigateToExpenses}>
-            <span>Log Expense</span>
-            <Receipt size={16} />
+          <div className="dashboard-member-stack" aria-label={`${houseUsers.length} household members`}>
+            {houseUsers.slice(0, 3).map((user) => <UserAvatar key={user.id} user={user} size={34} />)}
+            {houseUsers.length > 3 && <span>+{houseUsers.length - 3}</span>}
+          </div>
+          <button className="btn dashboard-settle-button" onClick={onNavigateToSettlement}>
+            <WalletCards size={17} aria-hidden="true" /><span>Settle up</span>
           </button>
-          <button className="btn btn-secondary" onClick={onNavigateToSettlement}>
-            <span>Settlement Hub</span>
-            <ArrowRight size={16} />
+          <button className="btn btn-primary dashboard-add-button" onClick={onNavigateToExpenses}>
+            <Plus size={18} aria-hidden="true" /><span>Add expense</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Top Summary Metric Cards */}
-      <div className="grid-summary" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px' }}>
-        {/* Metric 1: Selected Month Spend */}
-        <div className="glass-card summary-card animate-stagger-1">
-          <div className="summary-card-header">
-            <span className="summary-title">Selected Month Spend</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-primary)' }}>
-              <TrendingUp size={22} />
+      <section className="dashboard-hero-grid" aria-label="Monthly household summary">
+        <article className="dashboard-card dashboard-spend-card dashboard-reveal dashboard-reveal-1">
+          <div className="dashboard-card-header">
+            <div>
+              <span className="dashboard-eyebrow">Spent this month</span>
+              <strong className="dashboard-hero-value tabular-nums">{formatCurrency(selectedMonthSpentCents, false, lang)}</strong>
             </div>
+            <span className="dashboard-period-chip">{selectedMonthLabel}</span>
           </div>
-          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-primary)' }}>
-            {formatCurrency(selectedMonthSpentCents, false, lang)}
+          <div className={`dashboard-delta ${monthChange !== null && monthChange > 0 ? 'is-up' : 'is-down'}`}>
+            {monthChange === null ? <Sparkles size={14} /> : monthChange > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+            <span>{monthChange === null ? 'First month of comparison data' : `${Math.abs(monthChange)}% ${monthChange > 0 ? 'more' : 'less'} than last month`}</span>
           </div>
-          <div className="summary-footer">
-            <span>Spent in {selectedMonthLabel} ({monthExpenses.length} items)</span>
-          </div>
-        </div>
-
-        {/* Metric 2: Completed settlements in selected month */}
-        <div className="glass-card summary-card animate-stagger-2">
-          <div className="summary-card-header">
-            <span className="summary-title">Settled This Month</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}>
-              <Receipt size={22} />
+          {dailyTrend.totals.some(Boolean) ? (
+            <div className="dashboard-mini-chart">
+              <svg viewBox="0 0 600 180" preserveAspectRatio="none" role="img" aria-label={`Daily household spending trend for ${selectedMonthLabel}`}>
+                <defs>
+                  <linearGradient id="dashboardTrendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <line x1="0" y1="42" x2="600" y2="42" className="dashboard-chart-gridline" />
+                <line x1="0" y1="105" x2="600" y2="105" className="dashboard-chart-gridline" />
+                <polygon points={dailyTrend.area} fill="url(#dashboardTrendFill)" />
+                <polyline points={dailyTrend.line} className="dashboard-chart-line" />
+                {dailyTrend.points.filter((_, index) => index % Math.max(1, Math.floor(dailyTrend.points.length / 7)) === 0 || index === dailyTrend.points.length - 1).map((point, index) => (
+                  <circle key={`${point.x}-${index}`} cx={point.x} cy={point.y} r="4" className="dashboard-chart-point" />
+                ))}
+              </svg>
+              <div className="dashboard-chart-axis"><span>1</span><span>{Math.ceil(dailyTrend.totals.length / 2)}</span><span>{dailyTrend.totals.length}</span></div>
             </div>
-          </div>
-          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-purple)' }}>
-            {formatCurrency(selectedMonthSettledCents, false, lang)}
-          </div>
-          <div className="summary-footer">
-            <span>{monthSettlements.filter((settlement) => settlement.status === 'completed').length} completed payments in {selectedMonthLabel}</span>
-          </div>
-        </div>
+          ) : (
+            <div className="dashboard-chart-empty">Add an expense to start your monthly trend.</div>
+          )}
+        </article>
 
-        {/* Metric 3: Total Outstanding Debt */}
-        <div className="glass-card summary-card animate-stagger-3">
-          <div className="summary-card-header">
-            <span className="summary-title">Outstanding Debt (Cumulative)</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)' }}>
-              <Activity size={22} />
+        <article className="dashboard-card dashboard-outstanding-card dashboard-reveal dashboard-reveal-2">
+          <div className="dashboard-card-header">
+            <div>
+              <span className="dashboard-eyebrow">Outstanding</span>
+              <strong className="dashboard-card-value tabular-nums">{formatCurrency(totalPendingDebtCents, false, lang)}</strong>
+              <span className="dashboard-card-caption">{simplifiedSettlements.length} active transfer{simplifiedSettlements.length === 1 ? '' : 's'}</span>
             </div>
+            <span className="dashboard-icon-button" aria-hidden="true"><WalletCards size={19} /></span>
           </div>
-          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-amber)' }}>
-            {formatCurrency(totalPendingDebtCents, false, lang)}
+          <button className="dashboard-lime-action" onClick={onNavigateToSettlement}>
+            <span>{totalPendingDebtCents > 0 ? 'Settle up' : 'View settlements'}</span><ArrowRight size={17} />
+          </button>
+          <div className="dashboard-debt-breakdown">
+            <div><span>You owe</span><strong>{formatCurrency(youOweCents, false, lang)}</strong></div>
+            <div><span>You are owed</span><strong>{formatCurrency(youAreOwedCents, false, lang)}</strong></div>
           </div>
-          <div className="summary-footer">
-            <span>{simplifiedSettlements.length} active transfers as of {selectedMonthLabel} month-end</span>
-          </div>
-        </div>
+        </article>
 
-        {/* Metric 4: Average Per Member */}
-        <div className="glass-card summary-card animate-stagger-4">
-          <div className="summary-card-header">
-            <span className="summary-title">Average Per Member</span>
-            <div className="summary-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)' }}>
-              <CheckCircle2 size={22} />
+        <article className="dashboard-card dashboard-health-card dashboard-reveal dashboard-reveal-3">
+          <div className="dashboard-card-header">
+            <div>
+              <span className="dashboard-eyebrow">Settlement health</span>
+              <strong className="dashboard-health-status">{totalPendingDebtCents === 0 ? 'All clear' : 'In progress'}</strong>
             </div>
+            <span className="dashboard-icon-button" aria-hidden="true"><Check size={19} /></span>
           </div>
-          <div className="summary-amount tabular-nums font-display" style={{ color: 'var(--accent-emerald)' }}>
-            {formatCurrency(selectedMonthAveragePerMemberCents, false, lang)}
+          <p>{totalPendingDebtCents === 0 ? 'Everyone is settled as of this month-end.' : 'Outstanding transfers are ready to review.'}</p>
+          <div className="dashboard-progress-heading"><span>Resolved value</span><strong>{settlementProgress}%</strong></div>
+          <div className="dashboard-progress" role="progressbar" aria-label="Settlement value resolved" aria-valuenow={settlementProgress} aria-valuemin={0} aria-valuemax={100}>
+            <span style={{ width: `${settlementProgress}%` }} />
           </div>
-          <div className="summary-footer">
-            <span>Descriptive average of {selectedMonthLabel} shared spending; actual assigned shares are shown below</span>
-          </div>
-        </div>
-      </div>
+          <span className="dashboard-card-caption">{formatCurrency(selectedMonthSettledCents, false, lang)} completed this month</span>
+        </article>
+      </section>
 
-      {/* Main 2-Column Dashboard Grid */}
-      <div className="dashboard-main-grid">
-        
-        {/* Left Column: Housemate Net Balances, Debt Action Cards, Recent History & Analytics */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* 1. Housemate Net Balances Grid */}
-          <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={18} style={{ color: 'var(--accent-primary)' }} />
-              <span>Housemate Net Balances as of {selectedMonthLabel} month-end ({balanceUsers.length})</span>
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-              {balanceUsers.map((user) => {
-                const netCents = userBalances[user.id]?.netBalanceCents || 0;
-                const isCreditor = netCents > 0;
-                const isDebtor = netCents < 0;
-                const paidCents = monthExpenses
-                    .filter((e) => e.paidBy === user.id)
-                  .reduce((sum, e) => sum + e.amountCents, 0);
+      <section className="dashboard-analysis-grid" aria-label="Spending analysis">
+        <article className="dashboard-card dashboard-trend-card dashboard-reveal dashboard-reveal-2">
+          <div className="dashboard-section-heading">
+            <div><h2>Spending trend</h2><p>Daily totals across {selectedMonthLabel}</p></div>
+            <span className="dashboard-metric-note">{monthExpenses.length} expenses</span>
+          </div>
+          {dailyTrend.totals.some(Boolean) ? (
+            <div className="dashboard-large-chart">
+              <div className="dashboard-y-axis"><span>{formatCurrency(dailyTrend.max, false, lang)}</span><span>{formatCurrency(Math.round(dailyTrend.max / 2), false, lang)}</span><span>{formatCurrency(0, false, lang)}</span></div>
+              <div className="dashboard-large-chart-plot">
+                <svg viewBox="0 0 600 180" preserveAspectRatio="none" role="img" aria-label={`Daily spending line chart for ${selectedMonthLabel}`}>
+                  <line x1="0" y1="32" x2="600" y2="32" className="dashboard-chart-gridline" />
+                  <line x1="0" y1="95" x2="600" y2="95" className="dashboard-chart-gridline" />
+                  <line x1="0" y1="158" x2="600" y2="158" className="dashboard-chart-gridline" />
+                  <polygon points={dailyTrend.area} fill="url(#dashboardTrendFill)" />
+                  <polyline points={dailyTrend.line} className="dashboard-chart-line" />
+                </svg>
+                <div className="dashboard-chart-axis"><span>Day 1</span><span>Day {Math.ceil(dailyTrend.totals.length / 2)}</span><span>Day {dailyTrend.totals.length}</span></div>
+              </div>
+            </div>
+          ) : <div className="dashboard-chart-empty dashboard-chart-empty-large">No spending data for this month yet.</div>}
+        </article>
 
+        <article className="dashboard-card dashboard-category-card dashboard-reveal dashboard-reveal-3">
+          <div className="dashboard-section-heading">
+            <div><h2>By category</h2><p>Largest spending areas</p></div>
+          </div>
+          {categoryStats.length > 0 ? (
+            <div className="dashboard-category-list">
+              {categoryStats.slice(0, 5).map((item) => {
+                const Icon = categoryIcons[item.category];
                 return (
-                  <div key={user.id} className="glass-card balance-card">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <UserAvatar user={user} size={42} />
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: '1rem' }}>{user.name}</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            Paid {formatCurrency(paidCents, false, lang)} out-of-pocket
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '10px' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
-                        Net Position
-                      </div>
-                      <div
-                        className="tabular-nums"
-                        style={{
-                          fontSize: '1.35rem',
-                          fontWeight: 900,
-                          color: isCreditor
-                            ? 'var(--accent-emerald)'
-                            : isDebtor
-                            ? 'var(--accent-rose)'
-                            : 'var(--text-muted)',
-                        }}
-                      >
-                        {isCreditor ? `+${formatCurrency(netCents, false, lang)}` : formatCurrency(netCents, false, lang)}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', marginTop: '4px', fontWeight: 600 }}>
-                        {isCreditor && <span style={{ color: 'var(--accent-emerald)' }}>Gets back overall</span>}
-                        {isDebtor && <span style={{ color: 'var(--accent-rose)' }}>Owes overall</span>}
-                        {!isCreditor && !isDebtor && <span style={{ color: 'var(--text-muted)' }}>Fully settled</span>}
-                      </div>
-                    </div>
+                  <div className="dashboard-category-row" key={item.category}>
+                    <span className="dashboard-category-icon"><Icon size={15} aria-hidden="true" /></span>
+                    <span className="dashboard-category-name">{item.category}</span>
+                    <span className="dashboard-category-track"><span style={{ width: `${item.percentage}%` }} /></span>
+                    <strong className="tabular-nums">{formatCurrency(item.amountCents, false, lang)}</strong>
                   </div>
                 );
               })}
-
             </div>
+          ) : <div className="dashboard-chart-empty">Categories will appear after the first expense.</div>}
+          <button className="dashboard-text-link" onClick={onNavigateToExpenses}>View all expenses <ArrowRight size={15} /></button>
+        </article>
+
+        <article className="dashboard-card dashboard-payment-card dashboard-reveal dashboard-reveal-4">
+          <div className="dashboard-section-heading">
+            <div><h2>Payment mix</h2><p>Card and cash outlays</p></div>
           </div>
-
-          {/* 2. Direct Debt Settlement Action Cards */}
-          {simplifiedSettlements.length > 0 && (
-            <div className="glass-card">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-                    Optimized Debt Settlement Payments ({simplifiedSettlements.length})
-                  </h2>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Minimum cash flow algorithm solved to eliminate redundant transactions
-                  </p>
-                </div>
-
-                <button className="btn btn-primary btn-sm" onClick={onNavigateToSettlement}>
-                  <span>Settlement Hub</span>
-                  <ArrowRight size={15} />
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {simplifiedSettlements.map((tx) => (
-                  <div
-                    key={tx.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '14px 18px',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--bg-surface-elevated)',
-                      border: '1px solid var(--border-medium)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <UserAvatar user={tx.fromUser} size={34} />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{tx.fromUser.name}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--accent-rose)' }}>Owes debt</div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                      <ArrowRight size={16} style={{ color: 'var(--accent-amber)' }} />
-                      <span className="tabular-nums" style={{ fontWeight: 900, fontSize: '1rem', color: 'var(--accent-amber)' }}>
-                        {formatCurrency(tx.amountCents, false, lang)}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', textAlign: 'right' }}>{tx.toUser.name}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--accent-emerald)', textAlign: 'right' }}>Receives payment</div>
-                      </div>
-                      <UserAvatar user={tx.toUser} size={34} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 3. Recent Shared Expenses List */}
-          <div className="glass-card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-                Recent Shared Expenses
-              </h2>
-              <button className="btn btn-secondary btn-sm" onClick={onNavigateToExpenses}>
-                <span>View All</span>
-                <Receipt size={15} />
-              </button>
-            </div>
-
-            {recentExpenses.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                No shared expenses recorded for {selectedMonthLabel}.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {recentExpenses.map((exp) => {
-                  const payer = houseUsers.find((u) => u.id === exp.paidBy || u.name.toLowerCase() === exp.paidBy.toLowerCase()) || {
-                    id: exp.paidBy,
-                    name: exp.paidBy,
-                    avatar: exp.paidBy,
-                    color: '#6750a4',
-                  };
-
-                  return (
-                    <div
-                      key={exp.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 14px',
-                        borderRadius: 'var(--radius-md)',
-                        backgroundColor: 'var(--bg-input)',
-                        border: '1px solid var(--border-subtle)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <UserAvatar user={payer} size={34} />
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{exp.title}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            Paid by {payer.name} • {exp.date}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '1rem' }}>
-                        {formatCurrency(exp.amountCents, false, lang)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 4. Payer Out-of-Pocket Contribution Ratio Card (Moved to Left Column beneath Recent Expenses) */}
-          <PayerContributionCard expenses={monthExpenses} />
-
-          {/* 5. Payment Channel Distribution Card (Bank Cards vs Cash) */}
-          <div className="glass-card">
-            <div style={{ marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CreditCard size={18} style={{ color: 'var(--accent-cyan)' }} />
-                <span>Payment Channel Distribution</span>
-              </h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Bank Credit/Debit Cards vs Cash outlays ratio
-              </p>
-            </div>
-
-            {/* Channel Progress Bar */}
+          <div className="dashboard-payment-body">
             <div
-              style={{
-                width: '100%',
-                height: '14px',
-                borderRadius: 'var(--radius-full)',
-                overflow: 'hidden',
-                display: 'flex',
-                backgroundColor: 'var(--bg-surface-elevated)',
-                marginBottom: '18px',
-              }}
-            >
-              <div
-                style={{
-                  width: `${paymentChannelStats.cardPercentage}%`,
-                  backgroundColor: 'var(--accent-cyan)',
-                  transition: 'width 0.6s ease',
-                }}
-                title={`Bank Cards: ${paymentChannelStats.cardPercentage.toFixed(1)}%`}
-              />
-              <div
-                style={{
-                  width: `${paymentChannelStats.cashPercentage}%`,
-                  backgroundColor: 'var(--accent-amber)',
-                  transition: 'width 0.6s ease',
-                }}
-                title={`Cash: ${paymentChannelStats.cashPercentage.toFixed(1)}%`}
-              />
-            </div>
-
-            {/* Payment Channel Stat Badges */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-              <div
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--bg-input)',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <CreditCard size={15} style={{ color: 'var(--accent-cyan)' }} />
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Bank Cards</span>
-                </div>
-                <div className="tabular-nums" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-                  {formatCurrency(paymentChannelStats.cardCents, false, lang)}
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {paymentChannelStats.cardPercentage.toFixed(1)}% of total
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--bg-input)',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <Banknote size={15} style={{ color: 'var(--accent-amber)' }} />
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>Cash Payments</span>
-                </div>
-                <div className="tabular-nums" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-amber)' }}>
-                  {formatCurrency(paymentChannelStats.cashCents, false, lang)}
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {paymentChannelStats.cashPercentage.toFixed(1)}% of total
-                </div>
-              </div>
+              className="dashboard-donut"
+              style={{ '--dashboard-card-share': `${paymentChannelStats.cardPercentage * 3.6}deg` } as React.CSSProperties}
+              role="img"
+              aria-label={`${paymentChannelStats.cardPercentage}% card and ${paymentChannelStats.cashPercentage}% cash`}
+            ><span>{paymentChannelStats.cardPercentage}%</span></div>
+            <div className="dashboard-payment-legend">
+              <div><span className="dashboard-payment-icon is-card"><CreditCard size={16} /></span><span><small>Card</small><strong>{paymentChannelStats.cardPercentage}%</strong></span></div>
+              <div><span className="dashboard-payment-icon is-cash"><Banknote size={16} /></span><span><small>Cash</small><strong>{paymentChannelStats.cashPercentage}%</strong></span></div>
             </div>
           </div>
+        </article>
+      </section>
 
-        </div>
-
-        {/* Right Column: Visual Category Charts */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* 1. Category Donut Pie Chart */}
-          <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <PieChart size={18} style={{ color: 'var(--accent-primary)' }} />
-              <span>Category Spending Breakdown</span>
-            </h2>
-            <CategoryPieChart expenses={monthExpenses} lang={lang} />
+      <section className="dashboard-bottom-grid" aria-label="Household activity">
+        <article className="dashboard-card dashboard-balances-card dashboard-reveal dashboard-reveal-3">
+          <div className="dashboard-section-heading">
+            <div><h2>Housemate balances</h2><p>Positions as of {selectedMonthLabel} month-end</p></div>
+            <button className="dashboard-text-link" onClick={onNavigateToSettlement}>View all <ArrowRight size={15} /></button>
           </div>
+          {balanceUsers.length > 0 ? (
+            <div className="dashboard-balance-list">
+              {balanceUsers.map((user) => {
+                const netCents = userBalances[user.id]?.netBalanceCents || 0;
+                const status = netCents > 0 ? 'gets back' : netCents < 0 ? 'owes' : 'settled';
+                return (
+                  <div className="dashboard-balance-person" key={user.id}>
+                    <UserAvatar user={user} size={42} />
+                    <span><strong>{user.name}</strong><small className={`is-${status.replace(' ', '-')}`}>{status}</small></span>
+                    <b className="tabular-nums">{netCents > 0 ? '+' : ''}{formatCurrency(netCents, false, lang)}</b>
+                  </div>
+                );
+              })}
+            </div>
+          ) : <div className="dashboard-chart-empty">Housemate balances will appear after household setup.</div>}
+          <div className="dashboard-average-note"><span>Average per member</span><strong>{formatCurrency(averagePerMemberCents, false, lang)}</strong></div>
+        </article>
 
-          {/* 2. Category Progress Bars */}
-          <CategoryChart expenses={monthExpenses} />
-
-        </div>
-
-      </div>
+        <article className="dashboard-card dashboard-recent-card dashboard-reveal dashboard-reveal-4">
+          <div className="dashboard-section-heading">
+            <div><h2>Recent expenses</h2><p>Latest shared household activity</p></div>
+            <button className="dashboard-text-link" onClick={onNavigateToExpenses}>View all <ArrowRight size={15} /></button>
+          </div>
+          {recentExpenses.length > 0 ? (
+            <div className="dashboard-recent-list">
+              {recentExpenses.map((expense) => {
+                const payer = resolvePayer(expense, houseUsers);
+                const Icon = categoryIcons[expense.category];
+                const date = new Date(`${expense.date}T00:00:00`);
+                return (
+                  <button className="dashboard-expense-row" key={expense.id} onClick={onNavigateToExpenses} aria-label={`View ${expense.title} expense`}>
+                    <span className="dashboard-date-tile"><small>{date.toLocaleDateString('en-US', { month: 'short' })}</small><strong>{date.getDate()}</strong></span>
+                    <UserAvatar user={payer} size={34} />
+                    <span className="dashboard-expense-copy"><strong>{expense.title}</strong><small><Icon size={13} aria-hidden="true" /> {expense.category} / Paid by {payer.name}</small></span>
+                    <b className="tabular-nums">{formatCurrency(expense.amountCents, false, lang)}</b>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <button className="dashboard-empty-action" onClick={onNavigateToExpenses}><Receipt size={18} /><span>No expenses yet. Add the first one.</span></button>
+          )}
+        </article>
+      </section>
     </div>
   );
 };

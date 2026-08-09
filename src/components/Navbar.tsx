@@ -83,7 +83,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (favicon) favicon.href = logoSrc;
 
     const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = theme === 'dark' ? '#211B2B' : '#F1EBFF';
+    if (themeColor) themeColor.content = theme === 'dark' ? '#111512' : '#F4F4F1';
   }, [logoSrc, theme]);
 
   const handleLogoutClick = () => {
@@ -209,7 +209,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="nav-item-left">
                 <LayoutDashboard className="nav-icon" size={18} style={{ color: 'var(--accent-primary)' }} />
-                {!isCollapsed && <span>{t('dashboard')}</span>}
+                {!isCollapsed && <span>{lang === 'en' ? 'Overview' : t('dashboard')}</span>}
               </div>
             </button>
 
@@ -220,7 +220,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="nav-item-left">
                 <Receipt className="nav-icon" size={18} style={{ color: '#38bdf8' }} />
-                {!isCollapsed && <span>{t('householdExpenses')}</span>}
+                {!isCollapsed && <span>{lang === 'en' ? 'Expenses' : t('householdExpenses')}</span>}
               </div>
               {!isCollapsed && expenseCount !== undefined && expenseCount > 0 && (
                 <span className="nav-badge">{expenseCount}</span>
@@ -250,7 +250,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="nav-item-left">
                 <Building className="nav-icon" size={18} style={{ color: '#10b981' }} />
-                {!isCollapsed && <span>House Management</span>}
+                {!isCollapsed && <span>Household</span>}
               </div>
             </button>
           </nav>
@@ -265,7 +265,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="nav-item-left">
                 <Wallet className="nav-icon" size={18} style={{ color: 'var(--accent-amber)' }} />
-                {!isCollapsed && <span>{t('personalWallet')}</span>}
+                {!isCollapsed && <span>{lang === 'en' ? 'Personal' : t('personalWallet')}</span>}
               </div>
               {!isCollapsed && personalCount !== undefined && personalCount > 0 && (
                 <span className="nav-badge nav-badge-amber">
@@ -281,7 +281,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="nav-item-left">
                 <CreditCard className="nav-icon" size={18} style={{ color: 'var(--accent-cyan)' }} />
-                {!isCollapsed && <span>{t('paymentCards')}</span>}
+                {!isCollapsed && <span>{lang === 'en' ? 'Cards' : t('paymentCards')}</span>}
               </div>
               {!isCollapsed && cardsCount !== undefined && cardsCount > 0 && (
                 <span className="nav-badge nav-badge-cyan">
@@ -297,7 +297,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="nav-item-left">
                 <Calendar className="nav-icon" size={18} style={{ color: '#a855f7' }} />
-                {!isCollapsed && <span>{t('monthlyReport')}</span>}
+                {!isCollapsed && <span>{lang === 'en' ? 'Reports' : t('monthlyReport')}</span>}
               </div>
             </button>
           </nav>
@@ -312,7 +312,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <div className="nav-item-left">
                 <Settings className="nav-icon" size={18} style={{ color: '#ec4899' }} />
-                {!isCollapsed && <span>Settings & Account</span>}
+                {!isCollapsed && <span>Settings</span>}
               </div>
             </button>
           </nav>
@@ -350,7 +350,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           aria-current={activeTab === 'dashboard' ? 'page' : undefined}
         >
           <LayoutDashboard size={20} />
-          <span>{t('dashboard')}</span>
+          <span>{lang === 'en' ? 'Overview' : t('dashboard')}</span>
         </button>
 
         <button
@@ -359,7 +359,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           aria-current={activeTab === 'expenses' ? 'page' : undefined}
         >
           <Receipt size={20} />
-          <span>{t('householdExpenses')}</span>
+          <span>{lang === 'en' ? 'Expenses' : t('householdExpenses')}</span>
         </button>
 
         <button
@@ -368,7 +368,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           aria-current={activeTab === 'settlement' ? 'page' : undefined}
         >
           <ArrowLeftRight size={20} />
-          <span>{t('settlements')}</span>
+          <span>{lang === 'en' ? 'Settle' : t('settlements')}</span>
         </button>
 
         <button
@@ -377,7 +377,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           aria-current={activeTab === 'personal' ? 'page' : undefined}
         >
           <Wallet size={20} />
-          <span>Wallet</span>
+          <span>{lang === 'en' ? 'Personal' : t('personalWallet')}</span>
         </button>
 
         <button
@@ -425,9 +425,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <div className="mobile-menu-grid">
               {[
-                { tab: 'settlement' as const, label: t('settlements'), icon: ArrowLeftRight, count: settlementCount },
-                { tab: 'cards' as const, label: t('paymentCards'), icon: CreditCard, count: cardsCount },
-                { tab: 'monthly' as const, label: t('monthlyReport'), icon: Calendar },
+                { tab: 'cards' as const, label: lang === 'en' ? 'Cards' : t('paymentCards'), icon: CreditCard, count: cardsCount },
+                { tab: 'monthly' as const, label: lang === 'en' ? 'Reports' : t('monthlyReport'), icon: Calendar },
                 { tab: 'house' as const, label: 'Household', icon: Building },
                 { tab: 'settings' as const, label: 'Settings', icon: Settings },
               ].map(({ tab, label, icon: Icon, count }) => (
