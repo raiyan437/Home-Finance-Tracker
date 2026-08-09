@@ -103,10 +103,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const displayName = dbUserProfile?.displayName || userProfile.name || 'User';
   const profileAvatar = dbUserProfile ? dbUserProfile.avatar : firebaseUser?.photoURL || undefined;
 
-  const isLeader = Boolean(
-    dbUserProfile?.role === 'leader' ||
-    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === firebaseUser?.uid))
-  );
+  const isLeader = Boolean(currentHouse?.leaderUid === (dbUserProfile?.uid || firebaseUser?.uid));
 
   const syncLabel = syncState.status === 'saving'
     ? 'Saving'

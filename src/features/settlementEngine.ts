@@ -58,7 +58,7 @@ export const getCanonicalHouseMembers = (house: House): HouseMember[] => {
         ...member,
         // Prefer whichever index has a usable photo while preserving the
         // member list as the primary source for all other display fields.
-        ...(member.avatar || !indexedMember.avatar ? {} : { avatar: indexedMember.avatar }),
+        ...(member.avatarRemovedAt ? { avatar: undefined } : member.avatar || !indexedMember.avatar ? {} : { avatar: indexedMember.avatar }),
       };
     })
     .filter((member): member is HouseMember => Boolean(member));
@@ -77,7 +77,7 @@ export const getHouseUsers = (
     return canonicalMembers.map((m) => {
       const isCurrent = currentUser && (m.uid === (currentUser as any).uid || m.email === (currentUser as any).email);
       const resolvedName = (isCurrent && (currentUser as any).displayName) || m.displayName || m.email?.split('@')[0] || 'Member';
-      const rawAvatar = (isCurrent && (currentUser as any).avatar) || m.avatar;
+      const rawAvatar = isCurrent && !m.avatarRemovedAt ? (currentUser as any).avatar : m.avatar;
 
       const hasCustomPhoto =
         typeof rawAvatar === 'string' &&

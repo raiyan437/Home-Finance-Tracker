@@ -526,8 +526,10 @@ export const syncSaveUserIdentity = async (profile: UserProfile): Promise<SyncRe
 export const syncSaveUserAvatar = async (uid: string, avatarUrl: string | null): Promise<SyncResult> => profilePatch(
   uid,
   'profile-avatar',
-  avatarUrl ? { avatar: avatarUrl } : {},
-  avatarUrl ? [] : ['avatar'],
+  avatarUrl
+    ? { avatar: avatarUrl }
+    : { avatarRemovedAt: new Date().toISOString() },
+  avatarUrl ? ['avatarRemovedAt'] : ['avatar'],
 );
 
 export const syncSaveUserWalletSettings = async (uid: string, walletSettings: UserProfile['walletSettings']): Promise<SyncResult> => {
@@ -549,7 +551,7 @@ export const syncSaveUserMembership = async (uid: string, houseId: string | null
 export const syncSaveUser = async (profile: UserProfile): Promise<SyncResult> => aggregateResults([
   await syncSaveUserIdentity(profile),
   await syncSaveUserMembership(profile.uid, profile.houseId || null, profile.role || null),
-  ...(profile.avatar !== undefined ? [await syncSaveUserAvatar(profile.uid, profile.avatar)] : []),
+  ...(profile.avatar !== undefined || profile.avatarRemovedAt !== undefined ? [await syncSaveUserAvatar(profile.uid, profile.avatar || null)] : []),
   ...(profile.walletSettings !== undefined ? [await syncSaveUserWalletSettings(profile.uid, profile.walletSettings)] : []),
 ]);
 
@@ -585,8 +587,11 @@ export const getPendingProfileOverlay = (uid: string, profile: UserProfile): Use
     if (mutation.mutationType === 'profile-avatar') {
       if (mutation.deleteFields?.includes('avatar')) {
         const { avatar: _avatar, ...withoutAvatar } = result;
-        result = withoutAvatar;
-      } else if (typeof mutation.data?.avatar === 'string') result = { ...result, avatar: mutation.data.avatar };
+        result = { ...withoutAvatar, ...(typeof mutation.data?.avatarRemovedAt === 'string' ? { avatarRemovedAt: mutation.data.avatarRemovedAt } : {}) };
+      } else if (typeof mutation.data?.avatar === 'string') {
+        const { avatarRemovedAt: _avatarRemovedAt, ...withoutTombstone } = result;
+        result = { ...withoutTombstone, avatar: mutation.data.avatar };
+      }
     }
     if (mutation.mutationType === 'profile-wallet') {
       if (mutation.deleteFields?.includes('walletSettings')) {

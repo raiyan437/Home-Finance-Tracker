@@ -37,10 +37,7 @@ export const ExpenseListPage: React.FC<ExpenseListProps> = ({
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const myUid = dbUserProfile?.uid || activeUserId;
-  const isLeader = Boolean(
-    dbUserProfile?.role === 'leader' ||
-    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === activeUserId))
-  );
+  const isLeader = Boolean(currentHouse?.leaderUid === myUid);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => toLocalMonthKey());

@@ -4,6 +4,10 @@ import {
   createProfileFromIdentity,
   mergeProfileIntoCache,
   normalizeCloudProfile,
+  normalizeDisplayName,
+  normalizeEmail,
+  isValidDisplayName,
+  isValidEmail,
 } from './profileReconciliation';
 
 const identity = {
@@ -69,5 +73,22 @@ describe('cross-device profile reconciliation', () => {
       cashTrackedExpenseCents: 25_000,
       updatedAt: '2026-08-03T00:00:00.000Z',
     });
+  });
+
+  it('normalizes signup identity deterministically', () => {
+    expect(normalizeEmail('  Person@Example.COM ')).toBe('person@example.com');
+    expect(normalizeDisplayName('  Two   Names ')).toBe('Two Names');
+    expect(isValidEmail('person@example.com')).toBe(true);
+    expect(isValidDisplayName('Two Names')).toBe(true);
+    expect(isValidDisplayName('   ')).toBe(false);
+  });
+
+  it('does not resurrect an Auth photo after an explicit cloud tombstone', () => {
+    const profile = normalizeCloudProfile(
+      { ...identity, photoURL: 'https://auth.example/photo.png' },
+      { displayName: 'Cloud Person', avatarRemovedAt: '2026-08-04T12:00:00.000Z', createdAt: '2026-08-04T12:00:00.000Z' },
+    );
+    expect(profile.avatar).toBeUndefined();
+    expect(profile.avatarRemovedAt).toBe('2026-08-04T12:00:00.000Z');
   });
 });

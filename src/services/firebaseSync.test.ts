@@ -209,7 +209,7 @@ describe('Firebase sync reliability policy', () => {
       },
       {
         key: 'user-a/-/users/user-a/profile-avatar', mutationType: 'profile-avatar', collection: 'users', id: 'user-a', operation: 'set',
-        data: {}, deleteFields: ['avatar'], userUid: 'user-a', timestamp: now, retryCount: 0, maxRetries: 5, nextAttemptAt: now, mutationVersion: 2, status: 'pending',
+        data: { avatarRemovedAt: now }, deleteFields: ['avatar'], userUid: 'user-a', timestamp: now, retryCount: 0, maxRetries: 5, nextAttemptAt: now, mutationVersion: 2, status: 'pending',
       },
       {
         key: 'user-a/house-stale/users/user-a/profile-membership', mutationType: 'profile-membership', collection: 'users', id: 'user-a', operation: 'set',
@@ -222,6 +222,7 @@ describe('Firebase sync reliability policy', () => {
     });
     expect(overlay.walletSettings).toEqual({ monthlyBudgetCents: 5000 });
     expect(overlay.avatar).toBeUndefined();
+    expect(overlay.avatarRemovedAt).toBe(now);
     expect(overlay.houseId).toBeNull();
   });
 
@@ -229,6 +230,7 @@ describe('Firebase sync reliability policy', () => {
     await syncSaveUserAvatar('user-a', null);
     const [, payload, options] = setDocMock.mock.calls[0];
     expect(payload.avatar).toEqual({ __deleteField: true });
+    expect(payload.avatarRemovedAt).toEqual(expect.any(String));
     expect(options).toEqual({ merge: true });
   });
 

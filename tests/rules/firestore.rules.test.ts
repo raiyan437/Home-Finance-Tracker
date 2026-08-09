@@ -186,6 +186,38 @@ describe('household roster integrity', () => {
     batch.update(doc(db, 'houseCodes/HM-1000'), { houseId: 'house-1', name: 'Test House', leaderUid: 'member' });
     await assertSucceeds(batch.commit());
   });
+  it('allows only a single-member leader to close atomically and preserves audit reads', async () => {
+    await testEnv.clearFirestore();
+    const singleHouse = makeHouse([member('leader', 'leader')]);
+    await seed(singleHouse);
+    await withAdminDb((db) => setDoc(doc(db, 'expenses', 'expense-audit'), makeExpense({
+      id: 'expense-audit',
+      shares: [{ userId: 'leader', amountCents: 1000 }],
+      participantUids: ['leader'],
+    })));
+    const db = dbFor('leader');
+    const archive = {
+      id: 'house-1',
+      houseId: 'house-1',
+      code: singleHouse.code,
+      name: singleHouse.name,
+      leaderUid: 'leader',
+      members: singleHouse.members,
+      memberUids: singleHouse.memberUids,
+      memberMap: singleHouse.memberMap,
+      createdAt: now,
+      archivedAt: now,
+      archivedBy: 'leader',
+      auditPolicy: 'ledger-preserved-in-place',
+    };
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'houseArchives', 'house-1'), archive);
+    batch.delete(doc(db, 'houseCodes', singleHouse.code));
+    batch.delete(doc(db, 'houses', 'house-1'));
+    batch.update(doc(db, 'users', 'leader'), { houseId: null, role: null });
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(getDoc(doc(db, 'expenses', 'expense-audit')));
+  });
 });
 
 describe('expense, comment, and card authorization', () => {

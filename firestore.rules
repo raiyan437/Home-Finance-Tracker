@@ -20,6 +20,11 @@ service cloud.firestore {
              && ('memberUids' in houseData(houseId))
              && request.auth.uid in houseData(houseId).memberUids;
     }
+    function isArchivedHouseMember(houseId) {
+      return signedIn()
+             && exists(/databases/$(database)/documents/houseArchives/$(houseId))
+             && request.auth.uid in get(/databases/$(database)/documents/houseArchives/$(houseId)).data.memberUids;
+    }
 
     function isHouseLeader(houseId) {
       return signedIn()
@@ -73,7 +78,7 @@ service cloud.firestore {
 
     function validHouseMember(data) {
       return data is map
-             && data.keys().hasOnly(['uid', 'displayName', 'email', 'avatar', 'role', 'joinedAt'])
+             && data.keys().hasOnly(['uid', 'displayName', 'email', 'avatar', 'avatarRemovedAt', 'role', 'joinedAt'])
              && data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'joinedAt'])
              && validUid(data.uid)
              && validText(data.displayName, 120)
@@ -83,7 +88,8 @@ service cloud.firestore {
              && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
              && data.role in ['leader', 'member']
              && validTimestamp(data.joinedAt)
-             && (!('avatar' in data) || validImageUrl(data.avatar, 40000));
+             && (!('avatar' in data) || validImageUrl(data.avatar, 40000))
+             && (!('avatarRemovedAt' in data) || validTimestamp(data.avatarRemovedAt));
     }
 
     function validRosterMember(data, index) {
@@ -137,6 +143,43 @@ service cloud.firestore {
              && validRosterMember(data, 9);
     }
 
+    function validArchive(data) {
+      return data is map
+             && data.keys().hasOnly(['id', 'houseId', 'code', 'name', 'leaderUid', 'members', 'memberUids', 'memberMap', 'createdAt', 'archivedAt', 'archivedBy', 'auditPolicy'])
+             && data.keys().hasAll(['id', 'houseId', 'code', 'name', 'leaderUid', 'members', 'memberUids', 'memberMap', 'createdAt', 'archivedAt', 'archivedBy', 'auditPolicy'])
+             && data.id == data.houseId
+             && validUid(data.id)
+             && data.code is string
+             && data.code.size() >= 4
+             && data.code.size() <= 10
+             && validText(data.name, 120)
+             && validUid(data.leaderUid)
+             && data.members is list
+             && data.members.size() >= 1
+             && data.members.size() <= 10
+             && data.memberUids is list
+             && data.memberUids.size() == data.members.size()
+             && data.memberMap is map
+             && data.memberMap.keys().size() == data.memberUids.size()
+             && data.memberMap.keys().hasOnly(data.memberUids)
+             && data.memberMap.keys().hasAll(data.memberUids)
+             && data.leaderUid in data.memberUids
+             && validTimestamp(data.createdAt)
+             && validTimestamp(data.archivedAt)
+             && validUid(data.archivedBy)
+             && data.auditPolicy == 'ledger-preserved-in-place'
+             && validRosterMember(data, 0)
+             && validRosterMember(data, 1)
+             && validRosterMember(data, 2)
+             && validRosterMember(data, 3)
+             && validRosterMember(data, 4)
+             && validRosterMember(data, 5)
+             && validRosterMember(data, 6)
+             && validRosterMember(data, 7)
+             && validRosterMember(data, 8)
+             && validRosterMember(data, 9);
+    }
+
     function rosterListMatchesMapAt(data, index) {
       return data.memberUids.size() <= index
              || (data.members[index].uid == data.memberUids[index]
@@ -144,7 +187,7 @@ service cloud.firestore {
     }
 
     function rosterAvatarOnly(before, after) {
-      return before.diff(after).affectedKeys().hasOnly(['avatar'])
+       return before.diff(after).affectedKeys().hasOnly(['avatar', 'avatarRemovedAt'])
              && before.uid == after.uid
              && before.displayName == after.displayName
              && before.email == after.email
@@ -323,7 +366,7 @@ service cloud.firestore {
 
     function validProfile(uid, data) {
       return data is map
-             && data.keys().hasOnly(['uid', 'displayName', 'email', 'avatar', 'houseId', 'role', 'walletSettings', 'createdAt'])
+             && data.keys().hasOnly(['uid', 'displayName', 'email', 'avatar', 'avatarRemovedAt', 'houseId', 'role', 'walletSettings', 'createdAt'])
              && data.keys().hasAll(['uid', 'displayName', 'email', 'houseId', 'role', 'createdAt'])
              && data.uid == uid
              && validUid(data.uid)
@@ -334,7 +377,7 @@ service cloud.firestore {
              && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
              && (data.houseId == null || validUid(data.houseId))
              && (data.role == null || data.role in ['leader', 'member'])
-             && validProfileAvatar(data)
+             && validProfileAvatar(data) && (!('avatarRemovedAt' in data) || validTimestamp(data.avatarRemovedAt))
              && validWalletSettings(data)
              && validTimestamp(data.createdAt);
     }
@@ -411,7 +454,25 @@ service cloud.firestore {
                     && validText(request.resource.data.name, 120)
                     && validUid(request.resource.data.leaderUid)
                     && getAfter(/databases/$(database)/documents/houses/$(resource.data.houseId)).data.code == code;
-      allow delete: if signedIn() && resource.data.leaderUid == request.auth.uid;
+      allow delete: if signedIn()
+                    && resource.data.leaderUid == request.auth.uid
+                    && !existsAfter(/databases/$(database)/documents/houses/$(resource.data.houseId))
+                    && existsAfter(/databases/$(database)/documents/houseArchives/$(resource.data.houseId));
+    }
+
+    match /houseArchives/{houseId} {
+      allow get: if signedIn() && request.auth.uid in resource.data.memberUids;
+      allow list: if false;
+      allow create: if signedIn()
+                    && validArchive(request.resource.data)
+                    && request.resource.data.houseId == houseId
+                    && request.resource.data.archivedBy == request.auth.uid
+                    && get(/databases/$(database)/documents/houses/$(houseId)).data.leaderUid == request.auth.uid
+                    && get(/databases/$(database)/documents/houses/$(houseId)).data.memberUids.size() == 1
+                    && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.houseId == null
+                    && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == null;
+      allow update: if false;
+      allow delete: if false;
     }
 
     match /houses/{houseId} {
@@ -565,7 +626,12 @@ service cloud.firestore {
                              ? !('ledgerRevision' in request.resource.data)
                              : request.resource.data.ledgerRevision == resource.data.ledgerRevision)
                             && nonLedgerHouseUpdateAllowed()));
-      allow delete: if signedIn() && resource.data.leaderUid == request.auth.uid;
+      allow delete: if signedIn()
+                     && resource.data.leaderUid == request.auth.uid
+                     && resource.data.memberUids.size() == 1
+                     && existsAfter(/databases/$(database)/documents/houseArchives/$(houseId))
+                     && !existsAfter(/databases/$(database)/documents/houseCodes/$(resource.data.code))
+                     && clearedProfileAfter(resource.data.leaderUid);
     }
 
     match /expenses/{expenseId} {
@@ -597,7 +663,7 @@ service cloud.firestore {
 
       allow read: if signedIn() && (
         (isPersonal() && resource.data.ownerId == request.auth.uid)
-        || (!isPersonal() && isHouseMember(resource.data.houseId))
+        || (!isPersonal() && (isHouseMember(resource.data.houseId) || isArchivedHouseMember(resource.data.houseId)))
       );
       // Ten-member household ledger writes are sent through
       // mutateHouseholdLedger. Keeping the direct path bounded avoids the
@@ -640,7 +706,7 @@ service cloud.firestore {
     }
 
     match /settlements/{settlementId} {
-      allow read: if signedIn() && isHouseMember(resource.data.houseId);
+      allow read: if signedIn() && (isHouseMember(resource.data.houseId) || isArchivedHouseMember(resource.data.houseId));
       // Completed settlements are written only by confirmSettlement after it
       // recalculates the ledger and applies the idempotency key.
       allow create: if false;

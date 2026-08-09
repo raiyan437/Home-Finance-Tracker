@@ -9,6 +9,18 @@ export interface AuthIdentity {
 }
 
 const isRole = (value: unknown): value is HouseRole => value === 'leader' || value === 'member';
+export const normalizeEmail = (value: string): string => value.trim().toLowerCase();
+
+export const normalizeDisplayName = (value: string): string => value.trim().replace(/\s+/g, ' ');
+
+export const isValidEmail = (value: string): boolean => (
+  /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeEmail(value))
+);
+
+export const isValidDisplayName = (value: string): boolean => {
+  const normalized = normalizeDisplayName(value);
+  return normalized.length >= 1 && normalized.length <= 120;
+};
 
 const normalizeWalletSettings = (value: unknown): PersonalWalletSettings | undefined => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -31,10 +43,10 @@ export const createProfileFromIdentity = (
   identity: AuthIdentity,
   now = new Date().toISOString()
 ): UserProfile => {
-  const email = identity.email?.trim().toLowerCase() ?? '';
+  const email = identity.email ? normalizeEmail(identity.email) : '';
   return {
     uid: identity.uid,
-    displayName: identity.displayName?.trim() || email.split('@')[0] || 'User',
+    displayName: normalizeDisplayName(identity.displayName || '') || email.split('@')[0] || 'User',
     email,
     ...(identity.photoURL ? { avatar: identity.photoURL } : {}),
     houseId: null,
@@ -53,12 +65,16 @@ export const normalizeCloudProfile = (
     ? rawProfile.houseId
     : null;
   const walletSettings = normalizeWalletSettings(rawProfile.walletSettings);
+  const avatarRemovedAt = typeof rawProfile.avatarRemovedAt === 'string' && rawProfile.avatarRemovedAt
+    ? rawProfile.avatarRemovedAt
+    : undefined;
 
   return {
     uid: identity.uid,
-    displayName: rawProfile.displayName?.trim() || fallback.displayName,
-    email: identity.email?.trim().toLowerCase() || rawProfile.email?.trim().toLowerCase() || '',
-    ...(rawProfile.avatar || fallback.avatar ? { avatar: rawProfile.avatar || fallback.avatar } : {}),
+    displayName: normalizeDisplayName(rawProfile.displayName || '') || fallback.displayName,
+    email: identity.email ? normalizeEmail(identity.email) : normalizeEmail(rawProfile.email || ''),
+    ...(!avatarRemovedAt && (rawProfile.avatar || fallback.avatar) ? { avatar: rawProfile.avatar || fallback.avatar } : {}),
+    ...(avatarRemovedAt ? { avatarRemovedAt } : {}),
     houseId,
     role: houseId && isRole(rawProfile.role) ? rawProfile.role : null,
     ...(walletSettings ? { walletSettings } : {}),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { House } from '../types';
-import { getHouseUsers } from './settlementEngine';
+import { getCanonicalHouseMembers, getHouseUsers } from './settlementEngine';
 
 const baseHouse = (): House => ({
   id: 'house-live',
@@ -37,6 +37,15 @@ describe('house member avatar resolution', () => {
     const member = getHouseUsers(house).find((user) => user.id === 'member-uid');
 
     expect(member?.avatar).toBe('data:image/webp;base64,memberphoto');
+  });
+
+  it('does not resurrect a stale memberMap avatar after a removal tombstone', () => {
+    const house = baseHouse();
+    house.members[1].avatarRemovedAt = '2026-08-04T12:00:00.000Z';
+    house.memberMap = Object.fromEntries(house.members.map((member) => [member.uid, { ...member, avatar: member.uid === 'member-uid' ? 'stale-avatar' : member.avatar }]));
+
+    expect(getCanonicalHouseMembers(house).find((member) => member.uid === 'member-uid')?.avatar).toBeUndefined();
+    expect(getHouseUsers(house).find((user) => user.id === 'member-uid')?.avatar).toBeUndefined();
   });
 
   it('falls back to the member list when the denormalized index is stale', () => {

@@ -28,10 +28,7 @@ export const SettlementPage: React.FC<SettlementViewProps> = ({
 }) => {
   const { currentHouse, dbUserProfile, activeUserId } = useAuth();
   const myUid = dbUserProfile?.uid || activeUserId;
-  const isLeader = Boolean(
-    dbUserProfile?.role === 'leader' ||
-    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === activeUserId))
-  );
+  const isLeader = Boolean(currentHouse?.leaderUid === myUid);
   const houseUsers = useMemo(() => getHouseUsers(currentHouse, dbUserProfile), [currentHouse, dbUserProfile]);
 
   const isRecipientUser = (tx: SimplifiedTransaction): boolean => {

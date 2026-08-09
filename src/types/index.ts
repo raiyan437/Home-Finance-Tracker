@@ -18,6 +18,7 @@ export interface UserProfile {
   displayName: string;
   email: string;
   avatar?: string;
+  avatarRemovedAt?: string;
   houseId?: string | null;
   role?: HouseRole | null;
   walletSettings?: PersonalWalletSettings;
@@ -29,6 +30,7 @@ export interface HouseMember {
   displayName: string;
   email: string;
   avatar?: string;
+  avatarRemovedAt?: string;
   role: HouseRole;
   joinedAt: string;
 }
@@ -46,6 +48,20 @@ export interface House {
   createdAt: string;
 }
 
+export interface HouseArchive {
+  id: string;
+  houseId: string;
+  code: string;
+  name: string;
+  leaderUid: string;
+  members: HouseMember[];
+  memberUids: string[];
+  memberMap: Record<string, HouseMember>;
+  createdAt: string;
+  archivedAt: string;
+  archivedBy: string;
+  auditPolicy: 'ledger-preserved-in-place';
+}
 export interface User {
   id: UserId;
   name: string;

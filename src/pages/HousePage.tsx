@@ -25,7 +25,6 @@ interface HouseViewProps {
 
 export const HousePage: React.FC<HouseViewProps> = () => {
   const {
-    firebaseUser,
     dbUserProfile,
     currentHouse,
     createHouse,
@@ -34,6 +33,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
     kickMember,
     transferLeadership,
     leaveHouse,
+    closeHouse,
   } = useAuth();
 
   const [createHouseName, setCreateHouseName] = useState('');
@@ -46,15 +46,16 @@ export const HousePage: React.FC<HouseViewProps> = () => {
   const [kickingUid, setKickingUid] = useState<string | null>(null);
   const [transferringUid, setTransferringUid] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [closeConfirmation, setCloseConfirmation] = useState('');
+  const [isClosing, setIsClosing] = useState(false);
 
   // House Name Edit States
   const [isEditingHouseName, setIsEditingHouseName] = useState(false);
   const [newHouseNameInput, setNewHouseNameInput] = useState('');
   const [isSavingHouseName, setIsSavingHouseName] = useState(false);
 
-  const isLeader =
-    Boolean(firebaseUser && currentHouse && currentHouse.leaderUid === firebaseUser.uid) ||
-    dbUserProfile?.role === 'leader';
+  const isLeader = Boolean(currentHouse?.leaderUid === dbUserProfile?.uid);
 
   const handleCopyCode = () => {
     if (!currentHouse) return;
@@ -168,6 +169,22 @@ export const HousePage: React.FC<HouseViewProps> = () => {
     }
   };
 
+  const handleCloseHouseConfirm = async () => {
+    if (!currentHouse || closeConfirmation !== currentHouse.name) return;
+    setIsClosing(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await closeHouse();
+      setIsCloseModalOpen(false);
+      setCloseConfirmation('');
+      setSuccessMsg('Household closed. Financial audit records were preserved.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'The household could not be closed safely.');
+    } finally {
+      setIsClosing(false);
+    }
+  };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Header */}
@@ -358,6 +375,12 @@ export const HousePage: React.FC<HouseViewProps> = () => {
                     {shareFeedback}
                   </span>
                 )}
+                {isLeader && (
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => { setCloseConfirmation(''); setIsCloseModalOpen(true); }}>
+                    <AlertCircle size={15} />
+                    <span>Close Household</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -379,7 +402,7 @@ export const HousePage: React.FC<HouseViewProps> = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {currentHouse.members?.map((member) => {
-                  const memberIsLeader = member.role === 'leader' || member.uid === currentHouse.leaderUid;
+                  const memberIsLeader = member.uid === currentHouse.leaderUid;
                   const canKick = isLeader && !memberIsLeader;
 
                   return (
@@ -451,6 +474,20 @@ export const HousePage: React.FC<HouseViewProps> = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {isCloseModalOpen && currentHouse && (
+        <div role="dialog" aria-modal="true" aria-labelledby="close-house-title" style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: '20px', background: 'rgba(15, 23, 42, 0.72)' }}>
+          <section className="glass-card" style={{ width: 'min(520px, 100%)', borderTop: '4px solid var(--accent-rose)' }}>
+            <h2 id="close-house-title">Close {currentHouse.name}?</h2>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>This removes the active household and join code, clears your membership, and preserves financial audit data. Closure requires one active member, zero balances, and no pending mutations.</p>
+            <label className="form-label" htmlFor="close-house-confirmation">Type <strong>{currentHouse.name}</strong> to confirm</label>
+            <input id="close-house-confirmation" className="form-input" value={closeConfirmation} onChange={(event) => setCloseConfirmation(event.target.value)} autoFocus disabled={isClosing} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => { setIsCloseModalOpen(false); setCloseConfirmation(''); }} disabled={isClosing}>Cancel</button>
+              <button type="button" className="btn btn-danger" onClick={handleCloseHouseConfirm} disabled={isClosing || closeConfirmation !== currentHouse.name}>{isClosing ? 'Closing...' : 'Close household'}</button>
+            </div>
+          </section>
         </div>
       )}
     </div>

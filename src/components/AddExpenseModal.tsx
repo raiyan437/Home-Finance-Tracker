@@ -51,10 +51,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const activeUserKey = propsActiveUserId || dbUserProfile?.uid || activeUserId;
   const allUserIds = useMemo(() => houseUsers.map((u) => u.id), [houseUsers]);
 
-  const isLeader = Boolean(
-    dbUserProfile?.role === 'leader' ||
-    (currentHouse && currentHouse.leaderUid && (currentHouse.leaderUid === dbUserProfile?.uid || currentHouse.leaderUid === activeUserId))
-  );
+  const isLeader = Boolean(currentHouse?.leaderUid === activeUserKey);
   const myUid = dbUserProfile?.uid || activeUserKey;
   const myUidInUsers = useMemo(
     () => houseUsers.find((u) => u.id === myUid || (u.uid && u.uid === myUid))?.id || myUid,

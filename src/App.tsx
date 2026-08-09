@@ -117,8 +117,19 @@ const getTabFromPath = (): TabType | 'notfound' => {
 };
 
 const AppContent: React.FC = () => {
-  const { activeUserId, currentHouse, isAuthenticated, dbUserProfile, loading } = useAuth();
-  const currentUserId = dbUserProfile?.uid || activeUserId;
+  const {
+    activeUserId,
+    currentHouse,
+    isAuthenticated,
+    dbUserProfile,
+    firebaseUser,
+    loading,
+    profileInitializationError,
+    retryProfileInitialization,
+    householdRecoveryIssue,
+    logout,
+  } = useAuth();
+  const currentUserId = dbUserProfile?.uid || (loading ? '' : activeUserId);
   const currentHouseScope = currentHouse?.id ? houseStorageScope(currentHouse.id) : undefined;
   const currentPersonalScope = personalStorageScope(currentUserId);
   const currentHouseMembersRef = useRef(currentHouse?.members);
@@ -203,12 +214,19 @@ const AppContent: React.FC = () => {
   };
 
   // Modals state
+
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
 
   // Initialize data, theme, accent, and Firestore realtime subscriptions
   useEffect(() => {
+    if (loading || !dbUserProfile?.uid) {
+      setExpenses([]);
+      setSettlements([]);
+      setCards([]);
+      return;
+    }
     let cachedHouseExpenses = currentHouseScope ? loadExpenses(currentHouseScope) : [];
     let cachedPersonalExpenses = loadExpenses(currentPersonalScope);
     let cachedSettlements = currentHouseScope ? loadSettlements(currentHouseScope) : [];
@@ -322,7 +340,7 @@ const AppContent: React.FC = () => {
       unsubSt();
       unsubCards();
     };
-  }, [currentHouse?.id, currentHouseScope, currentPersonalScope, currentUserId, persistExpenses]);
+  }, [loading, dbUserProfile?.uid, currentHouse?.id, currentHouseScope, currentPersonalScope, currentUserId, persistExpenses]);
 
   // Generate every due occurrence exactly once using deterministic IDs.
   useEffect(() => {
@@ -334,7 +352,7 @@ const AppContent: React.FC = () => {
       (template) =>
         template.scope === 'personal' ||
         template.paidBy === currentUserId ||
-        dbUserProfile?.role === 'leader'
+        currentHouse?.leaderUid === currentUserId
     );
     if (result.generated.length > 0 || result.updatedTemplates.length > 0) {
       const previousExpenses = expenses;
@@ -359,7 +377,7 @@ const AppContent: React.FC = () => {
         persistExpenses(rolledBack);
       }).catch((error) => setActionError(classifyFirebaseError(error).userMessage));
     }
-  }, [expenses, currentHouse?.id, currentUserId, dbUserProfile?.role, persistExpenses]);
+  }, [expenses, currentHouse?.id, currentHouse?.leaderUid, currentUserId, persistExpenses]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -740,6 +758,40 @@ const AppContent: React.FC = () => {
   if (loading) {
     return <LoadingSpinner message="Authenticating session..." fullScreen />;
   }
+  if (profileInitializationError && firebaseUser && !dbUserProfile) {
+    return (
+      <main className="auth-shell">
+        <section className="glass-card auth-card" role="alert">
+          <h1>Finish account setup</h1>
+          <p>{profileInitializationError}</p>
+          <div className="auth-actions">
+            <button type="button" className="btn btn-primary" onClick={() => { void retryProfileInitialization().catch(() => undefined); }}>
+              Retry setup
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => { void logout(); }}>
+              Log out
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (householdRecoveryIssue) {
+    return (
+      <main className="auth-shell">
+        <section className="glass-card auth-card" role="alert">
+          <h1>Household recovery needs review</h1>
+          <p>This account appears in more than one active household. Nothing was selected automatically. Log out and ask an administrator to resolve the duplicate membership before continuing.</p>
+          <button type="button" className="btn btn-secondary" onClick={() => { void logout(); }}>
+            Log out
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+
 
   // Standalone Authentication Flow (Renders full LoginPage or SignUpPage when logged out)
   if (!isAuthenticated) {
