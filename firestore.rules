@@ -241,6 +241,54 @@ service cloud.firestore {
                  && get(/databases/$(database)/documents/cards/$(data.paymentMethod.cardId)).data.ownerId == data.paidBy);
     }
 
+    function commentCount(data) {
+      return 'comments' in data ? data.comments.size() : 0;
+    }
+
+    function commentsOrEmpty(data) {
+      return 'comments' in data ? data.comments : [];
+    }
+    function lastCommentAuthoredBy(data, uid) {
+      return data.size() == 1 ? data[0].userId == uid
+        : data.size() == 2 ? data[1].userId == uid
+        : data.size() == 3 ? data[2].userId == uid
+        : data.size() == 4 ? data[3].userId == uid
+        : data.size() == 5 ? data[4].userId == uid
+        : data.size() == 6 ? data[5].userId == uid
+        : data.size() == 7 ? data[6].userId == uid
+        : data.size() == 8 ? data[7].userId == uid
+        : data.size() == 9 ? data[8].userId == uid
+        : data.size() == 10 ? data[9].userId == uid
+        : data.size() == 11 ? data[10].userId == uid
+        : data.size() == 12 ? data[11].userId == uid
+        : data.size() == 13 ? data[12].userId == uid
+        : data.size() == 14 ? data[13].userId == uid
+        : data.size() == 15 ? data[14].userId == uid
+        : data.size() == 16 ? data[15].userId == uid
+        : data.size() == 17 ? data[16].userId == uid
+        : data.size() == 18 ? data[17].userId == uid
+        : data.size() == 19 ? data[18].userId == uid
+        : data.size() == 20 ? data[19].userId == uid
+        : false;
+    }
+    function validCommentUpdate(before, after) {
+      return before.scope == 'household'
+             && after.scope == 'household'
+             && before.houseId == after.houseId
+             && isHouseMember(before.houseId)
+             && ledgerAdvanced(before.houseId)
+             && before.diff(after).affectedKeys().hasOnly(['comments', 'updatedAt'])
+             && validTimestamp(after.updatedAt)
+             && after.comments is list
+             && commentCount(after) <= 20
+             && (
+               (commentCount(after) == commentCount(before) + 1
+                && after.comments.hasAll(commentsOrEmpty(before))
+                && lastCommentAuthoredBy(after.comments, request.auth.uid))
+               || (commentCount(after) == commentCount(before) - 1
+                   && commentsOrEmpty(before).hasAll(after.comments))
+             );
+    }
     function validExpense(data) {
       let shareCount = data.shares.size();
       return data is map
@@ -691,8 +739,13 @@ service cloud.firestore {
                           && (request.resource.data.paidBy == request.auth.uid || isHouseLeader(request.resource.data.houseId)))
                     );
       allow update: if signedIn()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasAny(['comments'])
+                    && validCommentUpdate(resource.data, request.resource.data)
+                    && request.resource.data.id == expenseId
+                    && request.resource.data.createdAt == resource.data.createdAt;
+      allow update: if signedIn()
                     && (request.resource.data.scope == 'personal' || request.resource.data.shares.size() <= 9)
-                    && commentsUnchanged(resource.data, request.resource.data)
+                     && commentsUnchanged(resource.data, request.resource.data)
                     && validExpense(request.resource.data)
                     && request.resource.data.id == expenseId
                     && request.resource.data.createdAt == resource.data.createdAt
@@ -707,9 +760,27 @@ service cloud.firestore {
 
     match /settlements/{settlementId} {
       allow read: if signedIn() && (isHouseMember(resource.data.houseId) || isArchivedHouseMember(resource.data.houseId));
-      // Completed settlements are written only by confirmSettlement after it
-      // recalculates the ledger and applies the idempotency key.
-      allow create: if false;
+      // Spark-plan clients confirm settlements in a Firestore transaction.
+      // The client recomputes the recommendation from the transaction snapshot;
+      // rules still bind the write to the authenticated recipient, the current
+      // roster, the current ledger revision, and a one-time idempotency key.
+      allow create: if signedIn()
+                    && validSettlement(request.resource.data)
+                    && request.resource.data.id == settlementId
+                    && request.resource.data.status == 'completed'
+                    && request.resource.data.houseId is string
+                    && isHouseMember(request.resource.data.houseId)
+                    && request.resource.data.fromUserId in houseData(request.resource.data.houseId).memberUids
+                    && request.resource.data.toUserId in houseData(request.resource.data.houseId).memberUids
+                    && request.resource.data.toUserId == request.auth.uid
+                    && request.resource.data.confirmedBy == request.auth.uid
+                    && request.resource.data.recommendationId is string
+                    && request.resource.data.idempotencyKey is string
+                    && request.resource.data.ledgerRevision is int
+                    && request.resource.data.ledgerRevision == ('ledgerRevision' in houseData(request.resource.data.houseId)
+                        ? houseData(request.resource.data.houseId).ledgerRevision
+                        : 0)
+                    && ledgerAdvanced(request.resource.data.houseId);
       allow update: if signedIn()
                     && validSettlement(request.resource.data)
                     && validSettlement(resource.data)

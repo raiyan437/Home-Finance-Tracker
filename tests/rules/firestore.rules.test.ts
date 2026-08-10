@@ -267,15 +267,17 @@ describe('expense, comment, and card authorization', () => {
     await assertFails(setDoc(doc(ownerDb, 'expenses/bad-date'), makeExpense({ id: 'bad-date', date: '2026-02-29' })));
   });
 
-  it('rejects direct comment rewrites so only callable transactions can mutate comments', async () => {
-    await commitLedgerWrite('leader', 'expense-1', makeExpense({ comments: [] }), 1);
+  it('allows a member comment through an atomic expense and ledger transaction', async () => {
+    await commitLedgerWrite('leader', 'expense-1', makeExpense(), 1);
     const db = dbFor('member');
-    await assertFails(updateDoc(doc(db, 'expenses/expense-1'), {
-      comments: [{ id: 'comment-1', userId: 'member', text: 'forged', createdAt: now }],
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'expenses/expense-1'), {
+      comments: [{ id: 'comment-1', userId: 'member', text: 'Looks good', createdAt: now }],
       updatedAt: '2026-08-04T12:01:00.000Z',
-    }));
+    });
+    batch.update(doc(db, 'houses/house-1'), { ledgerRevision: 2 });
+    await assertSucceeds(batch.commit());
   });
-
   it('validates card ownership, type, and schema', async () => {
     const db = dbFor('member');
     const card = { id: 'card-1', bankName: 'Example Bank', cardType: 'debit', color: 'linear-gradient(#111,#222)', ownerId: 'member', createdAt: now };
@@ -287,17 +289,32 @@ describe('expense, comment, and card authorization', () => {
 });
 
 describe('settlement integrity', () => {
-  it('rejects forged and duplicate completed settlements', async () => {
+  it('allows a valid recipient confirmation and rejects forged recipient data', async () => {
     const expense = makeExpense({ paidBy: 'member', shares: [{ userId: 'leader', amountCents: 1000 }], participantUids: ['leader'] });
     await commitLedgerWrite('member', 'expense-1', expense, 1);
-    const db = dbFor('member');
-    const forged = {
-      id: 'set-forged', fromUserId: 'member', toUserId: 'leader', amountCents: 1000, status: 'completed', houseId: 'house-1', createdAt: now, settledAt: now,
+    const leaderDb = dbFor('leader');
+    const valid = {
+      id: 'set-valid',
+      fromUserId: 'member',
+      toUserId: 'leader',
+      amountCents: 1000,
+      status: 'completed',
+      houseId: 'house-1',
+      createdAt: now,
+      settledAt: now,
+      recommendationId: 'sim-1-member-leader',
+      ledgerRevision: 1,
+      idempotencyKey: 'a'.repeat(64),
+      confirmedBy: 'leader',
     };
-    await assertFails(setDoc(doc(db, 'settlements/set-forged'), forged));
-    await assertFails(setDoc(doc(db, 'settlements/set-forged-2'), { ...forged, id: 'set-forged-2', recommendationId: 'sim-1-member-leader', ledgerRevision: 1, idempotencyKey: 'a'.repeat(64), confirmedBy: 'member' }));
-  });
+    const batch = writeBatch(leaderDb);
+    batch.set(doc(leaderDb, 'settlements/set-valid'), valid);
+    batch.update(doc(leaderDb, 'houses/house-1'), { ledgerRevision: 2 });
+    await assertSucceeds(batch.commit());
 
+    const forged = { ...valid, id: 'set-forged', toUserId: 'member', confirmedBy: 'leader', idempotencyKey: 'b'.repeat(64) };
+    await assertFails(setDoc(doc(leaderDb, 'settlements/set-forged'), forged));
+  });
   it('allows only an authorized, audited reversal with a matching revision advance', async () => {
     await withAdminDb((admin) => setDoc(doc(admin, 'settlements/set-valid'), {
       id: 'set-valid', fromUserId: 'member', toUserId: 'leader', amountCents: 100, status: 'completed', houseId: 'house-1', createdAt: now, settledAt: now,

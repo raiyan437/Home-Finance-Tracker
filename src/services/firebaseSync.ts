@@ -3,15 +3,21 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  getDocs,
   onSnapshot,
   query,
+  runTransaction,
   setDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, db, functions, isFirebaseConfigured } from '../config/firebase';
+import { auth, db, isFirebaseConfigured } from '../config/firebase';
 import type { Expense, ExpenseComment, House, PaymentCard, Settlement, UserProfile } from '../types';
+import {
+  evaluateSparkSettlementConfirmation,
+  getSparkHouseMemberIds,
+  idempotencyKeyFor,
+} from '../features/sparkLedger';
 
 export type SyncCollection = 'users' | 'houses' | 'houseCodes' | 'expenses' | 'settlements' | 'cards';
 export type SyncOperation = 'set' | 'delete';
@@ -417,12 +423,6 @@ export const subscribeSyncState = (onUpdate: (state: SyncState) => void): (() =>
   return () => syncSubscribers.delete(onUpdate);
 };
 
-const callableFunctions = () => {
-  if (functions) return functions;
-  if (auth?.app) return getFunctions(auth.app);
-  return null;
-};
-
 const performMergeWrite = async (mutation: PendingMutation, reference: ReturnType<typeof doc>): Promise<void> => {
   const cleanData = sanitizeForFirestore(mutation.data ?? {});
   const payload: Record<string, unknown> = { ...(cleanData as Record<string, unknown>) };
@@ -439,37 +439,133 @@ const performMergeWrite = async (mutation: PendingMutation, reference: ReturnTyp
   await setDoc(reference, payload, { merge: true });
 };
 
+const performHouseholdExpenseMutation = async (mutation: PendingMutation): Promise<void> => {
+  const houseId = mutation.houseId;
+  if (!db || !houseId) throw Object.assign(new Error('Cloud database is unavailable.'), { code: 'unavailable' });
+  const houseRef = doc(db, 'houses', houseId);
+  const expenseRef = doc(db, 'expenses', mutation.id);
+  await runTransaction(db, async (transaction) => {
+    const houseSnapshot = await transaction.get(houseRef);
+    const expenseSnapshot = await transaction.get(expenseRef);
+    if (!houseSnapshot.exists()) throw Object.assign(new Error('Household not found.'), { code: 'not-found' });
+    const house = { ...(houseSnapshot.data() as House), id: houseId };
+    const memberUids = getSparkHouseMemberIds(house);
+    const uid = currentUserUid();
+    if (!uid || !memberUids.includes(uid)) throw Object.assign(new Error('You are not a household member.'), { code: 'permission-denied' });
+    const currentRevision: number = typeof house.ledgerRevision === 'number' && Number.isSafeInteger(house.ledgerRevision) ? house.ledgerRevision : 0;
+    if (mutation.operation === 'delete') {
+      if (!expenseSnapshot.exists()) throw Object.assign(new Error('Expense not found.'), { code: 'not-found' });
+      const existing = expenseSnapshot.data() as Expense;
+      if (existing.scope === 'personal' || existing.houseId !== mutation.houseId) {
+        throw Object.assign(new Error('Expense does not belong to this household.'), { code: 'failed-precondition' });
+      }
+      if (existing.paidBy !== uid && house.leaderUid !== uid) {
+        throw Object.assign(new Error('Only the payer or leader can delete this expense.'), { code: 'permission-denied' });
+      }
+      transaction.delete(expenseRef);
+    } else {
+      const data = mutation.data as unknown as Expense | undefined;
+      if (!data) throw Object.assign(new Error('Expense data is missing.'), { code: 'invalid-argument' });
+      const existing = expenseSnapshot.exists() ? expenseSnapshot.data() as Expense : undefined;
+      if (existing && existing.paidBy !== uid && house.leaderUid !== uid) {
+        throw Object.assign(new Error('Only the payer or leader can update this expense.'), { code: 'permission-denied' });
+      }
+      transaction.set(expenseRef, sanitizeForFirestore(data) as unknown as Record<string, unknown>);
+    }
+    transaction.update(houseRef, { ledgerRevision: currentRevision + 1 });
+  });
+};
+
+const performCommentMutation = async (mutation: PendingMutation): Promise<void> => {
+  const houseId = mutation.houseId;
+  if (!db || !houseId) throw Object.assign(new Error('Cloud database is unavailable.'), { code: 'unavailable' });
+  const houseRef = doc(db, 'houses', houseId);
+  const expenseRef = doc(db, 'expenses', mutation.id);
+  await runTransaction(db, async (transaction) => {
+    const houseSnapshot = await transaction.get(houseRef);
+    const expenseSnapshot = await transaction.get(expenseRef);
+    if (!houseSnapshot.exists() || !expenseSnapshot.exists()) throw Object.assign(new Error('Expense not found.'), { code: 'not-found' });
+    const house = { ...(houseSnapshot.data() as House), id: houseId };
+    const uid = currentUserUid();
+    const memberUids = getSparkHouseMemberIds(house);
+    if (!uid || !memberUids.includes(uid)) throw Object.assign(new Error('You are not a household member.'), { code: 'permission-denied' });
+    const expense = expenseSnapshot.data() as Expense;
+    if (expense.scope === 'personal' || expense.houseId !== mutation.houseId) {
+      throw Object.assign(new Error('Comments are only available for household expenses.'), { code: 'permission-denied' });
+    }
+    const comments = Array.isArray(expense.comments) ? expense.comments : [];
+    let nextComments: ExpenseComment[];
+    if (mutation.mutationType === 'comment-add') {
+      const comment = mutation.data?.comment as unknown as ExpenseComment | undefined;
+      if (!comment || comment.userId !== uid) throw Object.assign(new Error('A comment must be authored by the signed-in user.'), { code: 'permission-denied' });
+      if (comment.id.length < 1 || comment.id.length > 128 || comment.text.trim().length < 1 || comment.text.length > 2000 || Number.isNaN(Date.parse(comment.createdAt))) throw Object.assign(new Error('The comment is invalid.'), { code: 'invalid-argument' });
+      if (comments.length >= 20) throw Object.assign(new Error('This expense has reached the comment limit.'), { code: 'resource-exhausted' });
+      if (comments.some((item) => item.id === comment.id)) throw Object.assign(new Error('This comment has already been submitted.'), { code: 'already-exists' });
+      nextComments = [...comments, comment];
+    } else {
+      const commentId = mutation.data?.commentId;
+      const target = comments.find((item) => item.id === commentId);
+      if (!target) throw Object.assign(new Error('Comment not found.'), { code: 'not-found' });
+      if (target.userId !== uid && house.leaderUid !== uid) throw Object.assign(new Error('Only the comment author or household leader can delete it.'), { code: 'permission-denied' });
+      nextComments = comments.filter((item) => item.id !== commentId);
+    }
+    transaction.update(expenseRef, { comments: nextComments, updatedAt: new Date().toISOString() });
+    const currentRevision: number = typeof house.ledgerRevision === 'number' && Number.isSafeInteger(house.ledgerRevision) ? house.ledgerRevision : 0;
+    transaction.update(houseRef, { ledgerRevision: currentRevision + 1 });
+  });
+};
+
+const performHouseholdSettlementMutation = async (mutation: PendingMutation): Promise<void> => {
+  const houseId = mutation.houseId;
+  if (!db || !houseId) throw Object.assign(new Error('Cloud database is unavailable.'), { code: 'unavailable' });
+  const houseRef = doc(db, 'houses', houseId);
+  const settlementRef = doc(db, 'settlements', mutation.id);
+  await runTransaction(db, async (transaction) => {
+    const houseSnapshot = await transaction.get(houseRef);
+    const settlementSnapshot = await transaction.get(settlementRef);
+    if (!houseSnapshot.exists() || !settlementSnapshot.exists()) throw Object.assign(new Error('Settlement not found.'), { code: 'not-found' });
+    const house = { ...(houseSnapshot.data() as House), id: houseId };
+    const uid = currentUserUid();
+    const memberUids = getSparkHouseMemberIds(house);
+    if (!uid || !memberUids.includes(uid)) throw Object.assign(new Error('You are not a household member.'), { code: 'permission-denied' });
+    const existing = settlementSnapshot.data() as Settlement;
+    if (mutation.operation === 'delete') {
+      if (house.leaderUid !== uid) throw Object.assign(new Error('Only the household leader can delete a settlement.'), { code: 'permission-denied' });
+      transaction.delete(settlementRef);
+    } else {
+      const data = mutation.data as unknown as Settlement | undefined;
+      if (!data || data.status !== 'reversed' || existing.status !== 'completed') {
+        throw Object.assign(new Error('Only a completed settlement can be reversed.'), { code: 'failed-precondition' });
+      }
+      if (existing.toUserId !== uid && house.leaderUid !== uid) {
+        throw Object.assign(new Error('Only the settlement recipient or household leader can reverse it.'), { code: 'permission-denied' });
+      }
+      transaction.update(settlementRef, { status: 'reversed', reversedAt: data.reversedAt, reversedBy: data.reversedBy });
+    }
+    const currentRevision: number = typeof house.ledgerRevision === 'number' && Number.isSafeInteger(house.ledgerRevision) ? house.ledgerRevision : 0;
+    transaction.update(houseRef, { ledgerRevision: currentRevision + 1 });
+  });
+};
+
 const performMutation = async (mutation: PendingMutation): Promise<void> => {
   if (!db) throw Object.assign(new Error('Cloud database is unavailable.'), { code: 'unavailable' });
   const signedInUid = currentUserUid();
   if (!signedInUid || signedInUid !== mutation.userUid) throw Object.assign(new Error('The signed-in account changed.'), { code: 'unauthenticated' });
 
-  const callable = callableFunctions();
   if (mutation.mutationType === 'comment-add' || mutation.mutationType === 'comment-delete') {
-    if (!callable) throw Object.assign(new Error('Cloud functions are unavailable.'), { code: 'unavailable' });
-    const functionName = mutation.mutationType === 'comment-add' ? 'addExpenseComment' : 'deleteExpenseComment';
-    if (mutation.mutationType === 'comment-add') {
-      await httpsCallable(callable, functionName)({ expenseId: mutation.id, comment: mutation.data?.comment });
-    } else {
-      await httpsCallable(callable, functionName)({ expenseId: mutation.id, commentId: mutation.data?.commentId });
-    }
+    await performCommentMutation(mutation);
     return;
   }
 
-  if (mutation.collection === 'expenses' || mutation.collection === 'settlements') {
-    const affectsLedger = Boolean(mutation.houseId);
-    if (affectsLedger) {
-      if (!callable) throw Object.assign(new Error('Cloud ledger functions are unavailable.'), { code: 'unavailable' });
-      await httpsCallable(callable, 'mutateHouseholdLedger')({
-        collection: mutation.collection,
-        operation: mutation.operation,
-        id: mutation.id,
-        houseId: mutation.houseId,
-        ...(mutation.operation === 'set' ? { data: sanitizeForFirestore(mutation.data ?? {}) } : {}),
-      });
-      return;
-    }
+  if (mutation.collection === 'expenses' && mutation.houseId) {
+    await performHouseholdExpenseMutation(mutation);
+    return;
   }
+  if (mutation.collection === 'settlements' && mutation.houseId) {
+    await performHouseholdSettlementMutation(mutation);
+    return;
+  }
+
 
   if (mutation.mutationType === 'house-with-code' && mutation.related) {
     const batch = writeBatch(db);
@@ -895,29 +991,81 @@ export const syncConfirmSettlement = async (
   transaction: { id: string; fromUserId: string; toUserId: string; amountCents: number },
   proofUrl?: string,
 ): Promise<Settlement> => {
-  if (!isFirebaseConfigured || !db) throw new Error('Cloud settlement confirmation is unavailable.');
-  const callable = callableFunctions();
-  if (!callable) throw new Error('Cloud functions are unavailable.');
-  const result = await httpsCallable<{
-    houseId: string;
-    expectedLedgerRevision: number;
-    recommendationId: string;
-    fromUserId: string;
-    toUserId: string;
-    amountCents: number;
-    proofUrl?: string;
-  }, { settlement: Settlement }>(callable, 'confirmSettlement')({
-    houseId,
-    expectedLedgerRevision: ledgerRevision,
-    recommendationId: transaction.id,
-    fromUserId: transaction.fromUserId,
-    toUserId: transaction.toUserId,
-    amountCents: transaction.amountCents,
-    ...(proofUrl ? { proofUrl } : {}),
-  });
-  return result.data.settlement;
-};
+  if (!isFirebaseConfigured || !db) throw Object.assign(new Error('Cloud settlement confirmation is unavailable.'), { code: 'unavailable' });
+  const uid = currentUserUid();
+  if (!uid) throw Object.assign(new Error('Sign in again to confirm this settlement.'), { code: 'unauthenticated' });
+  if (uid !== transaction.toUserId) {
+    throw Object.assign(new Error('Only the settlement recipient can confirm this payment.'), { code: 'permission-denied' });
+  }
 
+  const idempotencyKey = await idempotencyKeyFor(
+    houseId,
+    ledgerRevision,
+    transaction.id,
+    transaction.fromUserId,
+    transaction.toUserId,
+    transaction.amountCents,
+  );
+  const settlementId = `set-${idempotencyKey}`;
+  const houseRef = doc(db, 'houses', houseId);
+  const settlementRef = doc(db, 'settlements', settlementId);
+  const expenseQuery = query(
+    collection(db, 'expenses'),
+    where('houseId', '==', houseId),
+    where('scope', '==', 'household'),
+  );
+  const settlementQuery = query(collection(db, 'settlements'), where('houseId', '==', houseId));
+  const [expensesSnapshot, settlementsSnapshot] = await Promise.all([getDocs(expenseQuery), getDocs(settlementQuery)]);
+
+  return runTransaction(db, async (firestoreTransaction) => {
+    const houseSnapshot = await firestoreTransaction.get(houseRef);
+    const existingSnapshot = await firestoreTransaction.get(settlementRef);
+    if (!houseSnapshot.exists()) throw Object.assign(new Error('Household not found.'), { code: 'not-found' });
+
+    const house = { ...(houseSnapshot.data() as House), id: houseId };
+    const existing = existingSnapshot.exists() ? existingSnapshot.data() as Settlement : undefined;
+    const evaluation = evaluateSparkSettlementConfirmation({
+      house,
+      expenses: expensesSnapshot.docs.map((item) => item.data() as Expense),
+      settlements: settlementsSnapshot.docs.map((item) => item.data() as Settlement),
+      existing,
+      houseId,
+      expectedLedgerRevision: ledgerRevision,
+      recommendationId: transaction.id,
+      fromUserId: transaction.fromUserId,
+      toUserId: transaction.toUserId,
+      amountCents: transaction.amountCents,
+      idempotencyKey,
+      settlementId,
+    });
+    if (evaluation.kind === 'idempotent') return evaluation.existing;
+
+    const memberUids = getSparkHouseMemberIds(house);
+    if (!memberUids.includes(uid)) {
+      throw Object.assign(new Error('You are not a household member.'), { code: 'permission-denied' });
+    }
+    const currentRevision: number = typeof house.ledgerRevision === 'number' && Number.isSafeInteger(house.ledgerRevision) ? house.ledgerRevision : 0;
+    const now = new Date().toISOString();
+    const settlement: Settlement = {
+      id: settlementId,
+      houseId,
+      fromUserId: transaction.fromUserId,
+      toUserId: transaction.toUserId,
+      amountCents: transaction.amountCents,
+      status: 'completed',
+      recommendationId: transaction.id,
+      ledgerRevision,
+      idempotencyKey,
+      confirmedBy: uid,
+      createdAt: now,
+      settledAt: now,
+      ...(proofUrl ? { proofUrl } : {}),
+    };
+    firestoreTransaction.set(settlementRef, settlement as unknown as Record<string, unknown>);
+    firestoreTransaction.update(houseRef, { ledgerRevision: currentRevision + 1 });
+    return settlement;
+  });
+};
 export const syncDeleteSettlement = async (settlementId: string): Promise<SyncResult> => syncMutation({
   collection: 'settlements', id: settlementId, operation: 'delete', mutationType: 'document', writeMode: 'replace',
 });

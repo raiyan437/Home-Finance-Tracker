@@ -40,6 +40,12 @@ Record only reusable, evidence-backed lessons. Include the date and affected are
 - Evidence: `src/services/firebaseSync.ts` now guards the outbox and retry paths with `import.meta.env.PROD`, and `src/App.tsx` calls `clearOfflineOutbox()` before startup retry/listener effects. `npm test` (55 tests), `npx tsc -b`, `npm run lint`, `npm run build`, and a production-preview HTTP smoke check passed.
 - Consequence: Production financial state stays cloud-canonical and a hard refresh cannot resurrect a local queued status. A transient outage is surfaced as a failed action requiring an explicit retry; it is not silently persisted in browser storage.
 
+## 2026-08-10 ? Firebase Functions production blocker
+- FACT: The bound Firebase project has a Firestore default database in `asia-south1`, but `firebase functions:list` returns no deployed functions. The Cloud Functions API was initially disabled and became enabled during the deployment attempt.
+- FACT: Deploying the tested `functions/` package stopped because Artifact Registry/Cloud Build require the Firebase Blaze plan; the CLI explicitly refused to continue on Spark. No callable backend was deployed by the failed attempt.
+- Evidence: `firebase firestore:databases:list` returned the default database; `firebase functions:list --json` returned an empty result after API enablement; `firebase deploy --only functions` reported the Blaze requirement. Frontend tests (55), backend tests (10), lint, type-check, and production build passed.
+- Consequence: Cloud Functions remain unavailable on Spark; the approved resolution is the direct transaction and Rules migration recorded below. Do not attempt a Functions deployment unless the project intentionally moves to Blaze.
+
 ## Entry template
 
 ```text
@@ -49,3 +55,11 @@ Record only reusable, evidence-backed lessons. Include the date and affected are
 - Consequence: How future work should change.
 - Failed approach (if applicable): What failed and why.
 ```
+
+## 2026-08-10 ? Spark-plan direct-write migration
+- FACT: The production Firebase project is on Firestore free tier and has no deployed callable Functions; Spark rejects the Functions deployment before any callable backend can serve writes.
+- DECISION: Household expense, comment, settlement-reversal, and settlement-confirmation writes now use authenticated Firestore transactions with ledger revision advances and idempotency checks. The existing UI and business calculations remain unchanged.
+- FACT: Firestore Rules permit only bounded household expense writes, atomic member comments, recipient-bound settlement creation, and authorized reversals. A dedicated comment rule path avoids the 1,000-expression evaluator ceiling for normal expense edits.
+- Evidence: src/services/firebaseSync.ts, src/features/sparkLedger.ts, firestore.rules, and tests/rules/firestore.rules.test.ts; frontend tests (55), Rules emulator tests (15), function-logic tests (10), type-check, lint, production build, and preview smoke passed. Firestore Rules were released to home-finance-1ah277j9.
+- Consequence: The app can run on Firebase Spark without Cloud Functions. Production remains online-only; failed cloud writes roll back optimistic state instead of creating a durable offline queue.
+- Failed approach: Deploying functions/ on Spark was rejected by Firebase because Artifact Registry/Cloud Build require Blaze.

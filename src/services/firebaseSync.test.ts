@@ -11,7 +11,6 @@ const { setDocMock, deleteDocMock, authState } = vi.hoisted(() => ({
 vi.mock('../config/firebase', () => ({
   auth: authState,
   db: {},
-  functions: {},
   isFirebaseConfigured: true,
 }));
 
@@ -25,11 +24,6 @@ vi.mock('firebase/firestore', () => ({
   setDoc: setDocMock,
   where: vi.fn((...args: unknown[]) => args),
   writeBatch: vi.fn(),
-}));
-
-vi.mock('firebase/functions', () => ({
-  getFunctions: vi.fn(),
-  httpsCallable: vi.fn(),
 }));
 
 import {
