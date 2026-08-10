@@ -1,4 +1,4 @@
-import type { Expense, House, Settlement } from '../types';
+import type { Expense, House, HouseMember, Settlement } from '../types';
 
 const MAX_MEMBERS = 10;
 
@@ -32,6 +32,50 @@ export const getSparkHouseMemberIds = (house: House): string[] => {
     fail('failed-precondition', 'The household roster is not valid.');
   }
   return ids;
+};
+
+export interface SparkHouseRosterRepair {
+  memberUids: string[];
+  memberMap: Record<string, HouseMember>;
+}
+
+/**
+ * Builds only the denormalized roster indexes that can be derived without
+ * changing membership. Existing memberUids are authoritative when present:
+ * an inconsistent list requires administrative review instead of guessing.
+ */
+export const getSparkHouseRosterRepair = (house: House): SparkHouseRosterRepair | null => {
+  const members = Array.isArray(house.members) ? house.members : [];
+  const derivedUids = members.map((member) => member.uid);
+  const hasMemberUids = Object.prototype.hasOwnProperty.call(house, 'memberUids');
+  if (hasMemberUids && !Array.isArray(house.memberUids)) {
+    fail('failed-precondition', 'The household membership index is invalid.');
+  }
+  if (Array.isArray(house.memberUids)
+    && (house.memberUids.length !== derivedUids.length
+      || house.memberUids.some((uid, index) => uid !== derivedUids[index]))) {
+    fail('failed-precondition', 'The household membership index does not match its roster.');
+  }
+
+  const memberMap = Object.fromEntries(members.map((member) => [member.uid, member]));
+  const candidate: House = { ...house, memberUids: derivedUids, memberMap };
+  getSparkHouseMemberIds(candidate);
+
+  const existingMap = house.memberMap;
+  const mapMatches = Boolean(existingMap)
+    && Object.keys(existingMap || {}).length === derivedUids.length
+    && derivedUids.every((uid) => {
+      const existing = existingMap?.[uid];
+      const expected = memberMap[uid];
+      return Boolean(existing && expected)
+        && sameMember(
+          existing as unknown as Record<string, unknown>,
+          expected as unknown as Record<string, unknown>,
+        );
+    });
+  return Array.isArray(house.memberUids) && mapMatches
+    ? null
+    : { memberUids: derivedUids, memberMap };
 };
 
 const calculateRecommendations = (house: House, expenses: Expense[], settlements: Settlement[]) => {

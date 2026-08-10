@@ -39,6 +39,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { createId } from '../utils/ids';
+import { getSparkHouseRosterRepair } from '../features/sparkLedger';
 
 interface AuthContextType {
   activeUserId: UserId;
@@ -199,6 +200,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
     });
     return reconciledHouse;
+  };
+  const repairLegacyHouseRoster = async (profile: UserProfile, houseId: string): Promise<House | null> => {
+    if (!isFirebaseConfigured || !db) return null;
+    return runTransaction(db, async (transaction) => {
+      const houseRef = doc(db!, 'houses', houseId);
+      const snapshot = await transaction.get(houseRef);
+      if (!snapshot.exists()) return null;
+      const rawHouse = snapshot.data() as House;
+      const house = { ...rawHouse, id: houseId };
+      const authoritativeUids = Array.isArray(rawHouse.memberUids)
+        ? rawHouse.memberUids
+        : (Array.isArray(rawHouse.members) ? rawHouse.members.map((member) => member.uid) : []);
+      if (!authoritativeUids.includes(profile.uid)) return house;
+
+      const rosterRepair = getSparkHouseRosterRepair(house);
+      const missingDocumentId = typeof rawHouse.id !== 'string' || rawHouse.id !== houseId;
+      if (!rosterRepair && !missingDocumentId) return house;
+      const repair = {
+        ...(missingDocumentId ? { id: houseId } : {}),
+        ...(rosterRepair || {}),
+      };
+      transaction.update(houseRef, sanitizeForFirestore(repair));
+      return { ...house, ...repair };
+    });
   };
 
   const recoverRosterMembership = async (profile: UserProfile): Promise<UserProfile> => {
@@ -411,12 +436,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isFirebaseConfigured && db && targetHouseId) {
       try {
-        const docRef = doc(db, 'houses', targetHouseId);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const firestoreHouse = snap.data() as House;
+        const loadedHouse = await repairLegacyHouseRoster(profile, targetHouseId);
+        if (loadedHouse) {
+          const firestoreHouse = loadedHouse;
           // Verify user is still an active member in this house
-          const isStillMember = getCanonicalHouseMembers(firestoreHouse).some((member) => member.uid === profile.uid);
+          const authoritativeUids = Array.isArray(firestoreHouse.memberUids)
+            ? firestoreHouse.memberUids
+            : getCanonicalHouseMembers(firestoreHouse).map((member) => member.uid);
+          const isStillMember = authoritativeUids.includes(profile.uid);
           if (isStillMember) {
             const reconciledHouse = await reconcileProfileAvatarInHouse(profile, targetHouseId);
             const visibleHouse = reconciledHouse || firestoreHouse;

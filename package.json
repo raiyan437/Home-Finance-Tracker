@@ -8,8 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run src",
+    "audit:production": "node scripts/audit-production-firestore.cjs",
     "test:rules": "firebase emulators:exec --only firestore,storage \"npm.cmd exec -- vitest run tests/rules --no-file-parallelism\"",
-    "deploy:rules": "firebase deploy --only firestore:rules,storage",
+    "deploy:rules": "firebase deploy --only firestore:rules",
     "deploy:functions": "firebase deploy --only functions",
     "preview": "vite preview"
   },

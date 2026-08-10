@@ -37,6 +37,8 @@ import {
   reconcilePendingMutations,
   MAX_OUTBOX_RETRIES,
   readOutbox,
+  resetSyncState,
+  subscribeSyncState,
   syncSaveCard,
   syncSaveExpense,
   syncSaveUserAvatar,
@@ -94,6 +96,8 @@ beforeEach(() => {
   setDocMock.mockReset().mockResolvedValue(undefined);
   deleteDocMock.mockReset().mockResolvedValue(undefined);
   authState.currentUser = { uid: 'user-a' };
+  resetSyncState('user-a');
+  resetSyncState('user-b');
 });
 
 describe('Firebase sync reliability policy', () => {
@@ -205,6 +209,15 @@ describe('Firebase sync reliability policy', () => {
     expect(mergePending('expenses', [], 'user-a', undefined)).toEqual([]);
   });
 
+  it('does not publish one account failure to another account subscriber', async () => {
+    const userBStates: string[] = [];
+    const unsubscribe = subscribeSyncState((state) => userBStates.push(state.status), 'user-b');
+    setDocMock.mockRejectedValue({ code: 'permission-denied' });
+    await syncSaveExpense(personalExpense());
+    expect(userBStates.at(-1)).toBe('synced');
+    unsubscribe();
+  });
+
   it('stops retrying after the configured limit', async () => {
     localStorage.setItem('home_finance_sync_outbox_v2', JSON.stringify([
       outboxItem({
@@ -276,9 +289,19 @@ describe('Firebase sync reliability policy', () => {
   });
 
   it('writes wallet fields independently so concurrent settings survive', async () => {
-    await syncSaveUserWalletSettings('user-a', { monthlyBudgetCents: 5_000 });
+    await syncSaveUserWalletSettings('user-a', {
+      monthlyBudgetCents: 5_000,
+      cashOpeningBalanceCents: 2_500,
+      cashOpeningAt: now,
+      updatedAt: now,
+    });
     const [, payload, options] = setDocMock.mock.calls[0];
-    expect(payload).toEqual({ 'walletSettings.monthlyBudgetCents': 5_000 });
+    expect(payload).toEqual({
+      'walletSettings.monthlyBudgetCents': 5_000,
+      'walletSettings.cashOpeningBalanceCents': 2_500,
+      'walletSettings.cashOpeningAt': now,
+      'walletSettings.updatedAt': now,
+    });
     expect(options).toEqual({ merge: true });
   });
 });

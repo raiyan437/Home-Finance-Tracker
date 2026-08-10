@@ -13,6 +13,7 @@ dist-ssr
 *.local
 .env
 .env.*
+recovery-backups/
 
 # Python generated artifacts
 __pycache__/

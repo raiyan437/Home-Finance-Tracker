@@ -15,8 +15,9 @@ Run from the repository root:
 | `npm run dev` | Starts the Vite development server for local smoke testing. |
 | `npm run preview` | Serves the production build for a production-like smoke test. |
 | `npm run test:rules` | Starts Firestore and Storage emulators and runs `tests/rules` serially. Requires the Firebase emulator prerequisites, including a compatible Java runtime. |
+| `npm run audit:production` | Creates a git-ignored raw Firestore backup and reports aggregate referential-integrity findings. Requires Firebase CLI authentication and is read-only against production. |
 
-`npm run deploy:rules` and `npm run deploy:functions` are deployment commands, not validation; do not run them as tests.
+`npm run deploy:rules` deploys Firestore Rules only. `npm run deploy:functions` remains a deployment command but cannot succeed on the current Spark project. Deployment commands are not validation.
 
 ## Functions commands
 

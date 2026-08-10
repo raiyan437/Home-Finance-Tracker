@@ -45,6 +45,7 @@ import {
   classifyFirebaseError,
   clearOfflineOutbox,
   getSyncState,
+  resetSyncState,
   retryFailedSyncMutations,
   subscribeSyncState,
 } from './services/firebaseSync';
@@ -162,6 +163,7 @@ const AppContent: React.FC = () => {
   const [lang, setLang] = useState<Language>(() => (
     localStorage.getItem('home_finance_language') === 'bn' ? 'bn' : 'en'
   ));
+  const syncSessionRef = useRef<{ uid: string; houseId: string | null } | null>(null);
 
   // Clear queue records created by older production builds before any retry
   // or realtime listener can surface them in the sidebar. Firebase builds
@@ -186,8 +188,18 @@ const AppContent: React.FC = () => {
   }, [dbUserProfile?.uid, firebaseUser?.uid]);
 
   useEffect(() => {
+    const uid = firebaseUser?.uid && firebaseUser.uid === dbUserProfile?.uid ? firebaseUser.uid : '';
+    const houseId = currentHouse?.id || null;
+    const previous = syncSessionRef.current;
+    if (previous?.uid === uid && previous.houseId === houseId) return;
+    if (previous?.uid) resetSyncState(previous.uid);
+    if (uid) resetSyncState(uid);
+    syncSessionRef.current = uid ? { uid, houseId } : null;
+  }, [currentHouse?.id, dbUserProfile?.uid, firebaseUser?.uid]);
+
+  useEffect(() => {
     setSyncState(getSyncState(currentUserId));
-    return subscribeSyncState((nextState) => setSyncState(nextState));
+    return subscribeSyncState((nextState) => setSyncState(nextState), currentUserId);
   }, [currentUserId]);
 
   const handleTabChange = (nextTab: TabType) => {

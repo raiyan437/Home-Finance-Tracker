@@ -10,15 +10,49 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/houses/$(houseId)).data;
     }
 
-    function houseAfter(houseId) {
-      return getAfter(/databases/$(database)/documents/houses/$(houseId)).data;
-    }
-
     function isHouseMember(houseId) {
       return signedIn()
              && houseId is string
              && ('memberUids' in houseData(houseId))
              && request.auth.uid in houseData(houseId).memberUids;
+    }
+
+    function legacyMemberAt(data, index) {
+      return data.members.size() > index
+             && data.members[index] is map
+             && data.members[index].uid == request.auth.uid;
+    }
+
+    function isLegacyHouseMember(data) {
+      return signedIn()
+             && data is map
+             && !('memberUids' in data)
+             && data.members is list
+             && data.members.size() >= 1
+             && data.members.size() <= 10
+             && (
+               legacyMemberAt(data, 0)
+               || legacyMemberAt(data, 1)
+               || legacyMemberAt(data, 2)
+               || legacyMemberAt(data, 3)
+               || legacyMemberAt(data, 4)
+               || legacyMemberAt(data, 5)
+               || legacyMemberAt(data, 6)
+               || legacyMemberAt(data, 7)
+               || legacyMemberAt(data, 8)
+               || legacyMemberAt(data, 9)
+             );
+    }
+
+    function canReadHouse(data) {
+      return signedIn()
+             && data is map
+             && (
+               (('memberUids' in data)
+                && data.memberUids is list
+                && request.auth.uid in data.memberUids)
+               || isLegacyHouseMember(data)
+             );
     }
     function isArchivedHouseMember(houseId) {
       return signedIn()
@@ -405,8 +439,10 @@ service cloud.firestore {
     function validWalletSettings(data) {
       return !('walletSettings' in data)
              || (data.walletSettings is map
-                 && data.walletSettings.keys().hasOnly(['monthlyBudgetCents', 'cashBalanceCents', 'cashTrackedExpenseCents', 'updatedAt'])
+                 && data.walletSettings.keys().hasOnly(['monthlyBudgetCents', 'cashOpeningBalanceCents', 'cashOpeningAt', 'cashBalanceCents', 'cashTrackedExpenseCents', 'updatedAt'])
                  && (!('monthlyBudgetCents' in data.walletSettings) || (data.walletSettings.monthlyBudgetCents is int && data.walletSettings.monthlyBudgetCents >= 0 && data.walletSettings.monthlyBudgetCents <= 100000000000))
+                 && (!('cashOpeningBalanceCents' in data.walletSettings) || (data.walletSettings.cashOpeningBalanceCents is int && data.walletSettings.cashOpeningBalanceCents >= 0 && data.walletSettings.cashOpeningBalanceCents <= 100000000000))
+                 && (!('cashOpeningAt' in data.walletSettings) || validTimestamp(data.walletSettings.cashOpeningAt))
                  && (!('cashBalanceCents' in data.walletSettings) || (data.walletSettings.cashBalanceCents is int && data.walletSettings.cashBalanceCents >= 0 && data.walletSettings.cashBalanceCents <= 100000000000))
                  && (!('cashTrackedExpenseCents' in data.walletSettings) || (data.walletSettings.cashTrackedExpenseCents is int && data.walletSettings.cashTrackedExpenseCents >= 0 && data.walletSettings.cashTrackedExpenseCents <= 100000000000))
                  && (!('updatedAt' in data.walletSettings) || validTimestamp(data.walletSettings.updatedAt)));
@@ -525,7 +561,7 @@ service cloud.firestore {
 
     match /houses/{houseId} {
       allow get: if signedIn()
-                 && (request.auth.uid in resource.data.memberUids || resource.data.publicJoin == true);
+                 && (canReadHouse(resource.data) || resource.data.publicJoin == true);
       allow list: if signedIn() && request.auth.uid in resource.data.memberUids;
       allow create: if signedIn()
                     && validRoster(request.resource.data)
@@ -652,10 +688,51 @@ service cloud.firestore {
            && rosterListMatchesMapAt(request.resource.data, 8)
            && rosterListMatchesMapAt(request.resource.data, 9)
          );
-      }
-      allow update: if signedIn()
-                    && ((resource.data.memberUids.size() <= 9
-                         && request.resource.data.keys().hasOnly(['id', 'code', 'name', 'leaderUid', 'members', 'memberUids', 'memberMap', 'publicJoin', 'ledgerRevision', 'createdAt'])
+       }
+       function legacyRosterRepairAllowed() {
+         return signedIn()
+                && (resource.data.leaderUid == request.auth.uid
+                    || (resource.data.members.size() <= 9 && canReadHouse(resource.data)))
+                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['id', 'memberUids', 'memberMap'])
+                 && request.resource.data.id == houseId
+                 && request.resource.data.members is list
+                && request.resource.data.members.size() >= 1
+                && request.resource.data.members.size() <= 10
+                && request.resource.data.memberUids is list
+                && request.resource.data.memberUids.size() == request.resource.data.members.size()
+                && request.resource.data.memberUids.toSet().size() == request.resource.data.memberUids.size()
+                && request.resource.data.memberMap is map
+                && request.resource.data.memberMap.keys().size() == request.resource.data.memberUids.size()
+                && request.resource.data.memberMap.keys().hasOnly(request.resource.data.memberUids)
+                && request.resource.data.memberMap.keys().hasAll(request.resource.data.memberUids)
+                && request.resource.data.leaderUid in request.resource.data.memberUids
+                && (!('memberUids' in resource.data) || request.resource.data.memberUids == resource.data.memberUids)
+                && validRosterRepairMember(0)
+                && validRosterRepairMember(1)
+                && validRosterRepairMember(2)
+                && validRosterRepairMember(3)
+                && validRosterRepairMember(4)
+                && validRosterRepairMember(5)
+                && validRosterRepairMember(6)
+                && validRosterRepairMember(7)
+                && validRosterRepairMember(8)
+                && validRosterRepairMember(9);
+       }
+       function validRosterRepairMember(index) {
+         return request.resource.data.memberUids.size() <= index
+                || (resource.data.members[index] is map
+                    && validUid(resource.data.members[index].uid)
+                    && request.resource.data.memberUids[index] == resource.data.members[index].uid
+                    && request.resource.data.memberMap[request.resource.data.memberUids[index]] == resource.data.members[index]);
+       }
+       // Keep legacy index repair on its own rule path so it does not share the
+       // evaluator budget with the full lifecycle/ledger update expression.
+       allow update: if signedIn() && legacyRosterRepairAllowed();
+       allow update: if signedIn()
+                     && ((('memberUids' in resource.data)
+                          && resource.data.memberUids is list
+                          && resource.data.memberUids.size() <= 9
+                          && request.resource.data.keys().hasOnly(['id', 'code', 'name', 'leaderUid', 'members', 'memberUids', 'memberMap', 'publicJoin', 'ledgerRevision', 'createdAt'])
                          && request.resource.data.id == resource.data.id
                          && request.resource.data.code == resource.data.code
                          && request.resource.data.name == resource.data.name
@@ -670,10 +747,10 @@ service cloud.firestore {
                          && request.auth.uid in resource.data.memberUids
                          && request.resource.data.ledgerRevision is int
                          && request.resource.data.ledgerRevision == ('ledgerRevision' in resource.data ? resource.data.ledgerRevision + 1 : 1))
-                        || ((!('ledgerRevision' in resource.data)
-                             ? !('ledgerRevision' in request.resource.data)
-                             : request.resource.data.ledgerRevision == resource.data.ledgerRevision)
-                            && nonLedgerHouseUpdateAllowed()));
+                         || ((!('ledgerRevision' in resource.data)
+                               ? !('ledgerRevision' in request.resource.data)
+                               : request.resource.data.ledgerRevision == resource.data.ledgerRevision)
+                             && nonLedgerHouseUpdateAllowed()));
       allow delete: if signedIn()
                      && resource.data.leaderUid == request.auth.uid
                      && resource.data.memberUids.size() == 1

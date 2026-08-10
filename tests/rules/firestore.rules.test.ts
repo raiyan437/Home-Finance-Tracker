@@ -108,6 +108,51 @@ afterAll(async () => {
 });
 
 describe('household roster integrity', () => {
+  it('allows only an existing legacy roster member to restore derived indexes', async () => {
+    await testEnv.clearFirestore();
+    const canonical = makeHouse();
+    const { memberUids: _memberUids, memberMap: _memberMap, ...legacy } = canonical;
+    await withAdminDb(async (db) => {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'houses/house-1'), { ...legacy, id: 'wrong-legacy-id', publicJoin: false });
+      batch.set(doc(db, 'users/leader'), makeProfile('leader', 'house-1', 'leader'));
+      batch.set(doc(db, 'users/member'), makeProfile('member', 'house-1', 'member'));
+      await batch.commit();
+    });
+
+    const memberDb = dbFor('member');
+    await assertSucceeds(getDoc(doc(memberDb, 'houses/house-1')));
+    await assertFails(getDoc(doc(dbFor('outsider'), 'houses/house-1')));
+    await assertSucceeds(updateDoc(doc(memberDb, 'houses/house-1'), {
+      id: 'house-1',
+      memberUids: canonical.memberUids,
+      memberMap: canonical.memberMap,
+    }));
+    await assertFails(updateDoc(doc(memberDb, 'houses/house-1'), {
+      memberUids: ['leader', 'member', 'outsider'],
+      memberMap: { ...canonical.memberMap, outsider: member('outsider') },
+    }));
+  });
+
+  it('repairs a ten-member legacy roster within the Rules evaluator budget', async () => {
+    await testEnv.clearFirestore();
+    const tenMembers = [member('leader', 'leader'), ...Array.from({ length: 9 }, (_, index) => member(`member-${index + 1}`))];
+    const canonical = makeHouse(tenMembers);
+    const { memberUids: _memberUids, memberMap: _memberMap, ...legacy } = canonical;
+    await withAdminDb(async (db) => {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'houses/house-1'), { ...legacy, publicJoin: false });
+      for (const item of tenMembers) batch.set(doc(db, 'users', item.uid), makeProfile(item.uid, 'house-1', item.role));
+      await batch.commit();
+    });
+    const db = dbFor('leader');
+    await assertSucceeds(getDoc(doc(db, 'houses/house-1')));
+    await assertSucceeds(updateDoc(doc(db, 'houses/house-1'), {
+      memberUids: canonical.memberUids,
+      memberMap: canonical.memberMap,
+    }));
+  });
+
   it('allows leader management and blocks a member from editing another member', async () => {
     const leaderDb = dbFor('leader');
     await assertSucceeds(updateDoc(doc(leaderDb, 'houses/house-1'), { name: 'Renamed House' }));
@@ -285,6 +330,24 @@ describe('expense, comment, and card authorization', () => {
     await assertFails(setDoc(doc(db, 'cards/card-bad'), { ...card, id: 'card-bad', cardType: 'prepaid' }));
     await assertFails(updateDoc(doc(db, 'cards/card-1'), { ownerId: 'leader' }));
     await assertFails(getDoc(doc(dbFor('leader'), 'cards/card-1')));
+  });
+
+  it('accepts current cash-opening wallet fields and rejects invalid values', async () => {
+    const db = dbFor('member');
+    await assertSucceeds(updateDoc(doc(db, 'users/member'), {
+      walletSettings: {
+        monthlyBudgetCents: 50_000,
+        cashOpeningBalanceCents: 12_500,
+        cashOpeningAt: now,
+        updatedAt: now,
+      },
+    }));
+    await assertFails(updateDoc(doc(db, 'users/member'), {
+      walletSettings: {
+        cashOpeningBalanceCents: -1,
+        cashOpeningAt: 'not-a-timestamp',
+      },
+    }));
   });
 });
 

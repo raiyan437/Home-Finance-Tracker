@@ -104,7 +104,7 @@ const ONLINE_ONLY_SYNC = isFirebaseConfigured && import.meta.env.PROD;
 
 let flushPromise: Promise<void> | null = null;
 let mutationSequence = 0;
-const syncSubscribers = new Set<(state: SyncState) => void>();
+const syncSubscribers = new Set<{ userUid?: string; onUpdate: (state: SyncState) => void }>();
 const lastStatusByUid = new Map<string, UserSyncStatus>();
 const lastErrorByUid = new Map<string, SyncErrorInfo>();
 
@@ -170,6 +170,19 @@ export const classifyFirebaseError = (error: unknown): SyncErrorInfo => {
     userMessage: safeMessageFor(kind, code),
     occurredAt: new Date().toISOString(),
   };
+};
+
+const reportProductionMutationFailure = (mutation: PendingMutation, error: SyncErrorInfo): void => {
+  if (!import.meta.env.PROD) return;
+  console.error('[firebase-sync] Cloud mutation failed', {
+    code: codeWithoutNamespace(error.code),
+    kind: error.kind,
+    collection: mutation.collection,
+    operation: mutation.operation,
+    mutationType: mutation.mutationType,
+    householdScoped: Boolean(mutation.houseId),
+    authenticatedAccountMatches: currentUserUid() === mutation.userUid,
+  });
 };
 
 const currentUserUid = (): string | null => auth?.currentUser?.uid || null;
@@ -375,17 +388,26 @@ const resultFor = (status: SyncResultStatus, mutationKey?: string, error?: SyncE
   ...(mutationKey ? { mutationKey } : {}),
 });
 
-const publishSyncState = (uid?: string | null): void => {
-  const targetUid = uid || currentUserUid();
-  const state = getSyncState(targetUid || undefined);
-  syncSubscribers.forEach((subscriber) => subscriber(state));
+const publishSyncState = (): void => {
+  syncSubscribers.forEach((subscriber) => {
+    subscriber.onUpdate(getSyncState(subscriber.userUid || currentUserUid() || undefined));
+  });
 };
 
 const setLastStatus = (uid: string, status: UserSyncStatus, error?: SyncErrorInfo): void => {
   lastStatusByUid.set(uid, status);
   if (error) lastErrorByUid.set(uid, error);
   else if (status === 'synced') lastErrorByUid.delete(uid);
-  publishSyncState(uid);
+  publishSyncState();
+};
+
+/** Clears transient status when an auth or household session boundary changes. */
+export const resetSyncState = (userUid?: string): void => {
+  const uid = userUid || currentUserUid();
+  if (!uid) return;
+  lastStatusByUid.delete(uid);
+  lastErrorByUid.delete(uid);
+  publishSyncState();
 };
 
 export const getSyncState = (userUid?: string): SyncState => {
@@ -417,10 +439,11 @@ export const getSyncState = (userUid?: string): SyncState => {
   return { status: 'synced', pendingCount: 0, failedCount: 0, canRetry: false };
 };
 
-export const subscribeSyncState = (onUpdate: (state: SyncState) => void): (() => void) => {
-  syncSubscribers.add(onUpdate);
-  onUpdate(getSyncState());
-  return () => syncSubscribers.delete(onUpdate);
+export const subscribeSyncState = (onUpdate: (state: SyncState) => void, userUid?: string): (() => void) => {
+  const subscriber = { userUid, onUpdate };
+  syncSubscribers.add(subscriber);
+  onUpdate(getSyncState(userUid));
+  return () => { syncSubscribers.delete(subscriber); };
 };
 
 const performMergeWrite = async (mutation: PendingMutation, reference: ReturnType<typeof doc>): Promise<void> => {
@@ -614,6 +637,7 @@ const syncMutation = async (input: Omit<MutationInput, 'userUid'>, requestedUid?
     return resultFor('synced', mutation.key);
   } catch (error) {
     const classified = classifyFirebaseError(error);
+    reportProductionMutationFailure(mutation, classified);
     if (!ONLINE_ONLY_SYNC) {
       const stored = enqueueMutation(mutation, classified);
       if (classified.kind === 'retryable') {
@@ -681,7 +705,7 @@ export const syncSaveUserAvatar = async (uid: string, avatarUrl: string | null):
 
 export const syncSaveUserWalletSettings = async (uid: string, walletSettings: UserProfile['walletSettings']): Promise<SyncResult> => {
   if (!walletSettings) return profilePatch(uid, 'profile-wallet', {}, ['walletSettings']);
-  const fields = Object.entries(walletSettings).filter(([key]) => key !== 'updatedAt');
+  const fields = Object.entries(walletSettings);
   const data = fields.length > 0
     ? { walletSettings: Object.fromEntries(fields) }
     : {};
@@ -770,7 +794,7 @@ export const getPendingProfileOverlay = (uid: string, profile: UserProfile): Use
 
 export const discardPendingUserProfileMutation = (uid: string): void => {
   writeOutbox(readOutbox().filter((item) => !(item.collection === 'users' && item.userUid === uid && item.status === 'pending')));
-  publishSyncState(uid);
+  publishSyncState();
 };
 
 const applyPendingToCollection = <T extends { id: string }>(collectionName: SyncCollection, cloudItems: T[], userUid?: string, houseId?: string | null): T[] => {
@@ -852,7 +876,7 @@ export const reconcilePendingMutations = <T extends { id: string }>(
   if (uid) {
     const hasPendingForUser = readOutbox().some((item) => item.userUid === uid && item.status === 'pending');
     if (!hasPendingForUser) setLastStatus(uid, 'synced');
-    else publishSyncState(uid);
+    else publishSyncState();
   }
   return acknowledged.length;
 };
@@ -905,7 +929,7 @@ export const flushSyncOutbox = async (force = false): Promise<void> => {
       const action = await flushOne(mutation, force);
       if (action === 'stop') break;
     }
-    publishSyncState(uid);
+    publishSyncState();
   })().finally(() => { flushPromise = null; });
   return flushPromise;
 };
@@ -923,7 +947,7 @@ export const retryFailedSyncMutations = async (): Promise<void> => {
       : item
   ));
   writeOutbox(next);
-  publishSyncState(uid);
+  publishSyncState();
   await flushSyncOutbox(true);
 };
 

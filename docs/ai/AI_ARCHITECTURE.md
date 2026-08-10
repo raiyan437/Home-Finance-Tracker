@@ -1,10 +1,10 @@
 # Verified architecture
 
-Last verified: 2026-08-09. This map describes the implementation, not historical proposals.
+Last verified: 2026-08-10. This map describes the implementation and verified Spark production deployment, not historical proposals.
 
 ## System shape
 
-The project is a React single-page application with a Firebase-backed cloud path and scoped browser persistence for local/offline continuity. A separate CommonJS Firebase Functions package performs trusted household ledger/comment/settlement mutations. Firebase Firestore and Storage rules provide server-side access control.
+The project is a React single-page application with a Firebase-backed cloud path and scoped browser persistence. Configured production builds are online-only and use authenticated Firestore transactions plus Firestore Rules for household ledger/comment/settlement mutations. A CommonJS Functions package remains tested source but is not deployed on the Spark project.
 
 ```text
 Browser
@@ -15,13 +15,13 @@ Browser
          -> pages/ and components/
          -> features/ (domain calculations and validation)
          -> services/storage.ts (scoped LocalStorage/cache/backup)
-         -> services/firebaseSync.ts (Firestore listeners, outbox, callable functions)
-         -> services/attachments.ts (Cloud Storage)
+         -> services/firebaseSync.ts (Firestore listeners, direct transactions, scoped status)
+         -> services/attachments.ts (Storage integration; unavailable in current production project)
 
-Firebase
-  Auth + Firestore + Storage
-  Cloud Functions: trusted ledger, comments, settlement confirmation
-  firestore.rules + storage.rules: authorization/schema boundaries
+Firebase production
+  Auth + Firestore (Spark)
+  firestore.rules: authorization/schema and transaction boundary
+  no deployed Functions; Storage not initialized
 ```
 
 ## Frontend composition
@@ -47,14 +47,14 @@ Firebase
 ## Persistence and synchronization
 
 - `storage.ts` uses house- and user-scoped LocalStorage keys for household expenses/settlements/cards and personal expenses. It also validates backup import/export payloads.
-- `firebaseSync.ts` subscribes to house expenses, owner personal expenses, settlements, cards, and the current house. It classifies failures, maintains a UID/house-scoped mutation outbox with bounded retries, merges pending state, and exposes sync status.
-- Household ledger and comment mutations call Cloud Functions; other supported mutations use Firestore documents through the sync layer.
+- `firebaseSync.ts` subscribes to house expenses, owner personal expenses, settlements, cards, and the current house. It classifies failures and exposes account-scoped sync status. Production never persists failed mutations to an offline outbox.
+- Household ledger, comment, and settlement mutations use authenticated Firestore transactions with Rules-enforced invariants on Spark.
 - `attachments.ts` stores avatars, receipts, and settlement proofs in Cloud Storage.
 - Offline/local authentication support is implemented in `mockAuthDatabase.ts`; stored local credentials are hashed according to current tests.
 
 ## Cloud-side boundaries
 
-`functions/index.js` exports:
+`functions/index.js` exports the following tested alternatives, but none are deployed in the current Spark project:
 
 - `mutateHouseholdLedger`
 - `addExpenseComment`
@@ -74,6 +74,6 @@ Firestore collections referenced by current code include `users`, `houses`, `hou
 ## Architecture risks and unassessed areas
 
 - `App.tsx`, `AuthContext.tsx`, and `firebaseSync.ts` are large orchestration units; changes can cross UI, auth, persistence, and offline boundaries. This is an observation, not an authorization to refactor.
-- The authoritative production host is **NEEDS VERIFICATION** because Vercel and GitHub Pages deployment evidence coexist.
-- Exact production rules/functions parity with this repository is **NOT ASSESSED**.
+- Both Vercel and GitHub Pages are production hosts; each must be verified after a push to `main`.
+- Firestore Rules are deployed explicitly with `npm run deploy:rules`. GitHub Pages CI does not deploy Rules.
 - No end-to-end browser automation configuration was found. Manual coverage exists under `Tester/`.
