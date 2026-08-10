@@ -43,6 +43,7 @@ import {
   syncAddExpenseComment,
   syncDeleteExpenseComment,
   classifyFirebaseError,
+  clearOfflineOutbox,
   getSyncState,
   retryFailedSyncMutations,
   subscribeSyncState,
@@ -161,6 +162,14 @@ const AppContent: React.FC = () => {
   const [lang, setLang] = useState<Language>(() => (
     localStorage.getItem('home_finance_language') === 'bn' ? 'bn' : 'en'
   ));
+
+  // Clear queue records created by older production builds before any retry
+  // or realtime listener can surface them in the sidebar. Firebase builds
+  // are intentionally online-only; failed writes roll back instead of being
+  // persisted in browser storage.
+  useEffect(() => {
+    clearOfflineOutbox();
+  }, []);
 
   useEffect(() => {
     const retryPendingWrites = () => { void flushSyncOutbox().catch((error) => console.warn('Outbox retry notice:', error)); };

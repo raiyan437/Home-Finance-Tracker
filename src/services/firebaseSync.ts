@@ -90,6 +90,12 @@ export const MAX_OUTBOX_RETRIES = 5;
 const RETRY_BASE_DELAY_MS = 2_000;
 const RETRY_MAX_DELAY_MS = 5 * 60_000;
 
+// Production Firebase is the canonical data source. The durable local outbox
+// remains available to development/tests for exercising the legacy recovery
+// helpers, but a production build must never turn a transient cloud failure
+// into an indefinitely queued write.
+const ONLINE_ONLY_SYNC = isFirebaseConfigured && import.meta.env.PROD;
+
 let flushPromise: Promise<void> | null = null;
 let mutationSequence = 0;
 const syncSubscribers = new Set<(state: SyncState) => void>();
@@ -112,6 +118,10 @@ const safeMessageFor = (kind: SyncErrorKind, code: string): string => {
   const normalized = codeWithoutNamespace(code);
   if (kind === 'auth') return 'Your session needs attention. Sign in again to continue syncing.';
   if (kind === 'retryable') {
+    if (ONLINE_ONLY_SYNC) {
+      if (normalized === 'deadline-exceeded') return 'The cloud service took too long to respond. Your change was not saved. Try again when the connection is stable.';
+      return 'The cloud service is temporarily unavailable. Your change was not saved. Try again when the connection is stable.';
+    }
     if (normalized === 'deadline-exceeded') return 'The cloud service took too long to respond. Your change is queued.';
     return 'The cloud service is temporarily unavailable. Your change is queued.';
   }
@@ -236,6 +246,7 @@ const normalizeStoredMutation = (value: unknown, legacy = false): PendingMutatio
 };
 
 export const readOutbox = (): PendingMutation[] => {
+  if (ONLINE_ONLY_SYNC) return [];
   const current = readRawOutbox(OUTBOX_KEY)
     .map((item) => normalizeStoredMutation(item))
     .filter((item): item is PendingMutation => Boolean(item));
@@ -254,7 +265,23 @@ export const readOutbox = (): PendingMutation[] => {
 };
 
 const writeOutbox = (items: PendingMutation[]): void => {
-  if (typeof localStorage !== 'undefined') localStorage.setItem(OUTBOX_KEY, JSON.stringify(items));
+  if (!ONLINE_ONLY_SYNC && typeof localStorage !== 'undefined') localStorage.setItem(OUTBOX_KEY, JSON.stringify(items));
+};
+
+/**
+ * Removes queued mutations from older builds. Production intentionally does
+ * not retain offline writes; callers must retry a failed cloud write while
+ * online so the optimistic UI can roll back safely when it is rejected.
+ */
+export const clearOfflineOutbox = (): void => {
+  if (!ONLINE_ONLY_SYNC) return;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(OUTBOX_KEY);
+    localStorage.removeItem(LEGACY_OUTBOX_KEY);
+  }
+  lastStatusByUid.clear();
+  lastErrorByUid.clear();
+  publishSyncState();
 };
 
 export const getOutboxSnapshot = (userUid?: string, houseId?: string): PendingMutation[] => readOutbox().filter((item) => (
@@ -358,6 +385,17 @@ const setLastStatus = (uid: string, status: UserSyncStatus, error?: SyncErrorInf
 export const getSyncState = (userUid?: string): SyncState => {
   const uid = userUid || currentUserUid();
   if (!uid) return { status: 'synced', pendingCount: 0, failedCount: 0, canRetry: false };
+  if (ONLINE_ONLY_SYNC) {
+    const lastStatus = lastStatusByUid.get(uid);
+    const lastError = lastErrorByUid.get(uid);
+    if (lastStatus === 'auth-required' && lastError) {
+      return { status: 'auth-required', pendingCount: 0, failedCount: 0, message: lastError.userMessage, canRetry: false };
+    }
+    if (lastStatus === 'failed' && lastError) {
+      return { status: 'failed', pendingCount: 0, failedCount: 0, message: lastError.userMessage, canRetry: false };
+    }
+    return { status: 'synced', pendingCount: 0, failedCount: 0, canRetry: false };
+  }
   const scoped = getOutboxSnapshot(uid);
   const pendingCount = scoped.filter((item) => item.status === 'pending').length;
   const failed = scoped.filter((item) => item.status === 'failed');
@@ -456,31 +494,41 @@ const performMutation = async (mutation: PendingMutation): Promise<void> => {
 };
 
 const syncMutation = async (input: Omit<MutationInput, 'userUid'>, requestedUid?: string): Promise<SyncResult> => {
-  if (!isFirebaseConfigured || !db) return resultFor('disabled');
+  if (!isFirebaseConfigured) return resultFor('disabled');
   const uid = requestedUid || currentUserUid();
   if (!uid) {
     const error = classifyFirebaseError({ code: 'unauthenticated' });
     return resultFor('auth-required', undefined, error);
   }
+  if (!db) {
+    const error = classifyFirebaseError({ code: 'unavailable' });
+    setLastStatus(uid, 'failed', error);
+    return resultFor('failed', undefined, error);
+  }
   const mutation = makeMutation({ ...input, userUid: uid });
-  // Put the optimistic mutation in the outbox before the network call so a
-  // realtime snapshot that arrives during the write cannot erase local state.
-  enqueueMutation(mutation);
+  // The production build is online-only. Development/test builds retain the
+  // old outbox path so the recovery helpers stay covered without allowing a
+  // live deployment to accumulate local writes.
+  if (!ONLINE_ONLY_SYNC) enqueueMutation(mutation);
   setLastStatus(uid, 'saving');
   try {
     await performMutation(mutation);
-    removeStoredMutation(mutation);
+    if (!ONLINE_ONLY_SYNC) removeStoredMutation(mutation);
     setLastStatus(uid, 'synced');
     return resultFor('synced', mutation.key);
   } catch (error) {
     const classified = classifyFirebaseError(error);
-    const stored = enqueueMutation(mutation, classified);
-    if (classified.kind === 'retryable') {
-      setLastStatus(uid, 'offline-queued', classified);
-      return resultFor('queued', stored.key, classified);
+    if (!ONLINE_ONLY_SYNC) {
+      const stored = enqueueMutation(mutation, classified);
+      if (classified.kind === 'retryable') {
+        setLastStatus(uid, 'offline-queued', classified);
+        return resultFor('queued', stored.key, classified);
+      }
+      setLastStatus(uid, classified.kind === 'auth' ? 'auth-required' : 'failed', classified);
+      return resultFor(classified.kind === 'auth' ? 'auth-required' : 'failed', stored.key, classified);
     }
     setLastStatus(uid, classified.kind === 'auth' ? 'auth-required' : 'failed', classified);
-    return resultFor(classified.kind === 'auth' ? 'auth-required' : 'failed', stored.key, classified);
+    return resultFor(classified.kind === 'auth' ? 'auth-required' : 'failed', mutation.key, classified);
   }
 };
 
@@ -750,7 +798,7 @@ const flushOne = async (mutation: PendingMutation, force: boolean): Promise<'suc
 };
 
 export const flushSyncOutbox = async (force = false): Promise<void> => {
-  if (!isFirebaseConfigured || !db || flushPromise) return flushPromise ?? Promise.resolve();
+  if (ONLINE_ONLY_SYNC || !isFirebaseConfigured || !db || flushPromise) return flushPromise ?? Promise.resolve();
   const uid = currentUserUid();
   if (!uid) return;
   flushPromise = (async () => {
@@ -768,6 +816,7 @@ export const flushSyncOutbox = async (force = false): Promise<void> => {
 
 /** Retries only queued transport/session failures; permanent failures stay failed. */
 export const retryFailedSyncMutations = async (): Promise<void> => {
+  if (ONLINE_ONLY_SYNC) return;
   const uid = currentUserUid();
   if (!uid) return;
   const next = readOutbox().map((item) => (

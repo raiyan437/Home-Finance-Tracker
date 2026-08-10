@@ -34,6 +34,12 @@ Record only reusable, evidence-backed lessons. Include the date and affected are
 - Evidence: GitHub Actions run `31386907276` completed successfully, and both Vercel and GitHub Pages served `assets/index-CMBD4i2S.js` after deployment.
 - Consequence: Verify both deployment paths after production fixes because the repository maintains independent Vercel and GitHub Pages delivery paths.
 
+## 2026-08-10 ? Production online-only sync policy
+- DECISION: Configured production Firebase builds are online-only. They clear the current and legacy browser outbox at startup, never enqueue new transport failures, and roll back optimistic changes when the cloud write is not confirmed.
+- FACT: The live `offline, queued 2` state was caused by two durable local outbox records, not by the current Firestore snapshot status. The previous fix correctly removed stale labels only after the outbox was empty, so the records themselves kept the label alive.
+- Evidence: `src/services/firebaseSync.ts` now guards the outbox and retry paths with `import.meta.env.PROD`, and `src/App.tsx` calls `clearOfflineOutbox()` before startup retry/listener effects. `npm test` (55 tests), `npx tsc -b`, `npm run lint`, `npm run build`, and a production-preview HTTP smoke check passed.
+- Consequence: Production financial state stays cloud-canonical and a hard refresh cannot resurrect a local queued status. A transient outage is surfaced as a failed action requiring an explicit retry; it is not silently persisted in browser storage.
+
 ## Entry template
 
 ```text
