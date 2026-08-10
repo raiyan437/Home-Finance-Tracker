@@ -1,6 +1,6 @@
 # AI project memory
 
-Last verified: 2026-08-10 against the production-recovery working tree. Reverify changed areas before relying on this file.
+Last verified: 2026-08-10 against production recovery commit `ed952cc`. Reverify changed areas before relying on this file.
 
 ## Verified facts
 
