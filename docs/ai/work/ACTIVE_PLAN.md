@@ -8,6 +8,8 @@ The production permission incident has two verified root causes. The leader's le
 
 The identity graph is healthy for all current roster members: every roster UID has a Firebase Auth account and canonical profile, and profile/roster house links agree. One unrelated orphan profile exists outside the current roster and is deliberately left untouched.
 
+Commit `f0f958b` is deployed. Both documented production hosts return HTTP 200 and serve `assets/index-Cjci64QM.js`; the Vercel public shell renders without captured console errors. Authenticated acceptance remains pending because the user's session is not available to automation.
+
 Classification: **Critical / AIDOS L3**. Recommended route: strongest available engineering model with deep reasoning and full auth/Rules/data/deployment context.
 
 ## Phase 1 - Capture decisive evidence
@@ -36,8 +38,8 @@ Classification: **Critical / AIDOS L3**. Recommended route: strongest available 
 
 1. [completed] Passed 60 frontend tests, 19 Rules tests, 10 backend tests, type-check, lint, build, and production-preview browser verification.
 2. [completed] Used the fresh private production backup and read-only identity/schema audits; no destructive repair is required.
-3. [in_progress] Commit and push `main`; no Rules deployment is required.
-4. [pending] Verify GitHub Pages and Vercel serve the new bundle and have no public runtime errors.
+3. [completed] Committed and pushed `f0f958b` to `main`; no Rules deployment was required.
+4. [completed] Verified GitHub Pages and Vercel serve the same new bundle; the production public shell is clean.
 
 Rollback: redeploy the prior Rules revision and revert the client release commit. Never delete production data to hide a permission failure.
 
