@@ -29,6 +29,11 @@ Record only reusable, evidence-backed lessons. Include the date and affected are
 - Evidence: The production bundle previously served both documented hosts with the earlier queue fix, while the new regression tests cover stale-status clearing and authoritative snapshot acknowledgement.
 - Consequence: Never display a transport status after its durable queue is empty, and reconcile only non-cache, non-pending-write snapshots so local optimistic data is not discarded prematurely.
 
+## 2026-08-10 ? Production deployment verification
+- FACT: Commit `1097661` deployed successfully to both documented production hosts.
+- Evidence: GitHub Actions run `31386907276` completed successfully, and both Vercel and GitHub Pages served `assets/index-CMBD4i2S.js` after deployment.
+- Consequence: Verify both deployment paths after production fixes because the repository maintains independent Vercel and GitHub Pages delivery paths.
+
 ## Entry template
 
 ```text
