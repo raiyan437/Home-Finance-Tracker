@@ -185,7 +185,7 @@ export const PersonalWalletPage: React.FC<PersonalWalletProps> = ({
           type: paymentType,
           cardId: paymentType === 'card' ? (selectedCardId || userCards[0]?.id) : undefined,
         },
-        notes: notes.trim(),
+        notes: notes.trim() || undefined,
       },
       editingExp ? editingExp.id : undefined
     );

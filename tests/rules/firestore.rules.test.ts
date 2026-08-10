@@ -307,6 +307,11 @@ describe('expense, comment, and card authorization', () => {
       paidBy: 'member', shares: [{ userId: 'member', amountCents: 1000 }], participantUids: ['member'],
     });
     await assertSucceeds(setDoc(doc(ownerDb, 'expenses/personal-1'), personal));
+    await assertFails(setDoc(doc(ownerDb, 'expenses/personal-empty-notes'), {
+      ...personal,
+      id: 'personal-empty-notes',
+      notes: '',
+    }));
     await assertFails(getDoc(doc(dbFor('leader'), 'expenses/personal-1')));
     await assertFails(setDoc(doc(dbFor('leader'), 'expenses/forged'), makeExpense({ id: 'forged', scope: 'personal', ownerId: 'member', houseId: undefined })));
     await assertFails(setDoc(doc(ownerDb, 'expenses/bad-date'), makeExpense({ id: 'bad-date', date: '2026-02-29' })));
@@ -348,6 +353,30 @@ describe('expense, comment, and card authorization', () => {
         cashOpeningAt: 'not-a-timestamp',
       },
     }));
+  });
+
+  it('reproduces a legacy oversized avatar without conflating wallet and ledger authorization', async () => {
+    const oversizedAvatar = `data:image/webp;base64,${'a'.repeat(351_000)}`;
+    const legacyMembers = [
+      { ...member('leader', 'leader'), avatar: oversizedAvatar },
+      member('member'),
+    ];
+    await withAdminDb(async (admin) => {
+      const batch = writeBatch(admin);
+      batch.update(doc(admin, 'users/leader'), { avatar: oversizedAvatar });
+      batch.update(doc(admin, 'houses/house-1'), {
+        members: legacyMembers,
+        memberMap: Object.fromEntries(legacyMembers.map((item) => [item.uid, item])),
+      });
+      await batch.commit();
+    });
+
+    await assertFails(updateDoc(doc(dbFor('leader'), 'users/leader'), {
+      walletSettings: { monthlyBudgetCents: 50_000, updatedAt: now },
+    }));
+    await assertSucceeds(commitLedgerWrite('leader', 'expense-legacy-avatar', makeExpense({
+      id: 'expense-legacy-avatar',
+    }), 1));
   });
 });
 

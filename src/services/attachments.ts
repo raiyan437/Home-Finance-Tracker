@@ -6,6 +6,7 @@ export type AttachmentKind = 'avatars' | 'receipts' | 'settlement-proofs';
 const CLOUD_MAX_BYTES = 5 * 1024 * 1024;
 const OFFLINE_MAX_BYTES = 300 * 1024;
 const PROFILE_PHOTO_MAX_BYTES = 28 * 1024;
+export const FIRESTORE_PROFILE_AVATAR_MAX_CHARS = 40_000;
 const UPLOAD_TIMEOUT_MS = 20_000;
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -89,6 +90,28 @@ export const prepareProfilePhoto = async (file: File): Promise<File> => {
   } finally {
     URL.revokeObjectURL(imageUrl);
   }
+};
+
+export const profilePhotoNeedsNormalization = (avatarUrl?: string): boolean => (
+  Boolean(avatarUrl?.startsWith('data:image/') && avatarUrl.length > FIRESTORE_PROFILE_AVATAR_MAX_CHARS)
+);
+
+/**
+ * Re-encodes legacy inline avatars that predate the current Firestore-safe
+ * profile-photo limit. HTTPS avatars and already-compact data URLs are left
+ * untouched.
+ */
+export const normalizeStoredProfilePhoto = async (avatarUrl: string): Promise<string> => {
+  if (!profilePhotoNeedsNormalization(avatarUrl)) return avatarUrl;
+
+  const response = await fetch(avatarUrl);
+  const blob = await response.blob();
+  if (!SUPPORTED_IMAGE_TYPES.has(blob.type.toLowerCase())) {
+    throw new Error('The saved profile photo format is not supported.');
+  }
+
+  const prepared = await prepareProfilePhoto(new File([blob], 'legacy-profile-photo.webp', { type: blob.type }));
+  return asDataUrl(prepared);
 };
 
 export const saveAttachment = async (file: File, kind: AttachmentKind, houseId?: string): Promise<string> => {

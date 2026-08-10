@@ -40,6 +40,7 @@ import {
 } from 'firebase/auth';
 import { createId } from '../utils/ids';
 import { getSparkHouseRosterRepair } from '../features/sparkLedger';
+import { normalizeStoredProfilePhoto, profilePhotoNeedsNormalization } from '../services/attachments';
 
 interface AuthContextType {
   activeUserId: UserId;
@@ -144,6 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const houseRefreshVersionRef = useRef(0);
   const houseSnapshotVersionRef = useRef(0);
   const profileLoadVersionRef = useRef(0);
+  const legacyAvatarRepairRef = useRef(new Set<string>());
+  const updateUserProfilePhotoRef = useRef<((avatarUrl: string | null) => Promise<void>) | null>(null);
   const dbUserProfileRef = useRef(dbUserProfile);
   dbUserProfileRef.current = dbUserProfile;
 
@@ -822,6 +825,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   };
+  updateUserProfilePhotoRef.current = updateUserProfilePhoto;
+
+  useEffect(() => {
+    const profile = dbUserProfileRef.current;
+    const avatarUrl = profile?.avatar;
+    const updateProfilePhoto = updateUserProfilePhotoRef.current;
+    if (!profile || !avatarUrl || !updateProfilePhoto || !profilePhotoNeedsNormalization(avatarUrl)) return;
+
+    const repairKey = `${profile.uid}:${avatarUrl.length}`;
+    if (legacyAvatarRepairRef.current.has(repairKey)) return;
+    legacyAvatarRepairRef.current.add(repairKey);
+    const sessionVersion = sessionVersionRef.current;
+
+    void normalizeStoredProfilePhoto(avatarUrl)
+      .then(async (normalizedAvatarUrl) => {
+        if (!isSessionCurrent(sessionVersion, profile.uid) || dbUserProfileRef.current?.uid !== profile.uid) return;
+        await updateProfilePhoto(normalizedAvatarUrl);
+      })
+      .catch((error) => {
+        legacyAvatarRepairRef.current.delete(repairKey);
+        console.warn('Legacy profile photo normalization notice:', error);
+      });
+  }, [dbUserProfile?.uid, dbUserProfile?.avatar]);
 
   const updatePersonalWalletSettings = async (settings: Partial<PersonalWalletSettings>) => {
     if (!dbUserProfile) throw new Error('You must be logged in to update wallet settings.');
