@@ -40,6 +40,7 @@ import {
   getSyncState,
   getPendingProfileOverlay,
   mergePending,
+  reconcilePendingMutations,
   MAX_OUTBOX_RETRIES,
   readOutbox,
   syncSaveCard,
@@ -173,6 +174,30 @@ describe('Firebase sync reliability policy', () => {
     expect(setDocMock).toHaveBeenCalledTimes(2);
     expect(readOutbox()).toHaveLength(0);
     expect(getSyncState('user-a').status).toBe('synced');
+  });
+
+  it('clears a stale pending mutation when an authoritative snapshot already contains it', () => {
+    const card: PaymentCard = { id: 'card-1', bankName: 'Bank', color: '#000', createdAt: now, ownerId: 'user-a' };
+    localStorage.setItem('home_finance_sync_outbox_v2', JSON.stringify([
+      outboxItem({
+        key: 'user-a/-/cards/card-1/document',
+        collection: 'cards',
+        id: card.id,
+        houseId: undefined,
+        data: card as unknown as Record<string, unknown>,
+      }),
+    ]));
+
+    expect(reconcilePendingMutations('cards', [card], 'user-a', null)).toBe(1);
+    expect(readOutbox()).toEqual([]);
+    expect(getSyncState('user-a').status).toBe('synced');
+  });
+
+  it('does not keep a stale offline label after the outbox is empty', async () => {
+    setDocMock.mockRejectedValueOnce({ code: 'unavailable' });
+    await syncSaveCard({ id: 'card-1', bankName: 'Bank', color: '#000', createdAt: now, ownerId: 'user-a' });
+    localStorage.setItem('home_finance_sync_outbox_v2', '[]');
+    expect(getSyncState('user-a')).toMatchObject({ status: 'synced', pendingCount: 0, failedCount: 0 });
   });
 
   it('does not retry permission-denied writes and reports a failed state', async () => {

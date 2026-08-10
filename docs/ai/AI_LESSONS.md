@@ -23,6 +23,12 @@ Record only reusable, evidence-backed lessons. Include the date and affected are
 - Evidence: `src/services/firebaseSync.ts`, `src/App.tsx`, and the regression coverage in `src/services/firebaseSync.test.ts`; full frontend tests and production build passed.
 - Consequence: Preserve account/house filtering in all snapshot merges and invoke retry logic after the authenticated profile is ready.
 
+## 2026-08-10 ? Stale sync status reconciliation
+- FACT: `getSyncState()` must derive `offline-queued` from live pending outbox records; remembered in-memory transport status can outlive a successful write or browser session.
+- FACT: Authoritative Firestore snapshots can confirm a queued mutation that was committed before the client crashed or lost its final callback.
+- Evidence: The production bundle previously served both documented hosts with the earlier queue fix, while the new regression tests cover stale-status clearing and authoritative snapshot acknowledgement.
+- Consequence: Never display a transport status after its durable queue is empty, and reconcile only non-cache, non-pending-write snapshots so local optimistic data is not discarded prematurely.
+
 ## Entry template
 
 ```text

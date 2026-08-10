@@ -361,13 +361,16 @@ export const getSyncState = (userUid?: string): SyncState => {
   const scoped = getOutboxSnapshot(uid);
   const pendingCount = scoped.filter((item) => item.status === 'pending').length;
   const failed = scoped.filter((item) => item.status === 'failed');
-  const lastError = failed[failed.length - 1]?.lastError || lastErrorByUid.get(uid);
+  const lastError = failed[failed.length - 1]?.lastError || (pendingCount > 0 ? lastErrorByUid.get(uid) : undefined);
   const canRetry = failed.some((item) => item.lastError?.kind === 'retryable' || item.lastError?.kind === 'auth');
-  if (lastStatusByUid.get(uid) === 'saving') return { status: 'saving', pendingCount, failedCount: failed.length, canRetry };
+  if (pendingCount > 0 && lastStatusByUid.get(uid) === 'saving') return { status: 'saving', pendingCount, failedCount: failed.length, canRetry };
   if (lastError?.kind === 'auth') return { status: 'auth-required', pendingCount, failedCount: failed.length, message: lastError.userMessage, canRetry };
   if (failed.length > 0) return { status: 'failed', pendingCount, failedCount: failed.length, message: lastError?.userMessage, canRetry };
   if (pendingCount > 0) return { status: 'offline-queued', pendingCount, failedCount: 0, message: 'Changes are saved locally and queued for cloud sync.', canRetry: true };
-  return { status: lastStatusByUid.get(uid) || 'synced', pendingCount: 0, failedCount: 0, canRetry: false };
+  // A remembered transport status is only meaningful while its outbox record
+  // still exists. Once the queue is empty, the durable state is synced even if
+  // the previous tab/session did not publish its final success event.
+  return { status: 'synced', pendingCount: 0, failedCount: 0, canRetry: false };
 };
 
 export const subscribeSyncState = (onUpdate: (state: SyncState) => void): (() => void) => {
@@ -658,6 +661,58 @@ const applyPendingToCollection = <T extends { id: string }>(collectionName: Sync
   return [...byId.values()];
 };
 
+const serializedValue = (value: unknown): string => JSON.stringify(sanitizeForFirestore(value));
+
+const pendingMutationMatchesCloud = (mutation: PendingMutation, cloudItem?: Record<string, unknown>): boolean => {
+  if (mutation.operation === 'delete') return !cloudItem;
+  if (!cloudItem) return false;
+
+  if (mutation.mutationType === 'comment-add' && mutation.data?.comment) {
+    const comment = mutation.data.comment as Record<string, unknown>;
+    return Array.isArray(cloudItem.comments)
+      && cloudItem.comments.some((item) => isRecord(item) && item.id === comment.id
+        && Object.entries(comment).every(([key, value]) => serializedValue(item[key]) === serializedValue(value)));
+  }
+  if (mutation.mutationType === 'comment-delete') {
+    return !Array.isArray(cloudItem.comments) || !cloudItem.comments.some((item) => isRecord(item) && item.id === mutation.data?.commentId);
+  }
+  if (mutation.collection === 'settlements' && mutation.data?.status === 'reversed') {
+    return cloudItem.status === 'reversed' && cloudItem.reversedBy === mutation.data.reversedBy;
+  }
+  if (!mutation.data) return false;
+  return Object.entries(mutation.data).every(([key, value]) => serializedValue(cloudItem[key]) === serializedValue(value));
+};
+
+/** Removes pending records already confirmed by an authoritative cloud snapshot. */
+export const reconcilePendingMutations = <T extends { id: string }>(
+  collectionName: SyncCollection,
+  cloudItems: T[],
+  userUid?: string,
+  houseId?: string | null,
+): number => {
+  const uid = userUid || currentUserUid() || undefined;
+  const pending = readOutbox()
+    .filter((item) => item.collection === collectionName && item.status === 'pending')
+    .filter((item) => !uid || item.userUid === uid)
+    .filter((item) => houseId === undefined
+      ? true
+      : houseId === null
+        ? !item.houseId
+        : item.houseId === houseId);
+  const cloudById = new Map(cloudItems.map((item) => [item.id, item as unknown as Record<string, unknown>]));
+  const acknowledged = pending.filter((item) => pendingMutationMatchesCloud(item, cloudById.get(item.id)));
+  if (acknowledged.length === 0) return 0;
+
+  const acknowledgedKeys = new Set(acknowledged.map((item) => `${item.key}:${item.mutationVersion}`));
+  writeOutbox(readOutbox().filter((item) => !acknowledgedKeys.has(`${item.key}:${item.mutationVersion}`)));
+  if (uid) {
+    const hasPendingForUser = readOutbox().some((item) => item.userUid === uid && item.status === 'pending');
+    if (!hasPendingForUser) setLastStatus(uid, 'synced');
+    else publishSyncState(uid);
+  }
+  return acknowledged.length;
+};
+
 export const mergePending = <T extends { id: string }>(collectionName: SyncCollection, cloudItems: T[], userUid?: string, houseId?: string | null): T[] => (
   applyPendingToCollection(collectionName, cloudItems, userUid || currentUserUid() || undefined, houseId)
 );
@@ -843,7 +898,13 @@ export const subscribeHouse = (
   try {
     return onSnapshot(
       doc(db, 'houses', houseId),
-      (snapshot) => onUpdate(snapshot.exists() ? mergePending('houses', [snapshot.data() as House], currentUserUid() || undefined, houseId)[0] || null : null),
+      (snapshot) => {
+        const list = snapshot.exists() ? [snapshot.data() as House] : [];
+        if (!snapshot.metadata || (!snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites)) {
+          reconcilePendingMutations('houses', list, currentUserUid() || undefined, houseId);
+        }
+        onUpdate(snapshot.exists() ? mergePending('houses', list, currentUserUid() || undefined, houseId)[0] || null : null);
+      },
       (error) => onError?.(error),
     );
   } catch (error) {
@@ -861,6 +922,9 @@ export const subscribeExpenses = (onUpdate: (expenses: Expense[]) => void, house
       (snapshot) => {
         const list: Expense[] = [];
         snapshot.forEach((item) => list.push(item.data() as Expense));
+        if (!snapshot.metadata || (!snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites)) {
+          reconcilePendingMutations('expenses', list, currentUserUid() || undefined, houseId);
+        }
         onUpdate(mergePending('expenses', list, currentUserUid() || undefined, houseId));
         void flushSyncOutbox().catch(() => undefined);
       },
@@ -880,6 +944,9 @@ export const subscribePersonalExpenses = (onUpdate: (expenses: Expense[]) => voi
       (snapshot) => {
         const list: Expense[] = [];
         snapshot.forEach((item) => list.push(item.data() as Expense));
+        if (!snapshot.metadata || (!snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites)) {
+          reconcilePendingMutations('expenses', list, ownerId, null);
+        }
         onUpdate(mergePending('expenses', list, ownerId, null));
         void flushSyncOutbox().catch(() => undefined);
       },
@@ -899,6 +966,9 @@ export const subscribeSettlements = (onUpdate: (settlements: Settlement[]) => vo
       (snapshot) => {
         const list: Settlement[] = [];
         snapshot.forEach((item) => list.push(item.data() as Settlement));
+        if (!snapshot.metadata || (!snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites)) {
+          reconcilePendingMutations('settlements', list, currentUserUid() || undefined, houseId);
+        }
         onUpdate(mergePending('settlements', list, currentUserUid() || undefined, houseId));
         void flushSyncOutbox().catch(() => undefined);
       },
@@ -924,6 +994,9 @@ export const subscribeCards = (
       (snapshot) => {
         const list: PaymentCard[] = [];
         snapshot.forEach((item) => list.push(item.data() as PaymentCard));
+        if (!snapshot.metadata || (!snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites)) {
+          reconcilePendingMutations('cards', list, ownerId || currentUserUid() || undefined, houseId);
+        }
         onUpdate(mergePending('cards', list, ownerId || currentUserUid() || undefined, houseId));
         void flushSyncOutbox().catch(() => undefined);
       },
