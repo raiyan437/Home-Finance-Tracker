@@ -631,7 +631,14 @@ const applyPendingToCollection = <T extends { id: string }>(collectionName: Sync
   const pending = readOutbox()
     .filter((item) => item.collection === collectionName && item.status === 'pending')
     .filter((item) => !userUid || item.userUid === userUid)
-    .filter((item) => houseId === undefined || item.houseId === houseId)
+    // `null` explicitly represents an unscoped (personal) listener. Keep
+    // household mutations out of personal snapshots while allowing pending
+    // personal writes to survive a cloud snapshot after re-authentication.
+    .filter((item) => houseId === undefined
+      ? true
+      : houseId === null
+        ? !item.houseId
+        : item.houseId === houseId)
     .sort((a, b) => a.mutationVersion - b.mutationVersion);
 
   for (const mutation of pending) {
@@ -873,7 +880,7 @@ export const subscribePersonalExpenses = (onUpdate: (expenses: Expense[]) => voi
       (snapshot) => {
         const list: Expense[] = [];
         snapshot.forEach((item) => list.push(item.data() as Expense));
-        onUpdate(mergePending('expenses', list, ownerId, undefined));
+        onUpdate(mergePending('expenses', list, ownerId, null));
         void flushSyncOutbox().catch(() => undefined);
       },
       () => undefined,

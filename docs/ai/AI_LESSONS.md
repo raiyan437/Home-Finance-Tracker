@@ -17,6 +17,12 @@ Record only reusable, evidence-backed lessons. Include the date and affected are
 - Consequence: Revalidate documented test accounts before relying on them for authenticated UI verification; do not create external Firebase accounts as an implicit testing workaround.
 - Failed approach: The repository's documented dummy login could not unlock the authenticated dashboard, so this run verified the responsive public shell plus lint, tests, type-check, and production build instead.
 
+## 2026-08-10 ? Offline queue re-authentication
+- FACT: Personal listeners must use an explicit unscoped house value when merging pending mutations; treating `null` as an exact house ID drops queued cards and can overwrite the local cache after a cloud snapshot.
+- FACT: Re-authentication must trigger outbox replay because the one-time startup retry can run before Firebase restores the signed-in session.
+- Evidence: `src/services/firebaseSync.ts`, `src/App.tsx`, and the regression coverage in `src/services/firebaseSync.test.ts`; full frontend tests and production build passed.
+- Consequence: Preserve account/house filtering in all snapshot merges and invoke retry logic after the authenticated profile is ready.
+
 ## Entry template
 
 ```text

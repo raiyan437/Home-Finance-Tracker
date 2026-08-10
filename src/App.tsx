@@ -169,6 +169,13 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('online', retryPendingWrites);
   }, []);
 
+  // A login can happen after the one-time startup retry already ran. Replay
+  // this account's queued/auth-blocked writes as soon as its profile is ready.
+  useEffect(() => {
+    if (!firebaseUser?.uid || !dbUserProfile?.uid || firebaseUser.uid !== dbUserProfile.uid) return;
+    void retryFailedSyncMutations().catch((error) => console.warn('Re-authenticated outbox retry notice:', error));
+  }, [dbUserProfile?.uid, firebaseUser?.uid]);
+
   useEffect(() => {
     setSyncState(getSyncState(currentUserId));
     return subscribeSyncState((nextState) => setSyncState(nextState));

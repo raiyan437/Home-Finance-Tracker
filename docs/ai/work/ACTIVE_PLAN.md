@@ -8,4 +8,4 @@ No Significant, Large, or Critical task is active.
 
 ## Plan
 
-The responsive soft-bento dashboard and application-shell refresh was completed on 2026-08-10. Implementation, validation, and the authenticated browser-test limitation are recorded in Git history and `AI_LESSONS.md`.
+The offline queue re-authentication fix was completed on 2026-08-10. It added explicit unscoped snapshot filtering, same-account replay after profile hydration, regression coverage, and full validation; the browser CLI was unavailable, so smoke validation used the local HTTP response.

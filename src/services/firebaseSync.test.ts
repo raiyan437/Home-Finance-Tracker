@@ -141,6 +141,28 @@ describe('Firebase sync reliability policy', () => {
     expect(mergePending('expenses', [personalExpense({ scope: 'household', houseId: 'house-1' })], 'user-a', 'house-1').map((item) => item.id)).toEqual(['expense-1']);
   });
 
+  it('keeps unscoped pending records visible after a cloud snapshot and excludes household work', () => {
+    const card: PaymentCard = { id: 'card-1', bankName: 'Bank', color: '#000', createdAt: now, ownerId: 'user-a' };
+    localStorage.setItem('home_finance_sync_outbox_v2', JSON.stringify([
+      outboxItem({
+        key: 'user-a/-/cards/card-1/document',
+        collection: 'cards',
+        id: card.id,
+        houseId: undefined,
+        data: card as unknown as Record<string, unknown>,
+      }),
+      outboxItem({
+        key: 'user-a/house-1/expenses/expense-2/document',
+        id: 'expense-2',
+        houseId: 'house-1',
+        data: asData(personalExpense({ id: 'expense-2', scope: 'household', houseId: 'house-1' })),
+      }),
+    ]));
+
+    expect(mergePending('cards', [], 'user-a', null)).toEqual([card]);
+    expect(mergePending<Expense>('expenses', [], 'user-a', null).map((item) => item.id)).toEqual([]);
+  });
+
   it('queues a temporary save and replays it after connectivity returns', async () => {
     setDocMock.mockRejectedValueOnce({ code: 'unavailable' });
     const queued = await syncSaveExpense(personalExpense());
